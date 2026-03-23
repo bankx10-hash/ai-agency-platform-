@@ -11,8 +11,9 @@ COPY tsconfig.base.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/api/tsconfig.json ./apps/api/
 
-# Copy shared package
+# Copy shared package (two locations: root for tsconfig include, apps/ for relative import resolution)
 COPY packages/shared/ ./packages/shared/
+COPY packages/shared/ ./apps/packages/shared/
 
 # Copy Prisma schema
 COPY prisma/ ./prisma/
