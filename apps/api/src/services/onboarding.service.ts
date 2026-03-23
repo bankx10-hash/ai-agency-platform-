@@ -40,36 +40,6 @@ export class OnboardingService {
     logger.info('Onboarding completed', { clientId })
   }
 
-  private async createGHLSubAccount(client: {
-    id: string
-    businessName: string
-    email: string
-    phone?: string | null
-  }): Promise<{ locationId: string }> {
-    try {
-      const { locationId } = await ghlService.createSubAccount({
-        name: client.businessName,
-        email: client.email,
-        phone: client.phone || undefined
-      })
-
-      await prisma.client.update({
-        where: { id: client.id },
-        data: {
-          ghlLocationId: locationId,
-          ghlSubAccountId: locationId
-        }
-      })
-
-      logger.info('GHL sub-account created and saved', { clientId: client.id, locationId })
-
-      return { locationId }
-    } catch (error) {
-      logger.error('Failed to create GHL sub-account', { clientId: client.id, error })
-      throw error
-    }
-  }
-
   private async deployAgentsByPlan(
     clientId: string,
     plan: Plan,
