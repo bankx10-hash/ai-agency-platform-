@@ -52,6 +52,27 @@ router.post('/start', async (req: Request, res: Response): Promise<void> => {
           data: { startedAt: new Date().toISOString() }
         }
       })
+    } else {
+      // Reset so a retry can run cleanly
+      await prisma.onboarding.update({
+        where: { clientId },
+        data: {
+          step: 1,
+          status: 'IN_PROGRESS',
+          completedAt: null,
+          data: { startedAt: new Date().toISOString() }
+        }
+      })
+    }
+
+    // Remove any existing stale job with this ID so Bull accepts the new one
+    try {
+      const existingJob = await onboardingQueue.getJob(`onboarding-${clientId}`)
+      if (existingJob) {
+        await existingJob.remove()
+      }
+    } catch {
+      // Ignore — job may already be gone
     }
 
     await onboardingQueue.add(
@@ -71,6 +92,37 @@ router.post('/start', async (req: Request, res: Response): Promise<void> => {
     res.json({ message: 'Onboarding started', clientId })
   } catch (error) {
     logger.error('Error starting onboarding', { error })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.post('/:clientId/reset', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { clientId } = req.params
+    if (req.clientId !== clientId) {
+      res.status(403).json({ error: 'Forbidden' })
+      return
+    }
+
+    await prisma.onboarding.update({
+      where: { clientId },
+      data: { step: 1, status: 'IN_PROGRESS', completedAt: null, data: { startedAt: new Date().toISOString() } }
+    })
+
+    try {
+      const existingJob = await onboardingQueue.getJob(`onboarding-${clientId}`)
+      if (existingJob) await existingJob.remove()
+    } catch { /* ignore */ }
+
+    await onboardingQueue.add(
+      { clientId },
+      { attempts: 3, backoff: { type: 'exponential', delay: 5000 }, jobId: `onboarding-${clientId}` }
+    )
+
+    logger.info('Onboarding reset and re-queued', { clientId })
+    res.json({ message: 'Onboarding reset successfully' })
+  } catch (error) {
+    logger.error('Error resetting onboarding', { error })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
