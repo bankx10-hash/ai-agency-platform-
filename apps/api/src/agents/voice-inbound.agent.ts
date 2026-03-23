@@ -69,7 +69,7 @@ Respond naturally as if in a real phone conversation.`
       'You are an expert at creating AI voice agent prompts for businesses. Make them sound completely human.'
     )
 
-    let blandAgentId: string | undefined
+    let retellAgentId: string | undefined
     let phoneNumber: string | undefined
 
     try {
@@ -83,12 +83,12 @@ Respond naturally as if in a real phone conversation.`
         calendarWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-calendar-${clientId}`
       })
 
-      blandAgentId = voiceResult.agentId
+      retellAgentId = voiceResult.agentId
       phoneNumber = voiceResult.phoneNumber
 
-      logger.info('Bland.ai inbound agent created', { clientId, blandAgentId, phoneNumber })
+      logger.info('Retell AI inbound agent created', { clientId, retellAgentId, phoneNumber })
     } catch (error) {
-      logger.warn('Failed to create Bland.ai agent', { clientId, error })
+      logger.warn('Failed to create Retell AI agent', { clientId, error })
     }
 
     let workflowResult: { workflowId: string } | undefined
@@ -100,6 +100,7 @@ Respond naturally as if in a real phone conversation.`
         agentPrompt: voicePrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-inbound-${clientId}`,
         phoneNumber,
+        retellAgentId,
         calendarId: typedConfig.calendar_id,
         businessName: typedConfig.businessName
       })
@@ -113,15 +114,15 @@ Respond naturally as if in a real phone conversation.`
         ...typedConfig,
         generatedPrompt: voicePrompt,
         phone_number: phoneNumber,
-        bland_agent_id: blandAgentId
+        retell_agent_id: retellAgentId
       },
       workflowResult?.workflowId
     )
 
-    if (blandAgentId) {
+    if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { blandAgentId }
+        data: { retellAgentId }
       })
     }
 

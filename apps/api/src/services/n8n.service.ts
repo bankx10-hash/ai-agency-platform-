@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios'
 import fs from 'fs'
 import path from 'path'
+import { randomUUID } from 'crypto'
 import { logger } from '../utils/logger'
 import { WorkflowDeployConfig, WorkflowDeployResult, WorkflowStatus } from '../../../../packages/shared/types/workflow.types'
 
@@ -9,11 +10,7 @@ export class N8NService {
 
   constructor() {
     const baseURL = process.env.N8N_BASE_URL || 'http://localhost:5678'
-    const apiKey = process.env.N8N_API_KEY
-
-    if (!apiKey) {
-      throw new Error('N8N_API_KEY environment variable is not set')
-    }
+    const apiKey = process.env.N8N_API_KEY || ''
 
     this.client = axios.create({
       baseURL: `${baseURL}/api/v1`,
@@ -59,6 +56,7 @@ export class N8NService {
       '{{AGENT_PROMPT}}': config.agentPrompt.replace(/\\/g, '\\\\').replace(/"/g, '\\"'),
       '{{WEBHOOK_URL}}': config.webhookUrl || '',
       '{{PHONE_NUMBER}}': config.phoneNumber || '',
+      '{{RETELL_AGENT_ID}}': config.retellAgentId || '',
       '{{CALENDAR_ID}}': config.calendarId || '',
       '{{PIPELINE_ID}}': config.pipelineId || '',
       '{{API_KEY}}': config.apiKey || '',
@@ -73,25 +71,55 @@ export class N8NService {
     return JSON.parse(workflowStr)
   }
 
+  private assignNodeUUIDs(workflow: Record<string, unknown>): Record<string, unknown> {
+    const nodes = (workflow.nodes as Array<Record<string, unknown>>) || []
+    const idMap: Record<string, string> = {}
+
+    // Assign proper UUIDs to all nodes
+    const updatedNodes = nodes.map((node) => {
+      const newId = randomUUID()
+      idMap[node.id as string] = newId
+      return { ...node, id: newId }
+    })
+
+    // Remap webhookId references if present
+    const remapped = updatedNodes.map((node) => {
+      if (node.webhookId && idMap[node.webhookId as string]) {
+        return { ...node, webhookId: idMap[node.webhookId as string] }
+      }
+      return node
+    })
+
+    return { ...workflow, nodes: remapped, pinData: {} }
+  }
+
   async deployWorkflow(
     templateName: string,
     clientConfig: WorkflowDeployConfig
   ): Promise<WorkflowDeployResult> {
+    if (!process.env.N8N_API_KEY) {
+      throw new Error('N8N_API_KEY is not configured')
+    }
+
     const template = this.loadWorkflowTemplate(templateName)
     const workflow = this.injectVariables(template, clientConfig)
+    const workflowWithUUIDs = this.assignNodeUUIDs(workflow)
 
     const workflowName = `[${clientConfig.clientId}] ${(workflow as { name?: string }).name || templateName}`
+
+    // Tags must not be included in the create payload — N8N API manages them separately
+    const { tags: _tags, ...workflowBody } = workflowWithUUIDs as Record<string, unknown>
     const deployPayload = {
-      ...workflow,
+      ...workflowBody,
       name: workflowName,
-      active: false,
-      tags: [clientConfig.clientId, templateName]
+      active: false
     }
 
     const createResponse = await this.client.post('/workflows', deployPayload)
     const workflowId = createResponse.data.id
 
-    await this.client.patch(`/workflows/${workflowId}/activate`)
+    // Activate uses POST not PATCH
+    await this.client.post(`/workflows/${workflowId}/activate`)
 
     logger.info('N8N workflow deployed', { workflowId, templateName, clientId: clientConfig.clientId })
 
@@ -103,12 +131,12 @@ export class N8NService {
   }
 
   async pauseWorkflow(workflowId: string): Promise<void> {
-    await this.client.patch(`/workflows/${workflowId}/deactivate`)
+    await this.client.post(`/workflows/${workflowId}/deactivate`)
     logger.info('N8N workflow paused', { workflowId })
   }
 
   async resumeWorkflow(workflowId: string): Promise<void> {
-    await this.client.patch(`/workflows/${workflowId}/activate`)
+    await this.client.post(`/workflows/${workflowId}/activate`)
     logger.info('N8N workflow resumed', { workflowId })
   }
 

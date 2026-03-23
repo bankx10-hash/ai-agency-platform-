@@ -31,7 +31,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
+            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
             { "name": "Version", "value": "2021-07-28" }
           ]
         },
@@ -39,7 +39,7 @@
         "queryParameters": {
           "parameters": [
             { "name": "locationId", "value": "{{LOCATION_ID}}" },
-            { "name": "query", "value": "stage:{{CLIENT_ID}}-outbound-queue" },
+            { "name": "query", "value": "stage:outbound-queue" },
             { "name": "limit", "value": "50" }
           ]
         }
@@ -47,23 +47,23 @@
     },
     {
       "id": "launch-outbound-call",
-      "name": "Launch Call via Bland.ai",
+      "name": "Launch Call via Retell AI",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [750, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.bland.ai/v1/calls",
+        "url": "https://api.retellai.com/v2/create-call",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "={{$env.BLAND_API_KEY}}" },
+            { "name": "Authorization", "value": "Bearer ={{$env.RETELL_API_KEY}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"phone_number\":$json.phone,\"agent_id\":\"{{PHONE_NUMBER}}\",\"request_data\":{\"firstName\":$json.firstName,\"lastName\":$json.lastName,\"company\":$json.companyName}}"
+        "jsonBody": "={\"agent_id\":\"{{RETELL_AGENT_ID}}\",\"to_number\":$json.phone,\"from_number\":\"{{PHONE_NUMBER}}\",\"metadata\":{\"contactId\":$json.id,\"firstName\":$json.firstName,\"lastName\":$json.lastName}}"
       }
     },
     {
@@ -80,17 +80,17 @@
     },
     {
       "id": "get-call-result",
-      "name": "Get Call Result",
+      "name": "Get Call Result from Retell",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 500],
       "parameters": {
         "method": "GET",
-        "url": "https://api.bland.ai/v1/calls/{{$json.call_id}}",
+        "url": "=`https://api.retellai.com/v2/get-call/${$json.call_id}`",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "={{$env.BLAND_API_KEY}}" }
+            { "name": "Authorization", "value": "Bearer ={{$env.RETELL_API_KEY}}" }
           ]
         }
       }
@@ -114,7 +114,17 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this outbound call outcome. Classify as: INTERESTED, CALLBACK, NOT_INTERESTED, VOICEMAIL, NO_ANSWER. Return JSON with outcome, nextAction, and followUpSMS. Transcript: \" + JSON.stringify($json.transcripts)}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this outbound call outcome. Classify as: INTERESTED, CALLBACK, NOT_INTERESTED, VOICEMAIL, NO_ANSWER. Return JSON with: outcome, nextAction, followUpSMS (message to send). Transcript: \" + $json.transcript}]}"
+      }
+    },
+    {
+      "id": "parse-outcome",
+      "name": "Parse Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 500],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content[0].text;\nlet result;\ntry { result = JSON.parse(text); } catch { result = { outcome: 'NO_ANSWER', nextAction: 'retry', followUpSMS: '' }; }\nconst contactId = $('Call Completed Webhook').first().json.metadata?.contactId || '';\nreturn [{ json: { ...result, contactId } }];"
       }
     },
     {
@@ -122,14 +132,14 @@
       "name": "Update GHL with Outcome",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 500],
+      "position": [1250, 500],
       "parameters": {
         "method": "PUT",
         "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.contactId}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
+            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
             { "name": "Version", "value": "2021-07-28" }
           ]
         },
@@ -143,14 +153,14 @@
       "name": "Send Follow-up SMS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1250, 500],
+      "position": [1500, 500],
       "parameters": {
         "method": "POST",
         "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
+            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
             { "name": "Version", "value": "2021-07-28" }
           ]
         },
@@ -165,15 +175,18 @@
       "main": [[{ "node": "Fetch Call List from GHL", "type": "main", "index": 0 }]]
     },
     "Fetch Call List from GHL": {
-      "main": [[{ "node": "Launch Call via Bland.ai", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Launch Call via Retell AI", "type": "main", "index": 0 }]]
     },
     "Call Completed Webhook": {
-      "main": [[{ "node": "Get Call Result", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Get Call Result from Retell", "type": "main", "index": 0 }]]
     },
-    "Get Call Result": {
+    "Get Call Result from Retell": {
       "main": [[{ "node": "Claude - Analyse Call Outcome", "type": "main", "index": 0 }]]
     },
     "Claude - Analyse Call Outcome": {
+      "main": [[{ "node": "Parse Outcome", "type": "main", "index": 0 }]]
+    },
+    "Parse Outcome": {
       "main": [[{ "node": "Update GHL with Outcome", "type": "main", "index": 0 }]]
     },
     "Update GHL with Outcome": {

@@ -89,7 +89,7 @@ Remember: Closing is about helping them make a decision that's right for them. B
       'You are an elite sales closer trainer. Create scripts that are authentic, ethical, and highly effective.'
     )
 
-    let blandAgentId: string | undefined
+    let retellAgentId: string | undefined
 
     try {
       const voiceResult = await voiceService.createOutboundAgent({
@@ -100,10 +100,10 @@ Remember: Closing is about helping them make a decision that's right for them. B
         businessName: typedConfig.businessName
       })
 
-      blandAgentId = voiceResult.agentId
-      logger.info('Bland.ai closer agent created', { clientId, blandAgentId })
+      retellAgentId = voiceResult.agentId
+      logger.info('Retell AI closer agent created', { clientId, retellAgentId })
     } catch (error) {
-      logger.warn('Failed to create Bland.ai closer agent', { clientId, error })
+      logger.warn('Failed to create Retell AI closer agent', { clientId, error })
     }
 
     let workflowResult: { workflowId: string } | undefined
@@ -114,6 +114,7 @@ Remember: Closing is about helping them make a decision that's right for them. B
         locationId: typedConfig.locationId,
         agentPrompt: closingScript,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-closer-${clientId}`,
+        retellAgentId,
         businessName: typedConfig.businessName
       })
     } catch (error) {
@@ -125,15 +126,15 @@ Remember: Closing is about helping them make a decision that's right for them. B
       {
         ...typedConfig,
         generatedScript: closingScript,
-        bland_agent_id: blandAgentId
+        retell_agent_id: retellAgentId
       },
       workflowResult?.workflowId
     )
 
-    if (blandAgentId) {
+    if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { blandAgentId }
+        data: { retellAgentId }
       })
     }
 

@@ -36,6 +36,7 @@ export interface WorkflowDeployConfig {
   agentPrompt: string
   webhookUrl?: string
   phoneNumber?: string
+  retellAgentId?: string
   calendarId?: string
   pipelineId?: string
   apiKey?: string

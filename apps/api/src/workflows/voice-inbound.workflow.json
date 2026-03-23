@@ -17,17 +17,17 @@
     },
     {
       "id": "get-transcript",
-      "name": "Get Call Transcript from Bland.ai",
+      "name": "Get Call Transcript from Retell",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 300],
       "parameters": {
         "method": "GET",
-        "url": "https://api.bland.ai/v1/calls/{{$json.call_id}}",
+        "url": "=`https://api.retellai.com/v2/get-call/${$json.call_id}`",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "={{$env.BLAND_API_KEY}}" }
+            { "name": "Authorization", "value": "Bearer ={{$env.RETELL_API_KEY}}" }
           ]
         }
       }
@@ -51,7 +51,17 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this call transcript and extract: caller name, contact info, intent, appointment request (if any), and action items. Return as JSON. Transcript: \" + JSON.stringify($json.transcripts)}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this call transcript and extract: caller name, contact info, intent, appointment request (if any), and action items. Return as JSON with fields: callerName, callerPhone, callerEmail, intent, appointmentRequested (boolean), summary, actionItems. Transcript: \" + $json.transcript}]}"
+      }
+    },
+    {
+      "id": "parse-call-analysis",
+      "name": "Parse Call Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content[0].text;\nlet result;\ntry { result = JSON.parse(text); } catch { result = { callerName: 'Unknown', callerPhone: '', callerEmail: '', intent: 'unknown', appointmentRequested: false, summary: text, actionItems: '' }; }\nreturn [{ json: result }];"
       }
     },
     {
@@ -59,20 +69,20 @@
       "name": "Create/Update GHL Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 200],
+      "position": [1250, 200],
       "parameters": {
         "method": "POST",
         "url": "={{$env.GHL_BASE_URL}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
+            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
             { "name": "Version", "value": "2021-07-28" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"firstName\":$json.callerName?.split(' ')[0],\"phone\":$json.callerPhone,\"email\":$json.callerEmail,\"source\":\"Inbound Call\",\"tags\":[\"inbound-call\"]}"
+        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"firstName\":$json.callerName?.split(' ')[0] || 'Unknown',\"phone\":$json.callerPhone,\"email\":$json.callerEmail,\"source\":\"Inbound Call\",\"tags\":[\"inbound-call\"]}"
       }
     },
     {
@@ -80,20 +90,20 @@
       "name": "Add Call Note to GHL",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1250, 200],
+      "position": [1500, 200],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.contactId}}/notes",
+        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.id}}/notes",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
+            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
             { "name": "Version", "value": "2021-07-28" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"body\":\"Inbound call summary: \" + $json.summary + \"\\n\\nAction items: \" + $json.actionItems}"
+        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"body\":\"Inbound call summary: \" + $('Parse Call Analysis').first().json.summary + \"\\n\\nAction items: \" + $('Parse Call Analysis').first().json.actionItems}"
       }
     },
     {
@@ -101,20 +111,20 @@
       "name": "Book Appointment if Requested",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 400],
+      "position": [1250, 400],
       "parameters": {
         "method": "POST",
         "url": "={{$env.GHL_BASE_URL}}/appointments",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
+            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
             { "name": "Version", "value": "2021-07-28" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"calendarId\":\"{{CALENDAR_ID}}\",\"contactId\":$json.contactId,\"title\":\"Follow-up from Inbound Call\"}"
+        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"calendarId\":\"{{CALENDAR_ID}}\",\"contactId\":$json.id,\"title\":\"Follow-up from Inbound Call\"}"
       }
     },
     {
@@ -132,12 +142,15 @@
   ],
   "connections": {
     "Call Completed Webhook": {
-      "main": [[{ "node": "Get Call Transcript from Bland.ai", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Get Call Transcript from Retell", "type": "main", "index": 0 }]]
     },
-    "Get Call Transcript from Bland.ai": {
+    "Get Call Transcript from Retell": {
       "main": [[{ "node": "Claude - Analyse Call", "type": "main", "index": 0 }]]
     },
     "Claude - Analyse Call": {
+      "main": [[{ "node": "Parse Call Analysis", "type": "main", "index": 0 }]]
+    },
+    "Parse Call Analysis": {
       "main": [
         [{ "node": "Create/Update GHL Contact", "type": "main", "index": 0 }],
         [{ "node": "Book Appointment if Requested", "type": "main", "index": 0 }]
