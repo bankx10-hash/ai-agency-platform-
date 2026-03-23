@@ -45,6 +45,7 @@ COPY apps/api/package.json ./
 RUN npm install --omit=dev
 
 COPY --from=builder /app/apps/api/dist ./dist
+RUN printf "require('./apps/api/src/index.js')" > dist/index.js
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
