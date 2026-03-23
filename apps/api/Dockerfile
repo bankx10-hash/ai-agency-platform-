@@ -48,7 +48,7 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/apps/api/src/workflows ./dist/workflows
+COPY --from=builder /app/apps/api/src/workflows ./dist/apps/api/src/workflows
 
 RUN mkdir -p /app/logs
 
@@ -62,5 +62,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/apps/api/src/index.js"]
 
