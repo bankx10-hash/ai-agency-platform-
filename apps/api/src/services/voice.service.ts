@@ -59,10 +59,7 @@ export class VoiceService {
   private client: AxiosInstance
 
   constructor() {
-    const apiKey = process.env.BLAND_API_KEY
-    if (!apiKey) {
-      throw new Error('BLAND_API_KEY environment variable is not set')
-    }
+    const apiKey = process.env.BLAND_API_KEY || 'not-configured'
 
     this.client = axios.create({
       baseURL: 'https://api.bland.ai',
