@@ -71,15 +71,19 @@ export class OnboardingService {
         logger.info('Agent deployed', { clientId, agentType })
       } catch (error) {
         logger.error('Failed to deploy agent', { clientId, agentType, error })
-        await prisma.agentDeployment.create({
-          data: {
-            clientId,
-            agentType,
-            status: AgentStatus.ERROR,
-            config: { error: String(error) },
-            n8nWorkflowId: undefined
-          }
-        })
+        try {
+          await prisma.agentDeployment.create({
+            data: {
+              clientId,
+              agentType,
+              status: AgentStatus.ERROR,
+              config: { error: String(error) },
+              n8nWorkflowId: undefined
+            }
+          })
+        } catch (dbError) {
+          logger.error('Failed to create error record for agent', { clientId, agentType, dbError })
+        }
       }
     }
   }

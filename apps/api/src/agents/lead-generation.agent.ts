@@ -54,11 +54,17 @@ ${config.scoring_prompt || ''}`
     const typedConfig = config as unknown as LeadGenerationConfig
     logger.info('Deploying Lead Generation Agent', { clientId })
 
-    const agentPrompt = await this.callClaude(
-      `Generate a detailed lead scoring system prompt for a business with this ICP: ${typedConfig.icp_description}.
-       Make it specific, actionable, and effective for qualifying leads automatically.`,
-      'You are an expert at creating AI agent prompts for sales automation.'
-    )
+    let agentPrompt: string
+    try {
+      agentPrompt = await this.callClaude(
+        `Generate a detailed lead scoring system prompt for a business with this ICP: ${typedConfig.icp_description}.
+         Make it specific, actionable, and effective for qualifying leads automatically.`,
+        'You are an expert at creating AI agent prompts for sales automation.'
+      )
+    } catch (error) {
+      logger.warn('Claude prompt generation failed, using default prompt', { clientId, error })
+      agentPrompt = `Score leads 0-100 based on fit with this ICP: ${typedConfig.icp_description}. Focus on company size, industry fit, intent signals, and contact quality.`
+    }
 
     let workflowResult: { workflowId: string } | undefined
 
