@@ -2,14 +2,13 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json ./
-COPY apps/portal/ ./apps/portal/
+# Build context is apps/portal/ — copy everything directly
+COPY . .
 
-WORKDIR /app/apps/portal
 RUN npm install
 RUN npm run build
 
-# ── Production image ──
+# Production image
 FROM node:20-alpine AS runner
 
 WORKDIR /app
@@ -21,9 +20,11 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/apps/portal/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/apps/portal/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/portal/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.js ./next.config.js
 
 USER nextjs
 
@@ -31,9 +32,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode < 500 ? 0 : 1))"
-
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "server.js"]
-
+CMD ["npm", "start"]

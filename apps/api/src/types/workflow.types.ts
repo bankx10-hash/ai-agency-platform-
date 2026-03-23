@@ -9,7 +9,7 @@ export interface WorkflowDeployConfig {
   apiKey?: string
   businessName?: string
   icpDescription?: string
-  platforms?: string
+  platforms?: string | string[]
   bufferToken?: string
   metaAdAccountId?: string
   metaAccessToken?: string
