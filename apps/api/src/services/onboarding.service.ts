@@ -1,5 +1,4 @@
 import { PrismaClient, Prisma } from '@prisma/client'
-import { ghlService } from './ghl.service'
 import { n8nService } from './n8n.service'
 import { emailService } from './email.service'
 import { encryptJSON } from '../utils/encrypt'
@@ -24,19 +23,15 @@ export class OnboardingService {
       throw new Error(`Client not found: ${clientId}`)
     }
 
-    await this.updateOnboardingStep(clientId, 1, { message: 'Creating GHL workspace' })
+    await this.updateOnboardingStep(clientId, 1, { message: 'Setting up workspace' })
 
-    const { locationId } = await this.createGHLSubAccount(client)
+    const locationId = client.ghlLocationId || ''
 
-    await this.updateOnboardingStep(clientId, 2, { ghlCreated: true })
+    await this.updateOnboardingStep(clientId, 2, { workspaceReady: true })
 
     await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client)
 
     await this.updateOnboardingStep(clientId, 3, { agentsDeployed: true })
-
-    await this.assignVoiceNumbers(clientId, locationId, client.businessName)
-
-    await this.updateOnboardingStep(clientId, 4, { voiceAssigned: true })
 
     await this.sendWelcomeEmail(client.email, client.businessName)
 
