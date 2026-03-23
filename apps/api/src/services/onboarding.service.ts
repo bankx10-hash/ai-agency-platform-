@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { ghlService } from './ghl.service'
 import { n8nService } from './n8n.service'
 import { voiceService } from './voice.service'
@@ -86,7 +86,7 @@ export class OnboardingService {
     }
   ): Promise<void> {
     const planConfig = PLANS[plan]
-    const agentTypes = planConfig.agents as AgentType[]
+    const agentTypes = [...planConfig.agents] as AgentType[]
 
     logger.info('Deploying agents for plan', { clientId, plan, agentCount: agentTypes.length })
 
@@ -341,7 +341,7 @@ export class OnboardingService {
           data: {
             ...(existing.data as Record<string, unknown>),
             ...data
-          }
+          } as Prisma.InputJsonValue
         }
       })
     } else {
@@ -350,7 +350,7 @@ export class OnboardingService {
           clientId,
           step,
           status: 'IN_PROGRESS',
-          data
+          data: data as Prisma.InputJsonValue
         }
       })
     }

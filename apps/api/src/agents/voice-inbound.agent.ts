@@ -50,18 +50,19 @@ ${JSON.stringify(caller, null, 2)}
 Respond naturally as if in a real phone conversation.`
   }
 
-  async deploy(clientId: string, config: VoiceInboundConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as VoiceInboundConfig
     logger.info('Deploying Voice Inbound Agent', { clientId })
 
     const voicePrompt = await this.callClaude(
-      `Create a detailed, natural-sounding AI phone receptionist script for ${config.businessName}.
+      `Create a detailed, natural-sounding AI phone receptionist script for ${typedConfig.businessName}.
 
        The agent should:
-       1. Answer calls professionally with: "${config.greeting_script}"
-       2. Qualify callers with these questions (asked naturally): ${config.qualification_questions.join(', ')}
-       3. Handle FAQs from this knowledge base: ${config.faq_knowledge_base}
-       4. Book appointments using calendar ID: ${config.calendar_id}
-       5. Escalate to human at: ${config.escalation_number}
+       1. Answer calls professionally with: "${typedConfig.greeting_script}"
+       2. Qualify callers with these questions (asked naturally): ${typedConfig.qualification_questions.join(', ')}
+       3. Handle FAQs from this knowledge base: ${typedConfig.faq_knowledge_base}
+       4. Book appointments using calendar ID: ${typedConfig.calendar_id}
+       5. Escalate to human at: ${typedConfig.escalation_number}
 
        Create a comprehensive system prompt that makes the AI sound human, warm, and professional.
        Include specific language for handling common situations.`,
@@ -74,11 +75,11 @@ Respond naturally as if in a real phone conversation.`
     try {
       const voiceResult = await voiceService.createInboundAgent({
         prompt: voicePrompt,
-        voice: config.voice_id || 'nat',
-        firstSentence: config.greeting_script,
+        voice: typedConfig.voice_id || 'nat',
+        firstSentence: typedConfig.greeting_script,
         clientId,
-        businessName: config.businessName,
-        transferNumber: config.escalation_number,
+        businessName: typedConfig.businessName,
+        transferNumber: typedConfig.escalation_number,
         calendarWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-calendar-${clientId}`
       })
 
@@ -95,12 +96,12 @@ Respond naturally as if in a real phone conversation.`
     try {
       workflowResult = await n8nService.deployWorkflow('voice-inbound', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: voicePrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-inbound-${clientId}`,
         phoneNumber,
-        calendarId: config.calendar_id,
-        businessName: config.businessName
+        calendarId: typedConfig.calendar_id,
+        businessName: typedConfig.businessName
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
@@ -109,7 +110,7 @@ Respond naturally as if in a real phone conversation.`
     const deployment = await this.createDeploymentRecord(
       clientId,
       {
-        ...config,
+        ...typedConfig,
         generatedPrompt: voicePrompt,
         phone_number: phoneNumber,
         bland_agent_id: blandAgentId

@@ -50,11 +50,12 @@ Respond with a JSON object containing:
 ${config.scoring_prompt || ''}`
   }
 
-  async deploy(clientId: string, config: LeadGenerationConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as LeadGenerationConfig
     logger.info('Deploying Lead Generation Agent', { clientId })
 
     const agentPrompt = await this.callClaude(
-      `Generate a detailed lead scoring system prompt for a business with this ICP: ${config.icp_description}.
+      `Generate a detailed lead scoring system prompt for a business with this ICP: ${typedConfig.icp_description}.
        Make it specific, actionable, and effective for qualifying leads automatically.`,
       'You are an expert at creating AI agent prompts for sales automation.'
     )
@@ -64,12 +65,12 @@ ${config.scoring_prompt || ''}`
     try {
       workflowResult = await n8nService.deployWorkflow('lead-generation', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/lead-gen-${clientId}`,
-        pipelineId: config.pipeline_id,
-        businessName: config.businessName,
-        icpDescription: config.icp_description
+        pipelineId: typedConfig.pipeline_id,
+        businessName: typedConfig.businessName,
+        icpDescription: typedConfig.icp_description
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed, creating record without workflow', { clientId, error })
@@ -78,7 +79,7 @@ ${config.scoring_prompt || ''}`
     const deployment = await this.createDeploymentRecord(
       clientId,
       {
-        ...config,
+        ...typedConfig,
         generatedPrompt: agentPrompt
       },
       workflowResult?.workflowId

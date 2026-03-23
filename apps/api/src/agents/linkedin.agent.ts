@@ -42,11 +42,12 @@ Rules:
 Generate only the message text, nothing else.`
   }
 
-  async deploy(clientId: string, config: LinkedInAgentConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as LinkedInAgentConfig
     logger.info('Deploying LinkedIn Outreach Agent', { clientId })
 
     const connectionPrompt = await this.callClaude(
-      `Create 3 variations of a LinkedIn connection request for ${config.businessName}.
+      `Create 3 variations of a LinkedIn connection request for ${typedConfig.businessName}.
        Each should be under 300 characters, personalized, and human-sounding.
        Return as a JSON array of strings.`,
       'You are an expert LinkedIn marketer. Write in a genuine, human way.'
@@ -57,10 +58,10 @@ Generate only the message text, nothing else.`
     try {
       workflowResult = await n8nService.deployWorkflow('linkedin-outreach', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: connectionPrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/linkedin-${clientId}`,
-        businessName: config.businessName
+        businessName: typedConfig.businessName
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
@@ -69,9 +70,9 @@ Generate only the message text, nothing else.`
     const deployment = await this.createDeploymentRecord(
       clientId,
       {
-        ...config,
+        ...typedConfig,
         generatedPrompt: connectionPrompt,
-        linkedin_cookie: config.linkedin_cookie
+        linkedin_cookie: typedConfig.linkedin_cookie
       },
       workflowResult?.workflowId
     )

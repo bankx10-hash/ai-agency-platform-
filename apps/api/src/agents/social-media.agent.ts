@@ -237,20 +237,21 @@ Each week is an array of post objects. Plan ${config.posting_frequency} per day.
     return { platform, content: fullText }
   }
 
-  async deploy(clientId: string, config: SocialMediaAgentConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as SocialMediaAgentConfig
     logger.info('Deploying Social Media Agent', { clientId })
 
-    const contentCalendar = await this.generateContentCalendar(config)
+    const contentCalendar = await this.generateContentCalendar(typedConfig)
 
     let workflowResult: { workflowId: string } | undefined
     try {
       workflowResult = await n8nService.deployWorkflow('social-media', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: contentCalendar,
         webhookUrl: `${process.env.API_BASE_URL}/webhooks/social/${clientId}`,
-        businessName: config.businessName,
-        platforms: config.platforms.join(',')
+        businessName: typedConfig.businessName,
+        platforms: typedConfig.platforms.join(',')
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed, agent will run via direct API calls', { clientId, error })
@@ -258,7 +259,7 @@ Each week is an array of post objects. Plan ${config.posting_frequency} per day.
 
     const deployment = await this.createDeploymentRecord(
       clientId,
-      { ...config, generatedContentCalendar: contentCalendar },
+      { ...typedConfig, generatedContentCalendar: contentCalendar },
       workflowResult?.workflowId
     )
 

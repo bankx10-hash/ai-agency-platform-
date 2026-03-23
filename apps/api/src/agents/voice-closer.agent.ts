@@ -59,14 +59,15 @@ Price objection framework:
 Remember: Closing is about helping them make a decision that's right for them. Be confident, not pushy.`
   }
 
-  async deploy(clientId: string, config: VoiceCloserConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as VoiceCloserConfig
     logger.info('Deploying Voice Closer Agent', { clientId })
 
     const closingScript = await this.callClaude(
-      `Create a complete sales closing call script for ${config.businessName}.
+      `Create a complete sales closing call script for ${typedConfig.businessName}.
 
-       Offer: ${config.offer_details}
-       Payment link: ${config.payment_link}
+       Offer: ${typedConfig.offer_details}
+       Payment link: ${typedConfig.payment_link}
 
        Create:
        1. Opening (reference previous interaction, build rapport)
@@ -94,9 +95,9 @@ Remember: Closing is about helping them make a decision that's right for them. B
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: closingScript,
         voice: 'nat',
-        firstSentence: `Hi {{firstName}}, this is calling from ${config.businessName}. I'm following up from our conversation — do you have a few minutes?`,
+        firstSentence: `Hi {{firstName}}, this is calling from ${typedConfig.businessName}. I'm following up from our conversation — do you have a few minutes?`,
         clientId,
-        businessName: config.businessName
+        businessName: typedConfig.businessName
       })
 
       blandAgentId = voiceResult.agentId
@@ -110,10 +111,10 @@ Remember: Closing is about helping them make a decision that's right for them. B
     try {
       workflowResult = await n8nService.deployWorkflow('voice-closer', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: closingScript,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-closer-${clientId}`,
-        businessName: config.businessName
+        businessName: typedConfig.businessName
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
@@ -122,7 +123,7 @@ Remember: Closing is about helping them make a decision that's right for them. B
     const deployment = await this.createDeploymentRecord(
       clientId,
       {
-        ...config,
+        ...typedConfig,
         generatedScript: closingScript,
         bland_agent_id: blandAgentId
       },

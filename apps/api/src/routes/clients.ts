@@ -23,23 +23,23 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       return
     }
 
-    const client = await prisma.client.findUnique({
+    const clientWithHash = await prisma.client.findUnique({
       where: { id },
       include: {
         agents: {
           orderBy: { createdAt: 'desc' }
         },
         onboarding: true
-      },
-      omit: {
-        passwordHash: true
       }
     })
 
-    if (!client) {
+    if (!clientWithHash) {
       res.status(404).json({ error: 'Client not found' })
       return
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash: _ph, ...client } = clientWithHash as typeof clientWithHash & { passwordHash?: string }
 
     res.json({ client })
   } catch (error) {
@@ -63,11 +63,13 @@ router.patch('/:id', authMiddleware, async (req: AuthRequest, res: Response): Pr
       return
     }
 
-    const client = await prisma.client.update({
+    const clientWithHash = await prisma.client.update({
       where: { id },
-      data: parsed.data,
-      omit: { passwordHash: true }
+      data: parsed.data
     })
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash: _ph, ...client } = clientWithHash as typeof clientWithHash & { passwordHash?: string }
 
     res.json({ client })
   } catch (error) {

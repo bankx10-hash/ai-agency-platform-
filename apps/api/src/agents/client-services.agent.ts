@@ -66,19 +66,20 @@ NPS schedule: ${config.nps_schedule || 'monthly'}
 Always be warm, proactive, and solutions-focused. You genuinely care about client success.`
   }
 
-  async deploy(clientId: string, config: ClientServicesConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as ClientServicesConfig
     logger.info('Deploying Client Services Agent', { clientId })
 
     const clientSuccessPrompt = await this.callClaude(
-      `Create a comprehensive client success playbook for ${config.businessName}.
+      `Create a comprehensive client success playbook for ${typedConfig.businessName}.
 
        Design:
-       1. Welcome sequence for new clients (${config.welcome_sequence.length} touchpoints)
+       1. Welcome sequence for new clients (${typedConfig.welcome_sequence.length} touchpoints)
        2. Onboarding checklist follow-up cadence
        3. Monthly check-in framework
-       4. Health score calculation based on: ${JSON.stringify(config.health_score_weights)}
+       4. Health score calculation based on: ${JSON.stringify(typedConfig.health_score_weights)}
        5. Churn risk intervention script
-       6. Upsell conversation framework triggered by: ${config.upsell_triggers.join(', ')}
+       6. Upsell conversation framework triggered by: ${typedConfig.upsell_triggers.join(', ')}
        7. NPS survey follow-up based on score ranges
 
        Create specific message templates for each scenario.
@@ -92,10 +93,10 @@ Always be warm, proactive, and solutions-focused. You genuinely care about clien
     try {
       workflowResult = await n8nService.deployWorkflow('client-services', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: clientSuccessPrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/client-services-${clientId}`,
-        businessName: config.businessName
+        businessName: typedConfig.businessName
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
@@ -104,7 +105,7 @@ Always be warm, proactive, and solutions-focused. You genuinely care about clien
     const deployment = await this.createDeploymentRecord(
       clientId,
       {
-        ...config,
+        ...typedConfig,
         generatedPlaybook: clientSuccessPrompt
       },
       workflowResult?.workflowId

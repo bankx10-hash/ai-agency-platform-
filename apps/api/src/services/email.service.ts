@@ -159,10 +159,13 @@ export class EmailService {
   }
 
   getGmailAuthUrl(): string {
-    const oauth2Client = this.getOAuth2Client()
     const redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:4000/onboarding/oauth/gmail/callback'
-
-    oauth2Client.redirectUri = redirectUri
+    const clientId = process.env.GMAIL_CLIENT_ID
+    const clientSecret = process.env.GMAIL_CLIENT_SECRET
+    if (!clientId || !clientSecret) {
+      throw new Error('Gmail OAuth2 credentials not configured')
+    }
+    const oauth2Client = new OAuth2(clientId, clientSecret, redirectUri)
 
     return oauth2Client.generateAuthUrl({
       access_type: 'offline',
@@ -180,9 +183,13 @@ export class EmailService {
     refreshToken: string
     email: string
   }> {
-    const oauth2Client = this.getOAuth2Client()
     const redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:4000/onboarding/oauth/gmail/callback'
-    oauth2Client.redirectUri = redirectUri
+    const clientId = process.env.GMAIL_CLIENT_ID
+    const clientSecret = process.env.GMAIL_CLIENT_SECRET
+    if (!clientId || !clientSecret) {
+      throw new Error('Gmail OAuth2 credentials not configured')
+    }
+    const oauth2Client = new OAuth2(clientId, clientSecret, redirectUri)
 
     const { tokens } = await oauth2Client.getToken(code)
     oauth2Client.setCredentials(tokens)

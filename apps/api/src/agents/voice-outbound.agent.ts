@@ -53,15 +53,16 @@ Call outcomes to track:
 Always be respectful of the person's time. If they're busy, offer to call at a better time.`
   }
 
-  async deploy(clientId: string, config: VoiceOutboundConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as VoiceOutboundConfig
     logger.info('Deploying Voice Outbound Agent', { clientId })
 
     const outboundScript = await this.callClaude(
-      `Create a natural-sounding outbound call script for ${config.businessName}.
+      `Create a natural-sounding outbound call script for ${typedConfig.businessName}.
 
-       Starting script: "${config.call_script}"
-       Call window: ${config.call_window_hours}
-       Max daily calls: ${config.max_daily_calls}
+       Starting script: "${typedConfig.call_script}"
+       Call window: ${typedConfig.call_window_hours}
+       Max daily calls: ${typedConfig.max_daily_calls}
 
        Develop:
        1. Opening (first 15 seconds - get permission to continue)
@@ -81,9 +82,9 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: outboundScript,
         voice: 'nat',
-        firstSentence: `Hi, is this a good time to chat for just 2 minutes? I'm calling from ${config.businessName}.`,
+        firstSentence: `Hi, is this a good time to chat for just 2 minutes? I'm calling from ${typedConfig.businessName}.`,
         clientId,
-        businessName: config.businessName
+        businessName: typedConfig.businessName
       })
 
       blandAgentId = voiceResult.agentId
@@ -97,10 +98,10 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
     try {
       workflowResult = await n8nService.deployWorkflow('voice-outbound', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: outboundScript,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-outbound-${clientId}`,
-        businessName: config.businessName
+        businessName: typedConfig.businessName
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
@@ -109,7 +110,7 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
     const deployment = await this.createDeploymentRecord(
       clientId,
       {
-        ...config,
+        ...typedConfig,
         generatedScript: outboundScript,
         bland_agent_id: blandAgentId
       },

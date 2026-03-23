@@ -58,11 +58,12 @@ Respond with JSON:
 }`
   }
 
-  async deploy(clientId: string, config: AppointmentSetterConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as AppointmentSetterConfig
     logger.info('Deploying Appointment Setter Agent', { clientId })
 
     const followUpSequencePrompt = await this.callClaude(
-      `Create a 5-touch follow-up sequence for ${config.businessName} to convert leads into booked appointments.
+      `Create a 5-touch follow-up sequence for ${typedConfig.businessName} to convert leads into booked appointments.
        The sequence should include:
        - Day 0: Initial outreach (SMS + email)
        - Day 2: Follow-up if no response
@@ -71,7 +72,7 @@ Respond with JSON:
        - Day 14: Final attempt
 
        Booking link placeholder: [BOOKING_LINK]
-       Business name: ${config.businessName}
+       Business name: ${typedConfig.businessName}
 
        Make each message conversational, personalized with {{firstName}}, and non-pushy.
        Return as JSON array with day, channel (sms|email), and message fields.`,
@@ -83,11 +84,11 @@ Respond with JSON:
     try {
       workflowResult = await n8nService.deployWorkflow('appointment-setter', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: followUpSequencePrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/appointments-${clientId}`,
-        calendarId: config.calendar_id,
-        businessName: config.businessName
+        calendarId: typedConfig.calendar_id,
+        businessName: typedConfig.businessName
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })

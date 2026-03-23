@@ -50,13 +50,14 @@ Respond with a JSON object containing:
 }`
   }
 
-  async deploy(clientId: string, config: AdvertisingAgentConfig): Promise<{ id: string; n8nWorkflowId?: string }> {
+  async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
+    const typedConfig = config as unknown as AdvertisingAgentConfig
     logger.info('Deploying Advertising Agent', { clientId })
 
     const adStrategyPrompt = await this.callClaude(
-      `Create a paid advertising strategy and monitoring framework for ${config.businessName}.
-       Target ROAS: ${config.target_roas}x
-       Daily budget: $${config.daily_budget_limit}
+      `Create a paid advertising strategy and monitoring framework for ${typedConfig.businessName}.
+       Target ROAS: ${typedConfig.target_roas}x
+       Daily budget: $${typedConfig.daily_budget_limit}
        Create a system for:
        1. Daily performance monitoring rules
        2. Ad copy generation templates
@@ -71,10 +72,10 @@ Respond with a JSON object containing:
     try {
       workflowResult = await n8nService.deployWorkflow('advertising', {
         clientId,
-        locationId: config.locationId,
+        locationId: typedConfig.locationId,
         agentPrompt: adStrategyPrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/ads-${clientId}`,
-        businessName: config.businessName
+        businessName: typedConfig.businessName
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
