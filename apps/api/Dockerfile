@@ -1,7 +1,9 @@
-# Build stage — v3
+# Build stage — v4
 FROM node:20.19-alpine AS builder
 
 WORKDIR /app
+
+RUN apk add --no-cache openssl
 
 # Copy root package files
 COPY package.json ./
