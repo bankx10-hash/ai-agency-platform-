@@ -1,27 +1,28 @@
-FROM node:20-alpine AS builder
+# Build stage — v2
+FROM node:20.19-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl
-
-# Package files
+# Copy root package files
 COPY package.json ./
 COPY tsconfig.base.json ./
+
+# Copy API package files
 COPY apps/api/package.json ./apps/api/
 COPY apps/api/tsconfig.json ./apps/api/
 
-# Shared types (two locations to satisfy relative import paths)
+# Copy shared package (two locations: root for tsconfig include, apps/ for relative import resolution)
 COPY packages/shared/ ./packages/shared/
 COPY packages/shared/ ./apps/packages/shared/
 
-# Prisma schema
+# Copy Prisma schema
 COPY prisma/ ./prisma/
 
 # Install dependencies
 WORKDIR /app/apps/api
 RUN npm install
 
-# Source
+# Copy source
 WORKDIR /app
 COPY apps/api/src/ ./apps/api/src/
 
@@ -29,30 +30,34 @@ COPY apps/api/src/ ./apps/api/src/
 WORKDIR /app/apps/api
 RUN npx prisma generate --schema=../../prisma/schema.prisma
 
-# Compile TypeScript
-RUN npx tsc || true
+# Build TypeScript
+RUN npx tsc && echo "require('./apps/api/src/index.js');" > dist/index.js
 
-# ── Production image ──
-FROM node:20-alpine AS runner
+# Production stage
+FROM node:20.19-alpine AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init openssl
+RUN apk add --no-cache dumb-init
 
 ENV NODE_ENV=production
 
+# Copy package files
 COPY apps/api/package.json ./
+
+# Install production dependencies only
 RUN npm install --omit=dev
 
+# Copy built files
 COPY --from=builder /app/apps/api/dist ./dist
-RUN printf "require('./apps/api/src/index.js')" > dist/index.js
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/apps/api/src/workflows ./dist/apps/api/src/workflows
 
+# Create logs directory
 RUN mkdir -p /app/logs
 
+# Non-root user for security
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 api
 USER api
@@ -60,8 +65,7 @@ USER api
 EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT||4000) + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/apps/api/src/index.js"]
-

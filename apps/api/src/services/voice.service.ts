@@ -1,186 +1,114 @@
-import axios, { AxiosInstance } from 'axios'
+import axios from 'axios'
 import { logger } from '../utils/logger'
 
-interface InboundAgentConfig {
+const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
+
+const retellApi = axios.create({
+  baseURL: 'https://api.retellai.com',
+  headers: {
+    Authorization: `Bearer ${RETELL_API_KEY}`,
+    'Content-Type': 'application/json'
+  }
+})
+
+export interface CreateInboundAgentParams {
   prompt: string
   voice: string
-  phoneNumber?: string
-  firstSentence?: string
-  maxDuration?: number
-  interruptionThreshold?: number
-  backgroundTrack?: string
+  firstSentence: string
+  clientId: string
+  businessName: string
   transferNumber?: string
   calendarWebhook?: string
-  clientId: string
-  businessName: string
 }
 
-interface OutboundAgentConfig {
+export interface CreateOutboundAgentParams {
   prompt: string
   voice: string
-  firstSentence?: string
-  maxDuration?: number
-  interruptionThreshold?: number
+  firstSentence: string
   clientId: string
   businessName: string
 }
 
-interface CallData {
-  firstName?: string
-  lastName?: string
-  email?: string
-  phone?: string
-  notes?: string
-  [key: string]: string | undefined
-}
-
-interface BlandAgentResponse {
-  phone_number?: string
-  inbound_phone_number?: string
-  id?: string
-  agent_id?: string
-}
-
-interface CallTranscript {
-  callId: string
-  status: string
-  duration?: number
-  transcript: Array<{
-    role: string
-    text: string
-    timestamp?: string
-  }>
-  summary?: string
-  outcome?: string
-  recordingUrl?: string
+export interface VoiceAgentResult {
+  agentId: string
+  phoneNumber?: string
 }
 
 export class VoiceService {
-  private client: AxiosInstance
+  async createInboundAgent(params: CreateInboundAgentParams): Promise<VoiceAgentResult> {
+    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, calendarWebhook } = params
 
-  constructor() {
-    const apiKey = process.env.BLAND_API_KEY || 'not-configured'
-
-    this.client = axios.create({
-      baseURL: 'https://api.bland.ai',
-      headers: {
-        'Authorization': apiKey,
-        'Content-Type': 'application/json'
-      }
+    const agentRes = await retellApi.post('/create-agent', {
+      response_engine: { type: 'retell-llm', system_prompt: prompt },
+      voice_id: voice || 'eleven_turbo_v2',
+      agent_name: `${businessName} Inbound - ${clientId}`,
+      begin_message: firstSentence,
+      boosted_keywords: [businessName],
+      ...(transferNumber && {
+        post_call_analysis_data: [{ type: 'string', name: 'transfer_number', description: transferNumber }]
+      }),
+      ...(calendarWebhook && { webhook_url: calendarWebhook })
     })
 
-    this.client.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        logger.error('Bland.ai API error', {
-          status: error.response?.status,
-          data: error.response?.data,
-          url: error.config?.url
-        })
-        throw error
-      }
-    )
-  }
+    const agentId: string = agentRes.data.agent_id
+    logger.info('Retell inbound agent created', { agentId, clientId })
 
-  async createInboundAgent(config: InboundAgentConfig): Promise<{ agentId: string; phoneNumber: string }> {
-    const response = await this.client.post<BlandAgentResponse>('/v1/inbound', {
-      prompt: config.prompt,
-      voice: config.voice || 'nat',
-      first_sentence: config.firstSentence || `Thank you for calling ${config.businessName}. How can I help you today?`,
-      max_duration: config.maxDuration || 600,
-      interruption_threshold: config.interruptionThreshold || 100,
-      background_track: config.backgroundTrack || 'none',
-      transfer_phone_number: config.transferNumber,
-      webhook: config.calendarWebhook,
-      metadata: {
-        clientId: config.clientId,
-        businessName: config.businessName
-      }
-    })
-
-    logger.info('Bland.ai inbound agent created', {
-      agentId: response.data.id,
-      phoneNumber: response.data.phone_number
-    })
-
-    return {
-      agentId: response.data.id || response.data.agent_id || '',
-      phoneNumber: response.data.phone_number || response.data.inbound_phone_number || ''
+    let phoneNumber: string | undefined
+    try {
+      const phoneRes = await retellApi.post('/create-phone-number', {
+        area_code: 512,
+        inbound_agent_id: agentId,
+        nickname: `${businessName} - ${clientId}`,
+        twilio_account_sid: TWILIO_ACCOUNT_SID,
+        twilio_auth_token: TWILIO_AUTH_TOKEN
+      })
+      phoneNumber = phoneRes.data.phone_number
+      logger.info('Twilio phone number provisioned via Retell', { phoneNumber, clientId })
+    } catch (error) {
+      logger.warn('Failed to provision phone number', { clientId, error })
     }
+
+    return { agentId, phoneNumber }
   }
 
-  async createOutboundAgent(config: OutboundAgentConfig): Promise<{ agentId: string }> {
-    const response = await this.client.post<BlandAgentResponse>('/v1/agents', {
-      prompt: config.prompt,
-      voice: config.voice || 'nat',
-      first_sentence: config.firstSentence,
-      max_duration: config.maxDuration || 600,
-      interruption_threshold: config.interruptionThreshold || 100,
-      metadata: {
-        clientId: config.clientId,
-        businessName: config.businessName
-      }
+  async createOutboundAgent(params: CreateOutboundAgentParams): Promise<VoiceAgentResult> {
+    const { prompt, voice, firstSentence, clientId, businessName } = params
+
+    const agentRes = await retellApi.post('/create-agent', {
+      response_engine: { type: 'retell-llm', system_prompt: prompt },
+      voice_id: voice || 'eleven_turbo_v2',
+      agent_name: `${businessName} Outbound - ${clientId}`,
+      begin_message: firstSentence,
+      boosted_keywords: [businessName]
     })
 
-    logger.info('Bland.ai outbound agent created', { agentId: response.data.id })
+    const agentId: string = agentRes.data.agent_id
+    logger.info('Retell outbound agent created', { agentId, clientId })
 
-    return { agentId: response.data.id || response.data.agent_id || '' }
+    return { agentId }
   }
 
-  async launchOutboundCall(
-    agentId: string,
-    phoneNumber: string,
-    contactData: CallData
-  ): Promise<{ callId: string }> {
-    const response = await this.client.post('/v1/calls', {
-      phone_number: phoneNumber,
+  async launchCall(agentId: string, toNumber: string, fromNumber: string, requestData?: Record<string, unknown>): Promise<string> {
+    const res = await retellApi.post('/create-call', {
       agent_id: agentId,
-      request_data: contactData,
-      metadata: {
-        contactPhone: phoneNumber
-      }
+      to_number: toNumber,
+      from_number: fromNumber,
+      ...(requestData && { metadata: requestData })
     })
-
-    logger.info('Bland.ai outbound call launched', { callId: response.data.call_id, phoneNumber })
-
-    return { callId: response.data.call_id }
+    return res.data.call_id
   }
 
-  async getCallTranscript(callId: string): Promise<CallTranscript> {
-    const response = await this.client.get(`/v1/calls/${callId}`)
-
-    const call = response.data
-
-    return {
-      callId: call.call_id || callId,
-      status: call.status,
-      duration: call.call_length,
-      transcript: (call.transcripts || []).map((t: { user: string; text: string; created_at: string }) => ({
-        role: t.user === 'user' ? 'user' : 'assistant',
-        text: t.text,
-        timestamp: t.created_at
-      })),
-      summary: call.summary,
-      outcome: call.disposition,
-      recordingUrl: call.recording_url
-    }
+  async getCallTranscript(callId: string): Promise<string> {
+    const res = await retellApi.get(`/get-call/${callId}`)
+    const transcript = res.data.transcript || ''
+    return transcript
   }
 
-  async updateAgentPrompt(agentId: string, newPrompt: string): Promise<void> {
-    await this.client.post(`/v1/agents/${agentId}`, {
-      prompt: newPrompt
-    })
-
-    logger.info('Bland.ai agent prompt updated', { agentId })
-  }
-
-  async listInboundNumbers(): Promise<Array<{ phoneNumber: string; agentId: string }>> {
-    const response = await this.client.get('/v1/inbound')
-
-    return (response.data.inbound_numbers || []).map((n: { phone_number: string; agent_id: string }) => ({
-      phoneNumber: n.phone_number,
-      agentId: n.agent_id
-    }))
+  async deleteAgent(agentId: string): Promise<void> {
+    await retellApi.delete(`/delete-agent/${agentId}`)
+    logger.info('Retell agent deleted', { agentId })
   }
 }
 

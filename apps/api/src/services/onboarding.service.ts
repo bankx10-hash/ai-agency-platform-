@@ -1,12 +1,12 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ghlService } from './ghl.service'
 import { n8nService } from './n8n.service'
-import { voiceService } from './voice.service'
 import { emailService } from './email.service'
 import { encryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
-import { AgentType, AgentStatus, PLANS } from '../../../packages/shared/types/agent.types'
-import { Plan } from '../../../packages/shared/types/client.types'
+import { voiceService } from './voice.service'
+import { AgentType, AgentStatus, PLANS } from '../../../../packages/shared/types/agent.types'
+import { Plan } from '../../../../packages/shared/types/client.types'
 import { AGENT_REGISTRY } from '../agents'
 
 const prisma = new PrismaClient()

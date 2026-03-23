@@ -41,6 +41,7 @@ export interface WorkflowDeployConfig {
   apiKey?: string
   businessName?: string
   icpDescription?: string
+  platforms?: string
 }
 
 export interface WorkflowDeployResult {

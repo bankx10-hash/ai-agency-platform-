@@ -2,9 +2,8 @@ import { Router, Response } from 'express'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 import { n8nService } from '../services/n8n.service'
-import { voiceService } from '../services/voice.service'
 import { createAgent } from '../agents'
-import { AgentType, AgentStatus } from '../../../packages/shared/types/agent.types'
+import { AgentType, AgentStatus } from '../../../../packages/shared/types/agent.types'
 import { logger } from '../utils/logger'
 import { z } from 'zod'
 
@@ -119,14 +118,6 @@ router.patch('/:deploymentId/config', authMiddleware, async (req: AuthRequest, r
     const agent = createAgent(deployment.agentType as AgentType)
     const newPrompt = agent.generatePrompt(newConfig)
 
-    if (deployment.blandAgentId) {
-      try {
-        await voiceService.updateAgentPrompt(deployment.blandAgentId, newPrompt)
-        logger.info('Voice agent prompt updated', { deploymentId, blandAgentId: deployment.blandAgentId })
-      } catch (error) {
-        logger.warn('Failed to update voice agent prompt', { deploymentId, error })
-      }
-    }
 
     const updated = await prisma.agentDeployment.update({
       where: { id: deploymentId },
