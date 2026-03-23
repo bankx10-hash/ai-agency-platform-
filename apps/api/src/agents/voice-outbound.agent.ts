@@ -121,7 +121,7 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
     if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { retellAgentId }
+        data: { blandAgentId: retellAgentId }
       })
     }
 

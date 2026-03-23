@@ -134,7 +134,7 @@ Remember: Closing is about helping them make a decision that's right for them. B
     if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { retellAgentId }
+        data: { blandAgentId: retellAgentId }
       })
     }
 

@@ -77,15 +77,16 @@ export class N8NService {
 
     // Assign proper UUIDs to all nodes
     const updatedNodes = nodes.map((node) => {
-      const newId = randomUUID()
+      const newId: string = randomUUID()
       idMap[node.id as string] = newId
-      return { ...node, id: newId }
+      return { ...node, id: newId } as Record<string, unknown>
     })
 
     // Remap webhookId references if present
     const remapped = updatedNodes.map((node) => {
-      if (node.webhookId && idMap[node.webhookId as string]) {
-        return { ...node, webhookId: idMap[node.webhookId as string] }
+      const wid = node.webhookId as string | undefined
+      if (wid && idMap[wid]) {
+        return { ...node, webhookId: idMap[wid] }
       }
       return node
     })

@@ -122,7 +122,7 @@ Respond naturally as if in a real phone conversation.`
     if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { retellAgentId }
+        data: { blandAgentId: retellAgentId }
       })
     }
 
