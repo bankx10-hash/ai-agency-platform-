@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import axios from 'axios'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 import { onboardingQueue } from '../queue/onboarding.queue'
 import { encryptJSON } from '../utils/encrypt'
@@ -257,7 +258,8 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
 
     switch (platform) {
       case 'gmail': {
-        url = emailService.getGmailAuthUrl()
+        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        url = emailService.getGmailAuthUrl(state)
         break
       }
       case 'facebook':
@@ -267,7 +269,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const scope = platform === 'instagram'
           ? 'instagram_basic,instagram_content_publish,pages_read_engagement,pages_manage_posts'
           : 'pages_manage_posts,pages_read_engagement,pages_show_list'
-        const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/facebook/callback`)
+        const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/meta/callback`)
         const state = encodeURIComponent(JSON.stringify({ clientId, platform }))
         url = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${metaClientId}&redirect_uri=${redirect}&scope=${scope}&state=${state}&response_type=code`
         break
@@ -346,6 +348,7 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
   const { platform } = req.params
   const { code, state, error: oauthError } = req.query as Record<string, string>
   const portalBase = process.env.PORTAL_BASE_URL || 'http://localhost:3000'
+  const apiBase = process.env.API_BASE_URL || 'http://localhost:4000'
 
   if (oauthError) {
     res.redirect(`${portalBase}/onboarding/connect?error=${encodeURIComponent(oauthError)}`)
@@ -353,27 +356,95 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
   }
 
   let clientId = ''
+  let statePlatform = platform
   try {
     const parsed = JSON.parse(decodeURIComponent(state || '{}'))
     clientId = parsed.clientId || ''
+    if (parsed.platform) statePlatform = parsed.platform
   } catch {
     res.redirect(`${portalBase}/onboarding/connect?error=invalid_state`)
     return
   }
 
+  if (!clientId) {
+    res.redirect(`${portalBase}/onboarding/connect?error=missing_client`)
+    return
+  }
+
   try {
-    // Store the auth code as a pending credential — full token exchange happens async
-    const { encryptJSON } = await import('../utils/encrypt')
-    const encrypted = encryptJSON({ platform, code, connectedAt: new Date().toISOString() })
+    let credentials: Record<string, string> = {}
+
+    if (platform === 'gmail') {
+      const tokens = await emailService.exchangeCodeForTokens(code)
+      credentials = {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        email: tokens.email
+      }
+    } else if (platform === 'meta') {
+      const metaAppId = process.env.META_APP_ID
+      const metaAppSecret = process.env.META_APP_SECRET
+      const tokenRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+        params: {
+          client_id: metaAppId,
+          client_secret: metaAppSecret,
+          code,
+          redirect_uri: `${apiBase}/onboarding/oauth/meta/callback`
+        }
+      })
+      credentials = {
+        accessToken: tokenRes.data.access_token,
+        platform: statePlatform
+      }
+    } else if (platform === 'linkedin') {
+      const tokenRes = await axios.post(
+        'https://www.linkedin.com/oauth/v2/accessToken',
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: `${apiBase}/onboarding/oauth/linkedin/callback`,
+          client_id: process.env.LINKEDIN_CLIENT_ID || '',
+          client_secret: process.env.LINKEDIN_CLIENT_SECRET || ''
+        }),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      )
+      credentials = {
+        accessToken: tokenRes.data.access_token,
+        refreshToken: tokenRes.data.refresh_token || '',
+        expiresIn: String(tokenRes.data.expires_in || '')
+      }
+    } else if (platform === 'hubspot') {
+      const tokenRes = await axios.post(
+        'https://api.hubapi.com/oauth/v1/token',
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: process.env.HUBSPOT_CLIENT_ID || '',
+          client_secret: process.env.HUBSPOT_CLIENT_SECRET || '',
+          redirect_uri: `${apiBase}/onboarding/oauth/hubspot/callback`,
+          code
+        }),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      )
+      credentials = {
+        accessToken: tokenRes.data.access_token,
+        refreshToken: tokenRes.data.refresh_token || '',
+        expiresIn: String(tokenRes.data.expires_in || '')
+      }
+    } else {
+      credentials = { code, connectedAt: new Date().toISOString() }
+    }
+
+    const storePlatform = platform === 'meta' ? statePlatform : platform
+    const encrypted = encryptJSON({ ...credentials, connectedAt: new Date().toISOString() })
 
     await prisma.clientCredential.upsert({
-      where: { id: `${platform}-${clientId}` },
-      update: { credentials: encrypted, service: platform },
-      create: { id: `${platform}-${clientId}`, clientId, service: platform, credentials: encrypted }
+      where: { id: `${storePlatform}-${clientId}` },
+      update: { credentials: encrypted, service: storePlatform },
+      create: { id: `${storePlatform}-${clientId}`, clientId, service: storePlatform, credentials: encrypted }
     })
 
-    logger.info('OAuth callback stored', { platform, clientId })
-    res.redirect(`${portalBase}/onboarding/connect?connected=${platform}`)
+    logger.info('OAuth callback completed', { platform: storePlatform, clientId })
+    res.redirect(`${portalBase}/onboarding/connect?connected=${storePlatform}`)
   } catch (error) {
     logger.error('OAuth callback error', { error, platform, clientId })
     res.redirect(`${portalBase}/onboarding/connect?error=callback_failed`)

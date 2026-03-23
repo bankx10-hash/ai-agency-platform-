@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import axios from 'axios'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
@@ -10,12 +10,24 @@ type CrmType = 'gohighlevel' | 'hubspot' | 'salesforce' | 'zoho' | 'none'
 
 export default function ConnectPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [crmType, setCrmType] = useState<CrmType>('none')
   const [form, setForm] = useState({ businessDescription: '', icpDescription: '' })
 
   const [connected, setConnected] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    const justConnected = searchParams.get('connected')
+    const oauthError = searchParams.get('error')
+    if (justConnected) {
+      setConnected(prev => ({ ...prev, [justConnected]: true }))
+    }
+    if (oauthError) {
+      setError(`Connection failed: ${oauthError.replace(/_/g, ' ')}`)
+    }
+  }, [searchParams])
 
   function getToken() { return localStorage.getItem('token') || '' }
   function getClientId() { return localStorage.getItem('clientId') || '' }

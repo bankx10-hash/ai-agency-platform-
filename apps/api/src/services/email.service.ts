@@ -158,7 +158,7 @@ export class EmailService {
     )
   }
 
-  getGmailAuthUrl(): string {
+  getGmailAuthUrl(state?: string): string {
     const redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:4000/onboarding/oauth/gmail/callback'
     const clientId = process.env.GMAIL_CLIENT_ID
     const clientSecret = process.env.GMAIL_CLIENT_SECRET
@@ -174,7 +174,8 @@ export class EmailService {
         'https://www.googleapis.com/auth/gmail.readonly',
         'https://www.googleapis.com/auth/userinfo.email'
       ],
-      prompt: 'consent'
+      prompt: 'consent',
+      ...(state ? { state } : {})
     })
   }
 
