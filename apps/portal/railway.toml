@@ -1,3 +1,6 @@
+[build]
+builder = "NIXPACKS"
+
 [deploy]
 healthcheckPath = "/"
 healthcheckTimeout = 300
