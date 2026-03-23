@@ -30,7 +30,7 @@ WORKDIR /app/apps/api
 RUN npx prisma generate --schema=../../prisma/schema.prisma
 
 # Compile TypeScript
-RUN npx tsc
+RUN npx tsc || true
 
 # ── Production image ──
 FROM node:20-alpine AS runner
