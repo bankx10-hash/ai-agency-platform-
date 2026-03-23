@@ -23,6 +23,8 @@ export default function OnboardingCompletePage() {
   ])
   const [currentMessage, setCurrentMessage] = useState('Initialising your AI workforce...')
   const [isComplete, setIsComplete] = useState(false)
+  const [isFailed, setIsFailed] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [dots, setDots] = useState('')
 
   useEffect(() => {
@@ -78,10 +80,10 @@ export default function OnboardingCompletePage() {
         if (onboarding.status === 'COMPLETED') {
           setIsComplete(true)
           setCurrentMessage('Your AI workforce is ready!')
-
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 2000)
+          setTimeout(() => router.push('/dashboard'), 2000)
+        } else if (onboarding.status === 'FAILED') {
+          setIsFailed(true)
+          setCurrentMessage('Setup encountered an error.')
         }
       } catch (err) {
         console.error('Failed to fetch onboarding status:', err)
@@ -93,6 +95,27 @@ export default function OnboardingCompletePage() {
 
     return () => clearInterval(interval)
   }, [router])
+
+  const handleRetry = async () => {
+    const clientId = localStorage.getItem('clientId')
+    const token = localStorage.getItem('token')
+    if (!clientId || !token) return
+    setIsRetrying(true)
+    setIsFailed(false)
+    setCurrentMessage('Retrying setup...')
+    try {
+      await axios.post(
+        `${API_URL}/onboarding/start`,
+        { clientId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+    } catch (err) {
+      console.error('Retry failed:', err)
+      setIsFailed(true)
+    } finally {
+      setIsRetrying(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center px-4">
@@ -176,7 +199,20 @@ export default function OnboardingCompletePage() {
             ))}
           </div>
 
-          {!isComplete && (
+          {isFailed && (
+            <div className="mt-6 text-center">
+              <p className="text-sm text-red-500 mb-3">Setup failed. You can retry below.</p>
+              <button
+                onClick={handleRetry}
+                disabled={isRetrying}
+                className="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRetrying ? 'Retrying...' : 'Retry Setup'}
+              </button>
+            </div>
+          )}
+
+          {!isComplete && !isFailed && (
             <p className="text-center text-xs text-gray-400 mt-8">
               This usually takes 2-3 minutes. Please keep this page open.
             </p>
