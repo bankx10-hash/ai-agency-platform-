@@ -251,7 +251,7 @@ Each week is an array of post objects. Plan ${config.posting_frequency} per day.
         agentPrompt: contentCalendar,
         webhookUrl: `${process.env.API_BASE_URL}/webhooks/social/${clientId}`,
         businessName: typedConfig.businessName,
-        platforms: typedConfig.platforms.join(',')
+        platforms: Array.isArray(typedConfig.platforms) ? typedConfig.platforms.join(',') : typedConfig.platforms
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed, agent will run via direct API calls', { clientId, error })
