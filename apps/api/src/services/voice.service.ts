@@ -77,7 +77,7 @@ export class VoiceService {
   private async createRetellLlm(systemPrompt: string, firstSentence: string): Promise<string> {
     const llmRes = await retellApi.post('/create-retell-llm', {
       model: 'claude-4.5-sonnet',
-      system_prompt: systemPrompt,
+      general_prompt: systemPrompt,
       begin_message: firstSentence
     })
     return llmRes.data.llm_id as string
