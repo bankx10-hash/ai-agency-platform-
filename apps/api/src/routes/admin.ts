@@ -152,14 +152,21 @@ router.get('/client/:clientId', async (req: Request, res: Response): Promise<voi
 
 /**
  * POST /admin/fix-crm-nulls
- * One-time cleanup: sets crmType = null for any client where it was stored
- * as the string "NONE" or "none" instead of a proper null.
+ * Two-step fix:
+ * 1. ALTER the crmType column to be nullable (in case db push didn't apply it)
+ * 2. Update any rows where crmType was stored as the string "NONE"/"none" to NULL
  */
 router.post('/fix-crm-nulls', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const result = await prisma.$executeRaw`UPDATE "Client" SET "crmType" = NULL WHERE "crmType" IN ('NONE', 'none')`
-    logger.info('Fixed crmType nulls', { rowsAffected: result })
-    res.json({ success: true, rowsAffected: result })
+    // Step 1: make column nullable if it isn't already
+    await prisma.$executeRaw`ALTER TABLE "Client" ALTER COLUMN "crmType" DROP NOT NULL`
+    logger.info('Altered crmType column to nullable')
+
+    // Step 2: null out the bad string values
+    const updated = await prisma.$executeRaw`UPDATE "Client" SET "crmType" = NULL WHERE "crmType" IN ('NONE', 'none')`
+    logger.info('Fixed crmType nulls', { rowsAffected: updated })
+
+    res.json({ success: true, rowsAffected: updated })
   } catch (error) {
     logger.error('Failed to fix crmType nulls', { error })
     res.status(500).json({ error: 'Failed to fix crmType nulls' })

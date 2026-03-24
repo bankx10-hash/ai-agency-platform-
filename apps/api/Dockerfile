@@ -47,8 +47,8 @@ ENV NODE_ENV=production
 # Copy package files
 COPY apps/api/package.json ./
 
-# Install production dependencies only
-RUN npm install --omit=dev
+# Install production dependencies + prisma CLI for db push
+RUN npm install --omit=dev && npm install prisma
 
 # Copy built files
 COPY --from=builder /app/apps/api/dist ./dist
@@ -70,4 +70,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://localhost:' + (process.env.PORT||4000) + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/apps/api/src/index.js"]
+CMD ["sh", "-c", "npx prisma db push --schema=./prisma/schema.prisma --accept-data-loss && node dist/apps/api/src/index.js"]
