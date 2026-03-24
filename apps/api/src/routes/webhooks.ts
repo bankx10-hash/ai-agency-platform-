@@ -184,49 +184,9 @@ router.post('/ghl', async (req: Request, res: Response): Promise<void> => {
     const locationId = payload.locationId as string
     const contactId = payload.contactId as string
 
-    if (payload.type === 'PipelineStageChanged') {
-      const stage = payload.stageId as string
-
-      if (stage.toLowerCase().includes('ready-to-close')) {
-        const client = await prisma.client.findFirst({
-          where: { ghlLocationId: locationId }
-        })
-
-        if (client) {
-          const closerAgent = await prisma.agentDeployment.findFirst({
-            where: { clientId: client.id, agentType: 'VOICE_CLOSER', status: 'ACTIVE' }
-          })
-
-          if (closerAgent?.n8nWorkflowId) {
-            await n8nService.triggerWorkflow(closerAgent.n8nWorkflowId, {
-              contactId,
-              locationId,
-              stage
-            })
-          }
-        }
-      }
-    }
-
-    if (payload.type === 'ContactCreated' || payload.type === 'FormSubmitted') {
-      const client = await prisma.client.findFirst({
-        where: { ghlLocationId: locationId }
-      })
-
-      if (client) {
-        const leadGenAgent = await prisma.agentDeployment.findFirst({
-          where: { clientId: client.id, agentType: 'LEAD_GENERATION', status: 'ACTIVE' }
-        })
-
-        if (leadGenAgent?.n8nWorkflowId) {
-          await n8nService.triggerWorkflow(leadGenAgent.n8nWorkflowId, {
-            contactId,
-            locationId,
-            contact: payload.contact
-          })
-        }
-      }
-    }
+    // GHL pipeline/contact webhooks removed — platform no longer uses GoHighLevel.
+    // Pipeline stage changes and lead submissions are now handled via
+    // N8N webhook triggers and the internal /n8n/:clientId/* callback routes.
 
     res.json({ received: true })
   } catch (error) {

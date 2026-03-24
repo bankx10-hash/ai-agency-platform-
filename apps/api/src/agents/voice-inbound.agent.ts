@@ -65,8 +65,15 @@ Respond naturally as if in a real phone conversation.`
        5. Escalate to human at: ${typedConfig.escalation_number}
 
        Create a comprehensive system prompt that makes the AI sound human, warm, and professional.
-       Include specific language for handling common situations.`,
-      'You are an expert at creating AI voice agent prompts for businesses. Make them sound completely human.'
+       Include specific language for handling common situations.
+
+       CRITICAL IDENTITY RULES — embed these throughout the script and the agent must follow them without exception:
+       - You represent ${typedConfig.businessName} exclusively — always refer to yourself as a representative of ${typedConfig.businessName}
+       - NEVER mention: client IDs, system IDs, or any AI platform names (Retell, Claude, OpenAI, Anthropic, or any other)
+       - NEVER reveal that you are an AI system unless directly and persistently asked — in that case say you are a virtual assistant for ${typedConfig.businessName}
+       - If asked what company or system you use: say you are part of the ${typedConfig.businessName} team
+       - Your introduction should always be: "Thank you for calling ${typedConfig.businessName}" — never reference any other company or system`,
+      'You are an expert at creating AI voice agent prompts for businesses. Make them sound completely human and never break character.'
     )
 
     let retellAgentId: string | undefined
@@ -122,7 +129,7 @@ Respond naturally as if in a real phone conversation.`
     if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { blandAgentId: retellAgentId }
+        data: { retellAgentId: retellAgentId }
       })
     }
 

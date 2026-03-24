@@ -17,24 +17,17 @@
     },
     {
       "id": "get-contact-details",
-      "name": "Get Contact from GHL",
+      "name": "Get Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 300],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.contactId}}",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/={{$json.contactId}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
-          ]
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "locationId", "value": "{{LOCATION_ID}}" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
           ]
         }
       }
@@ -63,23 +56,23 @@
     },
     {
       "id": "send-sms",
-      "name": "Send SMS via GHL",
+      "name": "Send Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1000, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"contactId\":$json.contactId,\"type\":\"SMS\",\"message\":$json.content[0].text}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"type\":\"SMS\",\"message\":$json.content[0].text}"
       }
     },
     {
@@ -124,55 +117,52 @@
       "position": [750, 500],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.GHL_BASE_URL}}/calendars/{{CALENDAR_ID}}/free-slots",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/calendar-slots",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "locationId", "value": "{{LOCATION_ID}}" },
-            { "name": "startDate", "value": "={{new Date().toISOString().split('T')[0]}}" },
-            { "name": "endDate", "value": "={{new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}}" }
+            { "name": "calendarId", "value": "{{CALENDAR_ID}}" }
           ]
         }
       }
     },
     {
       "id": "book-appointment",
-      "name": "Book Appointment in GHL",
+      "name": "Book Appointment",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1000, 500],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/appointments",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"calendarId\":\"{{CALENDAR_ID}}\",\"contactId\":$json.contactId,\"startTime\":$json.selectedSlot}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"calendarId\":\"{{CALENDAR_ID}}\",\"startTime\":$json.slots?.[0],\"title\":\"Appointment via AI Agent\"}"
       }
     }
   ],
   "connections": {
     "New Lead Webhook": {
-      "main": [[{ "node": "Get Contact from GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Get Contact", "type": "main", "index": 0 }]]
     },
-    "Get Contact from GHL": {
+    "Get Contact": {
       "main": [[{ "node": "Claude - Write Follow-up Message", "type": "main", "index": 0 }]]
     },
     "Claude - Write Follow-up Message": {
-      "main": [[{ "node": "Send SMS via GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Send Message", "type": "main", "index": 0 }]]
     },
     "Handle Lead Reply": {
       "main": [[{ "node": "Claude - Classify Reply", "type": "main", "index": 0 }]]
@@ -181,7 +171,7 @@
       "main": [[{ "node": "Get Calendar Slots", "type": "main", "index": 0 }]]
     },
     "Get Calendar Slots": {
-      "main": [[{ "node": "Book Appointment in GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Book Appointment", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

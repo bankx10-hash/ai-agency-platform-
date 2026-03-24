@@ -3,8 +3,8 @@
   "active": false,
   "nodes": [
     {
-      "id": "ghl-stage-webhook",
-      "name": "GHL Pipeline Stage Webhook",
+      "id": "lead-ready-webhook",
+      "name": "Lead Ready to Close Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [250, 300],
@@ -34,24 +34,17 @@
     },
     {
       "id": "get-prospect-data",
-      "name": "Get Prospect Data from GHL",
+      "name": "Get Prospect Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [750, 300],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.contactId}}",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/={{$json.contactId}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
-          ]
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "locationId", "value": "{{LOCATION_ID}}" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
           ]
         }
       }
@@ -75,7 +68,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Personalise the closing script for this prospect. Include specific references to their situation and pain points. Return only the personalised script text. Prospect: \" + JSON.stringify($json.contact)}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Personalise the closing script for this prospect. Return only the script text. Prospect: \" + JSON.stringify($json.contact)}]}"
       }
     },
     {
@@ -96,7 +89,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"agent_id\":\"{{RETELL_AGENT_ID}}\",\"to_number\":$('Get Prospect Data from GHL').first().json.contact.phone,\"from_number\":\"{{PHONE_NUMBER}}\",\"metadata\":{\"contactId\":$('Get Prospect Data from GHL').first().json.contact.id,\"customScript\":$json.content[0].text}}"
+        "jsonBody": "={\"agent_id\":\"{{RETELL_AGENT_ID}}\",\"to_number\":$('Get Prospect Data').first().json.contact?.phone,\"from_number\":\"{{PHONE_NUMBER}}\",\"metadata\":{\"contactId\":$('Get Prospect Data').first().json.contact?.id,\"customScript\":$json.content[0].text}}"
       }
     },
     {
@@ -147,7 +140,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"Analyse closing call outcomes. Return JSON with: outcome (CLOSED_WON|CLOSED_LOST|FOLLOW_UP_NEEDED), reason, and nextAction.\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this closing call: \" + $json.transcript}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"Analyse closing call outcomes. Return JSON: { outcome (CLOSED_WON|CLOSED_LOST|FOLLOW_UP_NEEDED), reason, nextAction }.\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this closing call: \" + $json.transcript}]}"
       }
     },
     {
@@ -161,24 +154,24 @@
       }
     },
     {
-      "id": "update-ghl-deal",
-      "name": "Update GHL Deal Status",
+      "id": "save-deal-outcome",
+      "name": "Save Deal Outcome",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1250, 500],
       "parameters": {
-        "method": "PUT",
-        "url": "={{$env.GHL_BASE_URL}}/opportunities/{{$json.opportunityId}}",
+        "method": "POST",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/deal-outcomes",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"status\":$json.outcome === 'CLOSED_WON' ? 'won' : 'lost'}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"opportunityId\":$json.opportunityId,\"outcome\":$json.outcome,\"reason\":$json.reason}"
       }
     },
     {
@@ -189,28 +182,28 @@
       "position": [1500, 500],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"contactId\":$json.contactId,\"type\":\"SMS\",\"message\":\"Fantastic! Here is your payment link: {{WEBHOOK_URL}}\"}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"type\":\"SMS\",\"message\":\"Fantastic! Here is your payment link: {{WEBHOOK_URL}}\"}"
       }
     }
   ],
   "connections": {
-    "GHL Pipeline Stage Webhook": {
+    "Lead Ready to Close Webhook": {
       "main": [[{ "node": "Check Stage is Ready to Close", "type": "main", "index": 0 }]]
     },
     "Check Stage is Ready to Close": {
-      "main": [[{ "node": "Get Prospect Data from GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Get Prospect Data", "type": "main", "index": 0 }]]
     },
-    "Get Prospect Data from GHL": {
+    "Get Prospect Data": {
       "main": [[{ "node": "Claude - Personalise Closing Script", "type": "main", "index": 0 }]]
     },
     "Claude - Personalise Closing Script": {
@@ -226,9 +219,9 @@
       "main": [[{ "node": "Parse Close Outcome", "type": "main", "index": 0 }]]
     },
     "Parse Close Outcome": {
-      "main": [[{ "node": "Update GHL Deal Status", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Save Deal Outcome", "type": "main", "index": 0 }]]
     },
-    "Update GHL Deal Status": {
+    "Save Deal Outcome": {
       "main": [[{ "node": "Send Payment Link if Won", "type": "main", "index": 0 }]]
     }
   },

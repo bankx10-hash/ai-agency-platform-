@@ -49,6 +49,8 @@ export interface WorkflowDeployResult {
   workflowId: string
   webhookUrl?: string
   active: boolean
+  webhooksRegistered?: boolean
+  testExecutionPassed?: boolean
 }
 
 export interface N8NApiResponse<T> {
@@ -66,4 +68,34 @@ export interface WorkflowStatus {
     startedAt: string
     finishedAt?: string
   }
+}
+
+export interface WorkflowNodeIssue {
+  nodeId: string
+  nodeName: string
+  issue: string
+  severity: 'error' | 'warning'
+}
+
+export interface WorkflowTestResult {
+  success: boolean
+  checks: {
+    // Pre-deployment
+    templateValid: boolean
+    noUnreplacedPlaceholders: boolean
+    triggersValid: boolean
+    connectionGraphValid: boolean
+    nodeDataFlowValid: boolean
+    nodeParametersValid: boolean
+    n8nReachable: boolean
+    externalApisReachable: Record<string, boolean>
+    // Post-deployment (populated after deploy)
+    deploymentVerified?: boolean
+    workflowActive?: boolean
+    webhooksRegistered?: boolean
+    testExecutionPassed?: boolean
+  }
+  errors: string[]
+  warnings: string[]
+  nodeIssues: WorkflowNodeIssue[]
 }

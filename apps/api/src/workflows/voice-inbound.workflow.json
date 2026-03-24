@@ -51,7 +51,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this call transcript and extract: caller name, contact info, intent, appointment request (if any), and action items. Return as JSON with fields: callerName, callerPhone, callerEmail, intent, appointmentRequested (boolean), summary, actionItems. Transcript: \" + $json.transcript}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this call transcript. Return JSON: { callerName, callerPhone, callerEmail, intent, appointmentRequested (boolean), summary, actionItems }. Transcript: \" + $json.transcript}]}"
       }
     },
     {
@@ -65,45 +65,45 @@
       }
     },
     {
-      "id": "create-ghl-contact",
-      "name": "Create/Update GHL Contact",
+      "id": "save-contact",
+      "name": "Save Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1250, 200],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/contacts",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"firstName\":$json.callerName?.split(' ')[0] || 'Unknown',\"phone\":$json.callerPhone,\"email\":$json.callerEmail,\"source\":\"Inbound Call\",\"tags\":[\"inbound-call\"]}"
+        "jsonBody": "={\"name\":$json.callerName,\"phone\":$json.callerPhone,\"email\":$json.callerEmail,\"source\":\"Inbound Call\",\"tags\":[\"inbound-call\"],\"intent\":$json.intent}"
       }
     },
     {
       "id": "add-call-note",
-      "name": "Add Call Note to GHL",
+      "name": "Save Call Note",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1500, 200],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.id}}/notes",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/={{$json.id}}/notes",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"body\":\"Inbound call summary: \" + $('Parse Call Analysis').first().json.summary + \"\\n\\nAction items: \" + $('Parse Call Analysis').first().json.actionItems}"
+        "jsonBody": "={\"body\":\"Inbound call summary: \" + $('Parse Call Analysis').first().json.summary + \"\\nAction items: \" + $('Parse Call Analysis').first().json.actionItems}"
       }
     },
     {
@@ -114,17 +114,17 @@
       "position": [1250, 400],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/appointments",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"calendarId\":\"{{CALENDAR_ID}}\",\"contactId\":$json.id,\"title\":\"Follow-up from Inbound Call\"}"
+        "jsonBody": "={\"contactId\":$json.id,\"calendarId\":\"{{CALENDAR_ID}}\",\"title\":\"Follow-up from Inbound Call\"}"
       }
     },
     {
@@ -152,12 +152,12 @@
     },
     "Parse Call Analysis": {
       "main": [
-        [{ "node": "Create/Update GHL Contact", "type": "main", "index": 0 }],
+        [{ "node": "Save Contact", "type": "main", "index": 0 }],
         [{ "node": "Book Appointment if Requested", "type": "main", "index": 0 }]
       ]
     },
-    "Create/Update GHL Contact": {
-      "main": [[{ "node": "Add Call Note to GHL", "type": "main", "index": 0 }]]
+    "Save Contact": {
+      "main": [[{ "node": "Save Call Note", "type": "main", "index": 0 }]]
     },
     "Calendar Booking Webhook": {
       "main": [[{ "node": "Book Appointment if Requested", "type": "main", "index": 0 }]]

@@ -10,36 +10,29 @@
       "position": [250, 300],
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 10 * * 1-5"
-            }
-          ]
+          "interval": [{ "field": "cronExpression", "expression": "0 10 * * 1-5" }]
         }
       }
     },
     {
       "id": "fetch-call-list",
-      "name": "Fetch Call List from GHL",
+      "name": "Fetch Call List",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 300],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.GHL_BASE_URL}}/contacts",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "locationId", "value": "{{LOCATION_ID}}" },
-            { "name": "query", "value": "stage:outbound-queue" },
+            { "name": "stage", "value": "outbound-queue" },
             { "name": "limit", "value": "50" }
           ]
         }
@@ -63,7 +56,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"agent_id\":\"{{RETELL_AGENT_ID}}\",\"to_number\":$json.phone,\"from_number\":\"{{PHONE_NUMBER}}\",\"metadata\":{\"contactId\":$json.id,\"firstName\":$json.firstName,\"lastName\":$json.lastName}}"
+        "jsonBody": "={\"agent_id\":\"{{RETELL_AGENT_ID}}\",\"to_number\":$json.contacts?.[0]?.phone,\"from_number\":\"{{PHONE_NUMBER}}\",\"metadata\":{\"contactId\":$json.contacts?.[0]?.id,\"firstName\":$json.contacts?.[0]?.firstName}}"
       }
     },
     {
@@ -114,7 +107,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this outbound call outcome. Classify as: INTERESTED, CALLBACK, NOT_INTERESTED, VOICEMAIL, NO_ANSWER. Return JSON with: outcome, nextAction, followUpSMS (message to send). Transcript: \" + $json.transcript}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this outbound call. Return JSON: { outcome (INTERESTED|CALLBACK|NOT_INTERESTED|VOICEMAIL|NO_ANSWER), nextAction, followUpSMS }. Transcript: \" + $json.transcript}]}"
       }
     },
     {
@@ -128,53 +121,53 @@
       }
     },
     {
-      "id": "update-ghl-outcome",
-      "name": "Update GHL with Outcome",
+      "id": "save-call-outcome",
+      "name": "Save Call Outcome",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1250, 500],
       "parameters": {
-        "method": "PUT",
-        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.contactId}}",
+        "method": "POST",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/call-outcomes",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"tags\":[\"call-outcome-\" + $json.outcome],\"customFields\":{\"last_call_outcome\":$json.outcome,\"call_date\":new Date().toISOString()}}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"outcome\":$json.outcome,\"nextAction\":$json.nextAction}"
       }
     },
     {
       "id": "send-followup-sms",
-      "name": "Send Follow-up SMS",
+      "name": "Send Follow-up Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1500, 500],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"contactId\":$json.contactId,\"type\":\"SMS\",\"message\":$json.followUpSMS}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"type\":\"SMS\",\"message\":$json.followUpSMS}"
       }
     }
   ],
   "connections": {
     "Call Schedule": {
-      "main": [[{ "node": "Fetch Call List from GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Fetch Call List", "type": "main", "index": 0 }]]
     },
-    "Fetch Call List from GHL": {
+    "Fetch Call List": {
       "main": [[{ "node": "Launch Call via Retell AI", "type": "main", "index": 0 }]]
     },
     "Call Completed Webhook": {
@@ -187,10 +180,10 @@
       "main": [[{ "node": "Parse Outcome", "type": "main", "index": 0 }]]
     },
     "Parse Outcome": {
-      "main": [[{ "node": "Update GHL with Outcome", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Save Call Outcome", "type": "main", "index": 0 }]]
     },
-    "Update GHL with Outcome": {
-      "main": [[{ "node": "Send Follow-up SMS", "type": "main", "index": 0 }]]
+    "Save Call Outcome": {
+      "main": [[{ "node": "Send Follow-up Message", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

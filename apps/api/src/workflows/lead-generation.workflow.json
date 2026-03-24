@@ -10,12 +10,7 @@
       "position": [250, 300],
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "hours",
-              "hoursInterval": 2
-            }
-          ]
+          "interval": [{ "field": "hours", "hoursInterval": 2 }]
         }
       }
     },
@@ -34,25 +29,23 @@
     },
     {
       "id": "fetch-leads",
-      "name": "Fetch Leads from GHL",
+      "name": "Fetch Leads",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 300],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.GHL_BASE_URL}}/contacts",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "locationId", "value": "{{LOCATION_ID}}" },
-            { "name": "query", "value": "stage:new" },
+            { "name": "stage", "value": "new" },
             { "name": "limit", "value": "50" }
           ]
         }
@@ -77,7 +70,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Score this lead: \" + JSON.stringify($json.contact)}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Score this lead 0-100. Return JSON: { score, summary, nextAction, tags[] }. Lead: \" + JSON.stringify($json.contacts?.[0])}]}"
       }
     },
     {
@@ -87,7 +80,7 @@
       "typeVersion": 2,
       "position": [1000, 300],
       "parameters": {
-        "jsCode": "const response = JSON.parse($input.first().json.content[0].text);\nreturn [{ json: { score: response.score, summary: response.summary, nextAction: response.nextAction, tags: response.tags, contactId: $input.first().json.contactId } }];"
+        "jsCode": "const text = $input.first().json.content[0].text;\nlet result;\ntry { result = JSON.parse(text); } catch { result = { score: 0, summary: 'Parse error', nextAction: 'manual review', tags: [] }; }\nconst contacts = $('Fetch Leads').first().json.contacts || [];\nconst contactId = contacts[0]?.id || '';\nreturn [{ json: { ...result, contactId } }];"
       }
     },
     {
@@ -109,24 +102,24 @@
       }
     },
     {
-      "id": "update-ghl-high",
-      "name": "Update GHL - High Score Lead",
+      "id": "update-lead-high",
+      "name": "Update Lead - High Score",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1500, 150],
       "parameters": {
-        "method": "PUT",
-        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.contactId}}",
+        "method": "PATCH",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/score",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"tags\":[\"high-score-lead\",\"score-\" + $json.score],\"customFields\":{\"lead_score\":$json.score,\"lead_summary\":$json.summary}}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"score\":$json.score,\"tags\":[\"high-score-lead\"],\"summary\":$json.summary,\"nextAction\":$json.nextAction}"
       }
     },
     {
@@ -137,42 +130,48 @@
       "position": [1750, 150],
       "parameters": {
         "method": "POST",
-        "url": "{{WEBHOOK_URL}}/appointments-{{CLIENT_ID}}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"contactId\":$json.contactId,\"score\":$json.score,\"summary\":$json.summary,\"locationId\":\"{{LOCATION_ID}}\"}"
-      }
-    },
-    {
-      "id": "update-ghl-medium",
-      "name": "Update GHL - Medium Score Lead",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1500, 300],
-      "parameters": {
-        "method": "PUT",
-        "url": "={{$env.GHL_BASE_URL}}/contacts/{{$json.contactId}}",
+        "url": "={{$env.N8N_WEBHOOK_BASE}}/webhook/appointments-{{CLIENT_ID}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"tags\":[\"medium-score-lead\"],\"customFields\":{\"lead_score\":$json.score}}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"score\":$json.score,\"summary\":$json.summary}"
+      }
+    },
+    {
+      "id": "update-lead-medium",
+      "name": "Update Lead - Medium Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1500, 300],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/score",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"contactId\":$json.contactId,\"score\":$json.score,\"tags\":[\"medium-score-lead\"],\"summary\":$json.summary}"
       }
     }
   ],
   "connections": {
     "Schedule Trigger": {
-      "main": [[{ "node": "Fetch Leads from GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Fetch Leads", "type": "main", "index": 0 }]]
     },
     "Webhook Trigger": {
       "main": [[{ "node": "Claude AI - Score Lead", "type": "main", "index": 0 }]]
     },
-    "Fetch Leads from GHL": {
+    "Fetch Leads": {
       "main": [[{ "node": "Claude AI - Score Lead", "type": "main", "index": 0 }]]
     },
     "Claude AI - Score Lead": {
@@ -183,11 +182,11 @@
     },
     "Route by Score": {
       "main": [
-        [{ "node": "Update GHL - High Score Lead", "type": "main", "index": 0 }],
-        [{ "node": "Update GHL - Medium Score Lead", "type": "main", "index": 0 }]
+        [{ "node": "Update Lead - High Score", "type": "main", "index": 0 }],
+        [{ "node": "Update Lead - Medium Score", "type": "main", "index": 0 }]
       ]
     },
-    "Update GHL - High Score Lead": {
+    "Update Lead - High Score": {
       "main": [[{ "node": "Notify Appointment Setter", "type": "main", "index": 0 }]]
     }
   },

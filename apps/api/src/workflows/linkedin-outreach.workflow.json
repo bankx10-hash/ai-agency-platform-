@@ -10,12 +10,7 @@
       "position": [250, 300],
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 9 * * 1-5"
-            }
-          ]
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1-5" }]
         }
       }
     },
@@ -27,7 +22,7 @@
       "position": [500, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.phantombuster.com/api/v2/agents/{{CLIENT_ID}}-linkedin/launch",
+        "url": "https://api.phantombuster.com/api/v2/agents/launch",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -36,7 +31,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\"argument\":{\"searchUrl\":\"{{WEBHOOK_URL}}\",\"numberOfProfiles\":20}}"
+        "jsonBody": "={\"id\":\"{{API_KEY}}\",\"argument\":{\"searchUrl\":\"{{WEBHOOK_URL}}\",\"numberOfProfiles\":20}}"
       }
     },
     {
@@ -73,24 +68,24 @@
       }
     },
     {
-      "id": "log-to-ghl",
-      "name": "Log Activity to GHL",
+      "id": "save-prospect",
+      "name": "Save LinkedIn Prospect",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1250, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/contacts",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"firstName\":$json.firstName,\"lastName\":$json.lastName,\"source\":\"LinkedIn Outreach\",\"tags\":[\"linkedin-prospect\",\"client-{{CLIENT_ID}}\"]}"
+        "jsonBody": "={\"firstName\":$json.firstName,\"lastName\":$json.lastName,\"source\":\"LinkedIn Outreach\",\"tags\":[\"linkedin-prospect\"],\"message\":$('Claude - Personalise Message').first().json.content[0].text}"
       }
     },
     {
@@ -139,7 +134,7 @@
       "main": [[{ "node": "Claude - Personalise Message", "type": "main", "index": 0 }]]
     },
     "Claude - Personalise Message": {
-      "main": [[{ "node": "Log Activity to GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Save LinkedIn Prospect", "type": "main", "index": 0 }]]
     },
     "Handle LinkedIn Reply": {
       "main": [[{ "node": "Claude - Classify Reply", "type": "main", "index": 0 }]]

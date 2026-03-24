@@ -22,12 +22,7 @@
       "position": [250, 500],
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 9 * * 1"
-            }
-          ]
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1" }]
         }
       }
     },
@@ -61,40 +56,38 @@
       "position": [750, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"contactId\":$json.contactId,\"type\":\"Email\",\"subject\":\"Welcome to the family! Here's your next step\",\"body\":$json.content[0].text}"
+        "jsonBody": "={\"contactId\":$json.contactId,\"to\":$json.email,\"subject\":\"Welcome! Here's your next step\",\"body\":$json.content[0].text}"
       }
     },
     {
       "id": "get-all-clients",
-      "name": "Get Active Clients from GHL",
+      "name": "Get Active Contacts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 500],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.GHL_BASE_URL}}/contacts",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "locationId", "value": "{{LOCATION_ID}}" },
-            { "name": "query", "value": "tag:active-client" }
+            { "name": "tag", "value": "active-client" }
           ]
         }
       }
@@ -118,28 +111,28 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Assess client health and generate weekly check-in message for: \" + JSON.stringify($json.contact)}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Assess client health and generate weekly check-in message for: \" + JSON.stringify($json.contacts?.[0])}]}"
       }
     },
     {
       "id": "send-checkin",
-      "name": "Send Check-in Message",
+      "name": "Send Check-in Email",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1000, 500],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"contactId\":$json.contactId,\"type\":\"Email\",\"subject\":\"Quick check-in from your success team\",\"body\":$json.content[0].text}"
+        "jsonBody": "={\"contactId\":$json.contacts?.[0]?.id,\"to\":$json.contacts?.[0]?.email,\"subject\":\"Quick check-in from your success team\",\"body\":$json.content[0].text}"
       }
     },
     {
@@ -185,13 +178,13 @@
       "main": [[{ "node": "Send Welcome Email", "type": "main", "index": 0 }]]
     },
     "Weekly Check-in Schedule": {
-      "main": [[{ "node": "Get Active Clients from GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Get Active Contacts", "type": "main", "index": 0 }]]
     },
-    "Get Active Clients from GHL": {
+    "Get Active Contacts": {
       "main": [[{ "node": "Claude - Assess Client Health", "type": "main", "index": 0 }]]
     },
     "Claude - Assess Client Health": {
-      "main": [[{ "node": "Send Check-in Message", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Send Check-in Email", "type": "main", "index": 0 }]]
     },
     "Support Request Webhook": {
       "main": [[{ "node": "Claude - Handle Support Request", "type": "main", "index": 0 }]]

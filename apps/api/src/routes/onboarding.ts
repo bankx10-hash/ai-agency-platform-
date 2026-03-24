@@ -193,11 +193,7 @@ router.post('/:clientId/connect-crm', authMiddleware, async (req: AuthRequest, r
         }
         credPayload.locationId = locationId
 
-        // Persist locationId directly on the Client record so agents can use it
-        await prisma.client.update({
-          where: { id: clientId },
-          data: { ghlLocationId: locationId }
-        })
+        // locationId stored in ClientCredential below — no separate Client column needed
       }
 
       const encryptedCreds = encryptJSON(credPayload)

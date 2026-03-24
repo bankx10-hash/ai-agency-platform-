@@ -15,7 +15,7 @@ A multi-tenant SaaS platform where clients subscribe and get AI agents automatic
 | Automation | N8N (self-hosted, API-controlled) |
 | CRM | GoHighLevel (GHL) API v2 |
 | Billing | Stripe subscriptions + webhooks |
-| Voice | Bland.ai (inbound + outbound calls) |
+| Voice | Retell AI (agents) + Twilio (phone number provisioning) |
 | LinkedIn | Phantombuster + LinkedIn API |
 | Social Media | Meta Graph API + Buffer API |
 | Email | Gmail OAuth2 + SMTP (Nodemailer) |
@@ -97,12 +97,12 @@ Stripe price IDs live in env vars (`STRIPE_STARTER_PRICE_ID`, etc.). When a subs
 | `ghl.service.ts` | GHL API v2 wrapper — sub-accounts, contacts, pipelines, calendar, SMS, email. All calls scoped to `locationId`. |
 | `n8n.service.ts` | Deploy/pause/resume/delete N8N workflows. `deployWorkflow(templateName, clientConfig)` clones template and injects client vars. |
 | `stripe.service.ts` | Subscription lifecycle, webhook signature verification |
-| `voice.service.ts` | Bland.ai — provision phone numbers, create inbound/outbound agents, launch calls, fetch transcripts |
+| `voice.service.ts` | Retell AI — create inbound/outbound agents, launch calls, fetch transcripts. Phone numbers provisioned via Twilio credentials passed to Retell's `/create-phone-number` endpoint |
 | `email.service.ts` | Gmail OAuth2 flow + SMTP sending via Nodemailer |
 | `linkedin.service.ts` | Phantombuster — search, connection requests, follow-up sequences |
 | `social.service.ts` | Buffer scheduling + Meta Graph API posting |
 | `encrypt.ts` | AES-256 encrypt/decrypt for `ClientCredential.credentials` |
-| `onboarding.service.ts` | **Master orchestrator** — chains all services post-payment: GHL sub-account → credentials → deploy agents → connect email → assign phone numbers → send welcome email |
+| `onboarding.service.ts` | **Master orchestrator** — chains all services post-payment: deploy agents by plan → send welcome email. GHL sub-account creation removed; clients supply their own `ghlLocationId`. Phone number provisioning (`assignVoiceNumbers`) exists but is paused during testing |
 
 ## Agents (`apps/api/src/agents/`)
 
@@ -158,7 +158,9 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_STARTER_PRICE_ID=
 STRIPE_GROWTH_PRICE_ID=
 STRIPE_AGENCY_PRICE_ID=
-BLAND_API_KEY=
+RETELL_API_KEY=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
 PHANTOMBUSTER_API_KEY=
 REDIS_URL=redis://localhost:6379
 ENCRYPTION_KEY=          # 32-byte hex string for AES-256
@@ -166,6 +168,13 @@ GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=http://localhost:3000
+# N8N callback auth — set same value in N8N environment variables
+N8N_API_SECRET=          # shared secret between API and N8N
+# Set these in N8N's environment variables (Settings → Variables)
+# API_BASE_URL=https://api.nodusaisystems.com   (or http://api:4000 in Docker)
+# N8N_WEBHOOK_BASE=https://your-n8n-instance.com
+# META_AD_ACCOUNT_ID=     (for advertising agent)
+# META_ACCESS_TOKEN=      (for advertising agent)
 ```
 
 ## Build Order
@@ -182,3 +191,22 @@ When building from scratch, follow this sequence:
 8. Bull queue workers
 9. Next.js portal (auth → onboarding wizard → dashboard → agent management)
 10. Docker compose
+
+## Testing Mode (Active)
+
+The platform is currently in manual testing mode. The following constraints apply:
+
+- **Phone provisioning paused** — `assignVoiceNumbers()` exists but is NOT called from `runOnboarding()`. Skip all phone provisioning; `createInboundAgent()` may return an empty `phoneNumber`. Do not add Twilio purchasing logic until testing is complete.
+- **Signup/registration bypassed** — clients are added manually via the admin endpoint. Login stores `token` + `clientId` in localStorage for onboarding pages. `PENDING` clients are redirected to `/onboarding/connect` after login.
+- **Onboarding bypass** — `/onboarding/connect?clientId=xxx` accepts a URL param to skip login entirely.
+- **Admin test endpoint** — `POST /admin/test-onboarding` (with `x-admin-secret` header) creates a test client and queues onboarding without Stripe.
+- **GHL sub-account creation removed** — clients supply their own `ghlLocationId`; the platform does not create GHL sub-accounts.
+
+## Deployment
+
+- API: `https://api.nodusaisystems.com` (Railway, `docker/Dockerfile.api`)
+- Portal: Railway, `apps/portal/Dockerfile` + `railway.toml`
+- Deploy with `railway up` from repo root
+- TypeScript built with `npx tsc || true` (type errors are non-blocking)
+- Prisma client hoisted to `/app/node_modules/.prisma` due to npm workspaces
+- OpenSSL included in both builder and runner stages for Prisma compatibility

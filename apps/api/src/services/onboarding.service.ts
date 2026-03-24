@@ -25,7 +25,7 @@ export class OnboardingService {
 
     await this.updateOnboardingStep(clientId, 1, { message: 'Setting up workspace' })
 
-    const locationId = client.ghlLocationId || ''
+    const locationId = ''
 
     await this.updateOnboardingStep(clientId, 2, { workspaceReady: true })
 
@@ -249,11 +249,11 @@ export class OnboardingService {
         await prisma.agentDeployment.update({
           where: { id: agent.id },
           data: {
-            blandAgentId: agentId,
+            retellAgentId: agentId,
             config: {
               ...config,
               phone_number: phoneNumber,
-              bland_agent_id: agentId
+              retell_agent_id: agentId
             }
           }
         })
@@ -272,7 +272,7 @@ export class OnboardingService {
           create: {
             id: `voice-inbound-${clientId}`,
             clientId,
-            service: 'bland-inbound',
+            service: 'retell-inbound',
             credentials: credential
           }
         })

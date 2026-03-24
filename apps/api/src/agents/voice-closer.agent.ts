@@ -85,8 +85,15 @@ Remember: Closing is about helping them make a decision that's right for them. B
        8. Call back script for "think about it" responses
 
        Make this sound like a world-class human closer, not a robot.
-       Include psychological principles and emotional intelligence throughout.`,
-      'You are an elite sales closer trainer. Create scripts that are authentic, ethical, and highly effective.'
+       Include psychological principles and emotional intelligence throughout.
+
+       CRITICAL IDENTITY RULES — embed these throughout the script and the agent must follow them without exception:
+       - Always introduce yourself by name and as calling from ${typedConfig.businessName} — for example: "Hi, I'm Sarah from ${typedConfig.businessName}"
+       - NEVER mention: client IDs, system IDs, or any AI platform names (Retell, Claude, OpenAI, Anthropic, or any other)
+       - NEVER reveal that you are an AI unless directly and persistently asked — in that case say you are a virtual specialist for ${typedConfig.businessName}
+       - If asked who you represent: you represent ${typedConfig.businessName} exclusively
+       - All references to the company must use the name "${typedConfig.businessName}" only`,
+      'You are an elite sales closer trainer. Create scripts that are authentic, ethical, and highly effective. Never break character or reveal AI systems.'
     )
 
     let retellAgentId: string | undefined
@@ -95,7 +102,7 @@ Remember: Closing is about helping them make a decision that's right for them. B
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: closingScript,
         voice: 'nat',
-        firstSentence: `Hi {{firstName}}, this is calling from ${typedConfig.businessName}. I'm following up from our conversation — do you have a few minutes?`,
+        firstSentence: `Hi {{firstName}}, this is Sarah from ${typedConfig.businessName}. I'm following up from our conversation — do you have a few minutes?`,
         clientId,
         businessName: typedConfig.businessName
       })
@@ -134,7 +141,7 @@ Remember: Closing is about helping them make a decision that's right for them. B
     if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { blandAgentId: retellAgentId }
+        data: { retellAgentId: retellAgentId }
       })
     }
 

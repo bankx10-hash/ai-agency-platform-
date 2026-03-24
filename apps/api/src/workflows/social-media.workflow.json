@@ -10,12 +10,7 @@
       "position": [250, 300],
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 8 * * *"
-            }
-          ]
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }]
         }
       }
     },
@@ -38,63 +33,59 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":2048,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Create today's social media posts for all platforms. Return JSON with platform-specific content.\"}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":2048,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Create today's social media posts for {{BUSINESS_NAME}}. Return a single JSON object with keys for each platform the business uses: facebook, instagram, linkedin, twitter. Each value should be the post text, tailored for that platform's tone and format. Only include platforms relevant to the business.\"}]}"
       }
     },
     {
       "id": "parse-content",
-      "name": "Parse Content",
+      "name": "Parse Platform Content",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [750, 300],
       "parameters": {
-        "jsCode": "const content = JSON.parse($input.first().json.content[0].text);\nreturn Object.entries(content).map(([platform, post]) => ({ json: { platform, content: post, scheduledTime: new Date(Date.now() + 3600000).toISOString() } }));"
+        "jsCode": "const text = $input.first().json.content[0].text;\nlet content;\ntry { content = JSON.parse(text); } catch { content = { error: 'Failed to parse content' }; }\nreturn [{ json: { content, generatedAt: new Date().toISOString() } }];"
       }
     },
     {
-      "id": "schedule-buffer",
-      "name": "Schedule via Buffer",
+      "id": "post-to-platforms",
+      "name": "Post to All Connected Platforms",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1000, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/post-all",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{CLIENT_ID}}" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "bodyContentType": "form-urlencoded",
-        "bodyParameters": {
-          "parameters": [
-            { "name": "text", "value": "={{$json.content}}" },
-            { "name": "scheduled_at", "value": "={{$json.scheduledTime}}" }
-          ]
-        }
+        "specifyBody": "json",
+        "jsonBody": "={\"content\":$json.content,\"generatedAt\":$json.generatedAt}"
       }
     },
     {
-      "id": "log-to-ghl",
-      "name": "Log Post to GHL",
+      "id": "log-activity",
+      "name": "Log Post Activity",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1250, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/activity",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"type\":\"Note\",\"body\":\"Social post scheduled for \" + $json.platform + \": \" + $json.content}"
+        "jsonBody": "={\"type\":\"social_post\",\"platforms\":Object.keys($('Parse Platform Content').first().json.content),\"results\":$json.results,\"postedAt\":new Date().toISOString()}"
       }
     },
     {
@@ -115,13 +106,13 @@
       "main": [[{ "node": "Claude - Generate Post Content", "type": "main", "index": 0 }]]
     },
     "Claude - Generate Post Content": {
-      "main": [[{ "node": "Parse Content", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Parse Platform Content", "type": "main", "index": 0 }]]
     },
-    "Parse Content": {
-      "main": [[{ "node": "Schedule via Buffer", "type": "main", "index": 0 }]]
+    "Parse Platform Content": {
+      "main": [[{ "node": "Post to All Connected Platforms", "type": "main", "index": 0 }]]
     },
-    "Schedule via Buffer": {
-      "main": [[{ "node": "Log Post to GHL", "type": "main", "index": 0 }]]
+    "Post to All Connected Platforms": {
+      "main": [[{ "node": "Log Post Activity", "type": "main", "index": 0 }]]
     },
     "Content Brief Webhook": {
       "main": [[{ "node": "Claude - Generate Post Content", "type": "main", "index": 0 }]]

@@ -72,8 +72,15 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
        5. Close (book appointment or get callback time)
        6. Voicemail script (under 30 seconds)
 
-       Make it sound completely natural and human. Include emotional intelligence cues.`,
-      'You are an expert at creating outbound sales call scripts that feel authentic and get results.'
+       Make it sound completely natural and human. Include emotional intelligence cues.
+
+       CRITICAL IDENTITY RULES — embed these throughout the script and the agent must follow them without exception:
+       - Always introduce yourself as calling from ${typedConfig.businessName} — for example: "Hi, I'm Alex calling from ${typedConfig.businessName}"
+       - NEVER mention: client IDs, system IDs, or any AI platform names (Retell, Claude, OpenAI, Anthropic, or any other)
+       - NEVER reveal that you are an AI unless directly and persistently asked — in that case say you are a virtual assistant representing ${typedConfig.businessName}
+       - If asked who you work for: you work for ${typedConfig.businessName}, no other company or system
+       - The voicemail must also identify only as calling from ${typedConfig.businessName}`,
+      'You are an expert at creating outbound sales call scripts that feel authentic and get results. Never break character or reveal AI systems.'
     )
 
     let retellAgentId: string | undefined
@@ -121,7 +128,7 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
     if (retellAgentId) {
       await prisma.agentDeployment.update({
         where: { id: deployment.id },
-        data: { blandAgentId: retellAgentId }
+        data: { retellAgentId: retellAgentId }
       })
     }
 

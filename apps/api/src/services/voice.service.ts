@@ -6,7 +6,7 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 
 const retellApi = axios.create({
-  baseURL: 'https://api.retellai.com',
+  baseURL: 'https://api.retellai.com/v2',
   headers: {
     Authorization: `Bearer ${RETELL_API_KEY}`,
     'Content-Type': 'application/json'
@@ -37,19 +37,36 @@ export interface VoiceAgentResult {
 }
 
 export class VoiceService {
+  /**
+   * Creates a Retell LLM (v2) and returns its llm_id.
+   * Retell v2 requires LLM creation as a separate step before agent creation.
+   */
+  private async createRetellLlm(systemPrompt: string, firstSentence: string): Promise<string> {
+    const llmRes = await retellApi.post('/create-retell-llm', {
+      model: 'claude-3-5-sonnet',
+      system_prompt: systemPrompt,
+      begin_message: firstSentence
+    })
+    return llmRes.data.llm_id as string
+  }
+
   async createInboundAgent(params: CreateInboundAgentParams): Promise<VoiceAgentResult> {
     const { prompt, voice, firstSentence, clientId, businessName, transferNumber, calendarWebhook } = params
 
+    // Step 1: create the LLM with the system prompt
+    const llmId = await this.createRetellLlm(prompt, firstSentence)
+    logger.info('Retell LLM created', { llmId, clientId })
+
+    // Step 2: create the agent linked to the LLM
     const agentRes = await retellApi.post('/create-agent', {
-      response_engine: { type: 'retell-llm', system_prompt: prompt },
+      response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: voice || 'eleven_turbo_v2',
       agent_name: `${businessName} Inbound - ${clientId}`,
-      begin_message: firstSentence,
       boosted_keywords: [businessName],
+      ...(calendarWebhook && { webhook_url: calendarWebhook }),
       ...(transferNumber && {
         post_call_analysis_data: [{ type: 'string', name: 'transfer_number', description: transferNumber }]
-      }),
-      ...(calendarWebhook && { webhook_url: calendarWebhook })
+      })
     })
 
     const agentId: string = agentRes.data.agent_id
@@ -76,11 +93,15 @@ export class VoiceService {
   async createOutboundAgent(params: CreateOutboundAgentParams): Promise<VoiceAgentResult> {
     const { prompt, voice, firstSentence, clientId, businessName } = params
 
+    // Step 1: create the LLM
+    const llmId = await this.createRetellLlm(prompt, firstSentence)
+    logger.info('Retell LLM created for outbound agent', { llmId, clientId })
+
+    // Step 2: create the agent
     const agentRes = await retellApi.post('/create-agent', {
-      response_engine: { type: 'retell-llm', system_prompt: prompt },
+      response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: voice || 'eleven_turbo_v2',
       agent_name: `${businessName} Outbound - ${clientId}`,
-      begin_message: firstSentence,
       boosted_keywords: [businessName]
     })
 

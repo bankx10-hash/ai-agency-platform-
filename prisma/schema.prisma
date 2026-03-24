@@ -59,8 +59,7 @@ model Client {
   stripeSubId      String?
   plan             Plan             @default(STARTER)
   status           ClientStatus     @default(PENDING)
-  ghlSubAccountId  String?
-  ghlLocationId    String?
+  crmType          String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   agents           AgentDeployment[]
@@ -75,7 +74,7 @@ model AgentDeployment {
   agentType     AgentType
   status        AgentStatus @default(INACTIVE)
   n8nWorkflowId String?
-  blandAgentId  String?
+  retellAgentId String?
   config        Json
   metrics       Json?
   createdAt     DateTime    @default(now())

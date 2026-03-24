@@ -10,12 +10,7 @@
       "position": [250, 300],
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 7 * * *"
-            }
-          ]
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }]
         }
       }
     },
@@ -27,13 +22,14 @@
       "position": [500, 200],
       "parameters": {
         "method": "GET",
-        "url": "https://graph.facebook.com/v18.0/act_{{CLIENT_ID}}/insights",
+        "url": "=`https://graph.facebook.com/v18.0/act_${$env.META_AD_ACCOUNT_ID}/insights`",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             { "name": "fields", "value": "campaign_name,spend,impressions,clicks,ctr,cpc,roas,conversions" },
             { "name": "date_preset", "value": "yesterday" },
-            { "name": "level", "value": "adset" }
+            { "name": "level", "value": "adset" },
+            { "name": "access_token", "value": "={{$env.META_ACCESS_TOKEN}}" }
           ]
         }
       }
@@ -68,10 +64,10 @@
       "position": [1000, 200],
       "parameters": {
         "method": "POST",
-        "url": "https://graph.facebook.com/v18.0/{{$json.adSetId}}",
+        "url": "=`https://graph.facebook.com/v18.0/${$json.adSetId}`",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\"status\":\"PAUSED\"}"
+        "jsonBody": "={\"status\":\"PAUSED\",\"access_token\":$env.META_ACCESS_TOKEN}"
       }
     },
     {
@@ -93,7 +89,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Generate 3 new ad copy variants. Return as JSON array with headline, description, and cta fields.\"}]}"
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Generate 3 new ad copy variants for {{BUSINESS_NAME}}. Return JSON array with headline, description, and cta fields.\"}]}"
       }
     },
     {
@@ -109,24 +105,24 @@
       "webhookId": "ads-alert-{{CLIENT_ID}}"
     },
     {
-      "id": "send-alert-email",
-      "name": "Send Alert Email via GHL",
+      "id": "send-alert",
+      "name": "Send Performance Alert",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1250, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.GHL_BASE_URL}}/conversations/messages",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/alerts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer {{$env.GHL_API_KEY}}" },
-            { "name": "Version", "value": "2021-07-28" }
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"locationId\":\"{{LOCATION_ID}}\",\"type\":\"Email\",\"subject\":\"Ad Performance Alert - Action Required\",\"body\":\"Your advertising agent has detected issues: \" + JSON.stringify($json)}"
+        "jsonBody": "={\"subject\":\"Ad Performance Alert - Action Required\",\"body\":\"Your advertising agent has detected issues:\\n\" + $json.content[0].text}"
       }
     }
   ],
@@ -144,10 +140,10 @@
       ]
     },
     "Pause Underperforming Ads": {
-      "main": [[{ "node": "Send Alert Email via GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Send Performance Alert", "type": "main", "index": 0 }]]
     },
     "Budget Alert Webhook": {
-      "main": [[{ "node": "Send Alert Email via GHL", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Send Performance Alert", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

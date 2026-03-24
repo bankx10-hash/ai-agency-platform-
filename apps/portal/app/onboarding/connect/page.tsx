@@ -56,7 +56,8 @@ export default function ConnectPage() {
       const token = getToken()
       await axios.patch(`${API_URL}/clients/${clientId}`, {
         businessDescription: form.businessDescription,
-        icpDescription: form.icpDescription
+        icpDescription: form.icpDescription,
+        crmType: crmType !== 'none' ? crmType : null
       }, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
       await axios.post(`${API_URL}/onboarding/start`, { clientId }, {
         headers: { Authorization: `Bearer ${token}` }
