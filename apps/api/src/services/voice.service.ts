@@ -6,6 +6,37 @@ const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 
+const DEFAULT_VOICE_ID = '11labs-Adrian'
+// Known-valid Retell voice IDs — any value not in this set is replaced with the default
+const VALID_VOICE_IDS = new Set([
+  '11labs-Adrian',
+  '11labs-MyrtleInevitable',
+  '11labs-Myrtleinev',
+  'openai-alloy',
+  'openai-echo',
+  'openai-fable',
+  'openai-onyx',
+  'openai-nova',
+  'openai-shimmer',
+  'deepgram-aura-asteria-en',
+  'deepgram-aura-luna-en',
+  'deepgram-aura-stella-en',
+  'deepgram-aura-athena-en',
+  'deepgram-aura-hera-en',
+  'deepgram-aura-orion-en',
+  'deepgram-aura-arcas-en',
+  'deepgram-aura-perseus-en',
+  'deepgram-aura-angus-en',
+  'deepgram-aura-orpheus-en',
+  'deepgram-aura-helios-en',
+  'deepgram-aura-zeus-en',
+])
+
+function sanitizeVoiceId(voiceId: string | undefined): string {
+  if (!voiceId || !VALID_VOICE_IDS.has(voiceId)) return DEFAULT_VOICE_ID
+  return voiceId
+}
+
 const retellApi = axios.create({
   baseURL: 'https://api.retellai.com',
   headers: {
@@ -61,7 +92,7 @@ export class VoiceService {
     // Step 2: create the agent linked to the LLM
     const agentRes = await retellApi.post('/create-agent', {
       response_engine: { type: 'retell-llm', llm_id: llmId },
-      voice_id: voice || 'eleven_turbo_v2',
+      voice_id: sanitizeVoiceId(voice),
       agent_name: `${businessName} Inbound - ${clientId}`,
       boosted_keywords: [businessName],
       ...(calendarWebhook && { webhook_url: calendarWebhook }),
@@ -101,7 +132,7 @@ export class VoiceService {
     // Step 2: create the agent
     const agentRes = await retellApi.post('/create-agent', {
       response_engine: { type: 'retell-llm', llm_id: llmId },
-      voice_id: voice || 'eleven_turbo_v2',
+      voice_id: sanitizeVoiceId(voice),
       agent_name: `${businessName} Outbound - ${clientId}`,
       boosted_keywords: [businessName]
     })
