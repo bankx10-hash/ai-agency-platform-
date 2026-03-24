@@ -146,19 +146,20 @@ export class VoiceService {
         const available = await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1 })
         if (!available.length) throw new Error('No Australian Twilio numbers available')
 
-        const purchased = await twilioClient.incomingPhoneNumbers.create({
-          phoneNumber: available[0].phoneNumber,
-          friendlyName: `${businessName} - ${clientId}`,
-          ...(addressSid && { addressSid })
-        })
-        phoneNumber = purchased.phoneNumber
-        logger.info('AU Twilio number purchased', { phoneNumber, clientId })
-
-        // Import into Retell and link to agent.
-        // termination_uri = Twilio SIP trunk domain (fetched via TWILIO_SIP_TRUNK_SID)
         const trunkSid = process.env.TWILIO_SIP_TRUNK_SID
         if (!trunkSid) throw new Error('TWILIO_SIP_TRUNK_SID env var not set')
 
+        const purchased = await twilioClient.incomingPhoneNumbers.create({
+          phoneNumber: available[0].phoneNumber,
+          friendlyName: `${businessName} - ${clientId}`,
+          trunkSid,
+          ...(addressSid && { addressSid })
+        })
+        phoneNumber = purchased.phoneNumber
+        logger.info('AU Twilio number purchased and configured with SIP trunk', { phoneNumber, trunkSid, clientId })
+
+        // Import into Retell and link to agent.
+        // termination_uri = Twilio SIP trunk domain name
         const trunk = await twilioClient.trunking.v1.trunks(trunkSid).fetch()
         const terminationUri = trunk.domainName
         if (!terminationUri) throw new Error('Twilio SIP trunk has no domain name configured')
