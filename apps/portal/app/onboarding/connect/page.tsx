@@ -14,9 +14,44 @@ export default function ConnectPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [crmType, setCrmType] = useState<CrmType>('none')
-  const [form, setForm] = useState({ businessDescription: '', icpDescription: '' })
-
+  const [form, setForm] = useState({
+    businessDescription: '',
+    icpDescription: '',
+    greetingScript: '',
+    faqKnowledgeBase: '',
+    q1: '',
+    q2: '',
+    q3: '',
+    escalationNumber: ''
+  })
   const [connected, setConnected] = useState<Record<string, boolean>>({})
+
+  // Dev rerun shortcut — visible when ?rerun=true
+  const isRerun = searchParams.get('rerun') === 'true'
+  const [rerunClientId, setRerunClientId] = useState(searchParams.get('clientId') || '')
+  const [rerunLoading, setRerunLoading] = useState(false)
+  const [rerunMsg, setRerunMsg] = useState('')
+
+  async function handleRerun() {
+    if (!rerunClientId.trim()) return
+    setRerunLoading(true)
+    setRerunMsg('')
+    try {
+      const res = await axios.post(
+        `${API_URL}/admin/rerun/${rerunClientId.trim()}`,
+        {},
+        { headers: { 'x-admin-secret': process.env.NEXT_PUBLIC_ADMIN_SECRET || '' } }
+      )
+      setRerunMsg(`Rerun queued for "${res.data.businessName}". Redirecting...`)
+      localStorage.setItem('clientId', rerunClientId.trim())
+      setTimeout(() => router.push('/onboarding/complete'), 1500)
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Rerun failed'
+      setRerunMsg(`Error: ${msg}`)
+    } finally {
+      setRerunLoading(false)
+    }
+  }
 
   useEffect(() => {
     const justConnected = searchParams.get('connected')
@@ -59,9 +94,18 @@ export default function ConnectPage() {
         icpDescription: form.icpDescription,
         crmType: crmType !== 'none' ? crmType : null
       }, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
-      await axios.post(`${API_URL}/onboarding/start`, { clientId }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+
+      const qualificationQuestions = [form.q1, form.q2, form.q3].filter(q => q.trim())
+
+      await axios.post(`${API_URL}/onboarding/start`, {
+        clientId,
+        voiceConfig: {
+          greetingScript: form.greetingScript.trim() || undefined,
+          faqKnowledgeBase: form.faqKnowledgeBase.trim() || undefined,
+          qualificationQuestions: qualificationQuestions.length ? qualificationQuestions : undefined,
+          escalationNumber: form.escalationNumber.trim() || undefined
+        }
+      }, { headers: { Authorization: `Bearer ${token}` } })
       router.push('/onboarding/complete')
     } catch {
       setError('Setup failed. Please try again or contact support.')
@@ -97,6 +141,41 @@ export default function ConnectPage() {
           <h1 className="text-3xl font-bold text-gray-900">Connect your tools</h1>
           <p className="mt-2 text-gray-600">Connect your platforms so your AI agents can work across every channel.</p>
         </div>
+
+        {/* ── DEV: Re-run existing client (visible when ?rerun=true) ── */}
+        {isRerun && (
+          <div className="mb-6 bg-amber-50 border border-amber-300 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              Dev shortcut — Re-run deployment for existing client
+            </div>
+            <p className="text-xs text-amber-700">Clears existing agent deployments and re-runs onboarding using stored credentials. No credential re-entry needed.</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={rerunClientId}
+                onChange={e => setRerunClientId(e.target.value)}
+                placeholder="Client ID (e.g. cmn38f9m20000z1w2...)"
+                className="flex-1 px-3 py-2 text-sm border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none bg-white font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleRerun}
+                disabled={rerunLoading || !rerunClientId.trim()}
+                className="px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {rerunLoading ? 'Running...' : 'Re-run →'}
+              </button>
+            </div>
+            {rerunMsg && (
+              <p className={`text-xs font-medium ${rerunMsg.startsWith('Error') ? 'text-red-600' : 'text-green-700'}`}>
+                {rerunMsg}
+              </p>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">{error}</div>
@@ -335,6 +414,71 @@ export default function ConnectPage() {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-none"/>
               <p className="text-xs text-gray-400 mt-1">The more detail you provide, the better your AI agents will qualify leads.</p>
             </div>
+          </div>
+
+          {/* ── SECTION: Voice Agent Setup ── */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4">Voice Agent Setup</p>
+          <p className="text-xs text-gray-500 -mt-2">Used to personalise your AI phone receptionist. All fields are optional — we&apos;ll use smart defaults if left blank.</p>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-5">
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Greeting script</label>
+              <input
+                type="text"
+                value={form.greetingScript}
+                onChange={e => setForm(f => ({ ...f, greetingScript: e.target.value }))}
+                placeholder={`Thank you for calling [your business]. How can I help you today?`}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">The first thing your AI receptionist says when someone calls.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">What does your business do?</label>
+              <textarea
+                value={form.faqKnowledgeBase}
+                onChange={e => setForm(f => ({ ...f, faqKnowledgeBase: e.target.value }))}
+                rows={4}
+                placeholder="Describe your services, pricing, hours, location, and common questions callers ask. The more detail, the better your agent will handle real calls."
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-none"
+              />
+              <p className="text-xs text-gray-400 mt-1">This becomes your agent&apos;s knowledge base — it answers FAQs from this.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Qualification questions <span className="text-gray-400 font-normal">(up to 3)</span></label>
+              <div className="space-y-2">
+                {(['q1', 'q2', 'q3'] as const).map((key, i) => (
+                  <input
+                    key={key}
+                    type="text"
+                    value={form[key]}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                    placeholder={[
+                      'e.g. What brings you in today?',
+                      'e.g. Have you worked with us before?',
+                      'e.g. What is your timeline for this?'
+                    ][i]}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Questions your agent will ask naturally during the call to qualify the caller.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Escalation phone number</label>
+              <input
+                type="tel"
+                value={form.escalationNumber}
+                onChange={e => setForm(f => ({ ...f, escalationNumber: e.target.value }))}
+                placeholder="e.g. +61412345678"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">If a caller is upset or asks for a human, your agent will transfer to this number.</p>
+            </div>
+
           </div>
 
           {/* ── SUBMIT ── */}

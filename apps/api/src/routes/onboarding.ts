@@ -13,7 +13,13 @@ const prisma = new PrismaClient()
 
 const startOnboardingSchema = z.object({
   clientId: z.string(),
-  stripeSessionId: z.string().optional()
+  stripeSessionId: z.string().optional(),
+  voiceConfig: z.object({
+    greetingScript: z.string().optional(),
+    faqKnowledgeBase: z.string().optional(),
+    qualificationQuestions: z.array(z.string()).optional(),
+    escalationNumber: z.string().optional()
+  }).optional()
 })
 
 const connectCRMSchema = z.object({
@@ -34,7 +40,7 @@ router.post('/start', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    const { clientId } = parsed.data
+    const { clientId, voiceConfig } = parsed.data
 
     const client = await prisma.client.findUnique({ where: { id: clientId } })
     if (!client) {
@@ -49,7 +55,7 @@ router.post('/start', async (req: Request, res: Response): Promise<void> => {
           clientId,
           step: 1,
           status: 'IN_PROGRESS',
-          data: { startedAt: new Date().toISOString() }
+          data: { startedAt: new Date().toISOString(), ...(voiceConfig && { voiceConfig }) }
         }
       })
     } else {
@@ -60,7 +66,7 @@ router.post('/start', async (req: Request, res: Response): Promise<void> => {
           step: 1,
           status: 'IN_PROGRESS',
           completedAt: null,
-          data: { startedAt: new Date().toISOString() }
+          data: { startedAt: new Date().toISOString(), ...(voiceConfig && { voiceConfig }) }
         }
       })
     }

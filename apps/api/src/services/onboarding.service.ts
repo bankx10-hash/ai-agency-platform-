@@ -19,6 +19,8 @@ export class OnboardingService {
       include: { onboarding: true }
     })
 
+
+
     if (!client) {
       throw new Error(`Client not found: ${clientId}`)
     }
@@ -29,7 +31,10 @@ export class OnboardingService {
 
     await this.updateOnboardingStep(clientId, 2, { workspaceReady: true })
 
-    await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client, (client as Record<string, unknown>).country as string | undefined)
+    const onboardingData = (client.onboarding?.data ?? {}) as Record<string, unknown>
+    const voiceConfig = onboardingData.voiceConfig as Record<string, unknown> | undefined
+
+    await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client, (client as Record<string, unknown>).country as string | undefined, voiceConfig)
 
     await this.updateOnboardingStep(clientId, 3, { agentsDeployed: true })
 
@@ -49,7 +54,8 @@ export class OnboardingService {
       businessName: string
       email: string
     },
-    country?: string
+    country?: string,
+    voiceConfig?: Record<string, unknown>
   ): Promise<void> {
     const planConfig = PLANS[plan]
     const agentTypes = [...planConfig.agents] as AgentType[]
@@ -65,7 +71,7 @@ export class OnboardingService {
         }
 
         const agent = new AgentClass()
-        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName, country)
+        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName, country, voiceConfig)
 
         await agent.deploy(clientId, defaultConfig)
 
@@ -93,7 +99,8 @@ export class OnboardingService {
     agentType: AgentType,
     locationId: string,
     businessName: string,
-    country?: string
+    country?: string,
+    voiceConfig?: Record<string, unknown>
   ): Record<string, unknown> {
     const baseConfig = {
       locationId,
@@ -157,14 +164,14 @@ export class OnboardingService {
       },
       [AgentType.VOICE_INBOUND]: {
         ...baseConfig,
-        greeting_script: `Thank you for calling ${businessName}. How can I help you today?`,
-        qualification_questions: [
+        greeting_script: (voiceConfig?.greetingScript as string) || `Thank you for calling ${businessName}. How can I help you today?`,
+        qualification_questions: (voiceConfig?.qualificationQuestions as string[]) || [
           'What brings you in today?',
           'Have you worked with us before?',
           'What is your timeline for this?'
         ],
-        faq_knowledge_base: `${businessName} FAQs`,
-        escalation_number: '',
+        faq_knowledge_base: (voiceConfig?.faqKnowledgeBase as string) || `${businessName} provides products and services. Answer questions helpfully based on the caller's needs.`,
+        escalation_number: (voiceConfig?.escalationNumber as string) || '',
         voice_id: '11labs-Adrian',
         calendar_id: ''
       },
