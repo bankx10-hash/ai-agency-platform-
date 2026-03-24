@@ -53,6 +53,7 @@ export interface CreateInboundAgentParams {
   businessName: string
   transferNumber?: string
   calendarWebhook?: string
+  country?: string
 }
 
 export interface CreateOutboundAgentParams {
@@ -83,7 +84,8 @@ export class VoiceService {
   }
 
   async createInboundAgent(params: CreateInboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, calendarWebhook } = params
+    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, calendarWebhook, country } = params
+    const clientCountry = (country || 'AU').toUpperCase()
 
     // Step 1: create the LLM with the system prompt
     const llmId = await this.createRetellLlm(prompt, firstSentence)
@@ -106,17 +108,28 @@ export class VoiceService {
 
     let phoneNumber: string | undefined
     try {
-      const phoneRes = await retellApi.post('/create-phone-number', {
-        area_code: 512,
-        inbound_agent_id: agentId,
-        nickname: `${businessName} - ${clientId}`,
-        twilio_account_sid: TWILIO_ACCOUNT_SID,
-        twilio_auth_token: TWILIO_AUTH_TOKEN
-      })
+      // AU clients get Australian numbers (+61), US clients get US numbers by area code
+      const phonePayload = clientCountry === 'AU'
+        ? {
+            country_code: 'AU',
+            inbound_agent_id: agentId,
+            nickname: `${businessName} - ${clientId}`,
+            twilio_account_sid: TWILIO_ACCOUNT_SID,
+            twilio_auth_token: TWILIO_AUTH_TOKEN
+          }
+        : {
+            area_code: 512,
+            inbound_agent_id: agentId,
+            nickname: `${businessName} - ${clientId}`,
+            twilio_account_sid: TWILIO_ACCOUNT_SID,
+            twilio_auth_token: TWILIO_AUTH_TOKEN
+          }
+
+      const phoneRes = await retellApi.post('/create-phone-number', phonePayload)
       phoneNumber = phoneRes.data.phone_number
-      logger.info('Twilio phone number provisioned via Retell', { phoneNumber, clientId })
+      logger.info('Phone number provisioned', { phoneNumber, clientId, country: clientCountry })
     } catch (error) {
-      logger.warn('Failed to provision phone number', { clientId, error })
+      logger.warn('Failed to provision phone number', { clientId, country: clientCountry, error })
     }
 
     return { agentId, phoneNumber }

@@ -16,6 +16,7 @@ export interface VoiceInboundConfig {
   calendar_id: string
   locationId: string
   businessName: string
+  country?: string
 }
 
 export class VoiceInboundAgent extends BaseAgent {
@@ -87,7 +88,8 @@ Respond naturally as if in a real phone conversation.`
         clientId,
         businessName: typedConfig.businessName,
         transferNumber: typedConfig.escalation_number,
-        calendarWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-calendar-${clientId}`
+        calendarWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-calendar-${clientId}`,
+        country: typedConfig.country || 'AU'
       })
 
       retellAgentId = voiceResult.agentId

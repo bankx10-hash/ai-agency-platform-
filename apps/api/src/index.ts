@@ -34,6 +34,11 @@ async function runStartupMigrations() {
     logger.warn('Startup migration: UPDATE failed', { err })
   }
 
+  try {
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "country" TEXT DEFAULT 'AU'`
+    logger.info('Startup migration: country column ensured')
+  } catch { /* already exists, skip */ }
+
   await prisma.$disconnect()
 }
 

@@ -29,7 +29,7 @@ export class OnboardingService {
 
     await this.updateOnboardingStep(clientId, 2, { workspaceReady: true })
 
-    await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client)
+    await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client, (client as Record<string, unknown>).country as string | undefined)
 
     await this.updateOnboardingStep(clientId, 3, { agentsDeployed: true })
 
@@ -48,7 +48,8 @@ export class OnboardingService {
       id: string
       businessName: string
       email: string
-    }
+    },
+    country?: string
   ): Promise<void> {
     const planConfig = PLANS[plan]
     const agentTypes = [...planConfig.agents] as AgentType[]
@@ -64,7 +65,7 @@ export class OnboardingService {
         }
 
         const agent = new AgentClass()
-        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName)
+        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName, country)
 
         await agent.deploy(clientId, defaultConfig)
 
@@ -91,11 +92,13 @@ export class OnboardingService {
   private getDefaultAgentConfig(
     agentType: AgentType,
     locationId: string,
-    businessName: string
+    businessName: string,
+    country?: string
   ): Record<string, unknown> {
     const baseConfig = {
       locationId,
-      businessName
+      businessName,
+      country: country || 'AU'
     }
 
     const configs: Record<AgentType, Record<string, unknown>> = {
@@ -162,7 +165,7 @@ export class OnboardingService {
         ],
         faq_knowledge_base: `${businessName} FAQs`,
         escalation_number: '',
-        voice_id: 'nat',
+        voice_id: '11labs-Adrian',
         calendar_id: ''
       },
       [AgentType.VOICE_OUTBOUND]: {

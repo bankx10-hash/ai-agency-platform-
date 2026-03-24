@@ -14,7 +14,8 @@ const registerSchema = z.object({
   businessName: z.string().min(1, 'Business name required'),
   email: z.string().email('Invalid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  phone: z.string().optional()
+  phone: z.string().optional(),
+  country: z.string().optional().default('AU')
 })
 
 const loginSchema = z.object({
@@ -30,7 +31,7 @@ router.post('/register', authRateLimit, async (req: Request, res: Response): Pro
       return
     }
 
-    const { businessName, email, password, phone } = parsed.data
+    const { businessName, email, password, phone, country } = parsed.data
 
     const existing = await prisma.client.findUnique({ where: { email } })
     if (existing) {
@@ -56,6 +57,7 @@ router.post('/register', authRateLimit, async (req: Request, res: Response): Pro
         phone,
         passwordHash,
         stripeCustomerId,
+        country,
         status: 'PENDING',
         plan: 'STARTER'
       }

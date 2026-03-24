@@ -60,6 +60,7 @@ model Client {
   plan             Plan             @default(STARTER)
   status           ClientStatus     @default(PENDING)
   crmType          String?
+  country          String?          @default("AU")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   agents           AgentDeployment[]
