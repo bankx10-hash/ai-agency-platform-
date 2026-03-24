@@ -733,6 +733,16 @@ export class N8NService {
 
     const workflowName = `[${clientConfig.clientId} | ${clientConfig.businessName || 'Unknown'}] ${(workflow as { name?: string }).name || templateName}`
 
+    // Delete any existing workflow with this exact name to prevent webhook conflicts
+    const existing = await this.listClientWorkflows(clientConfig.clientId)
+    const duplicate = existing.find(w => w.name === workflowName)
+    if (duplicate) {
+      logger.info('Removing existing workflow before redeploy', { workflowId: duplicate.id, workflowName })
+      await this.deleteWorkflow(duplicate.id).catch((err) =>
+        logger.warn('Could not delete existing workflow', { workflowId: duplicate.id, err })
+      )
+    }
+
     // Only send fields N8N accepts on POST /workflows — extra properties cause a 400
     const wf = workflowWithUUIDs as Record<string, unknown>
     const deployPayload = {
@@ -798,6 +808,8 @@ export class N8NService {
   }
 
   async deleteWorkflow(workflowId: string): Promise<void> {
+    // Deactivate first — required before delete to release webhook registrations
+    await this.client.post(`/workflows/${workflowId}/deactivate`).catch(() => {})
     await this.client.delete(`/workflows/${workflowId}`)
     logger.info('N8N workflow deleted', { workflowId })
   }
@@ -824,13 +836,6 @@ export class N8NService {
         finishedAt: lastExecution.stoppedAt
       } : undefined
     }
-  }
-
-  async deleteWorkflow(workflowId: string): Promise<void> {
-    // Deactivate first (required before delete in some N8N versions)
-    await this.client.post(`/workflows/${workflowId}/deactivate`).catch(() => {})
-    await this.client.delete(`/workflows/${workflowId}`)
-    logger.info('N8N workflow deleted', { workflowId })
   }
 
   async triggerWorkflow(workflowId: string, payload: Record<string, unknown>): Promise<void> {
