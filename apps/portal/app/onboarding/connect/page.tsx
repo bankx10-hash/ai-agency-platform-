@@ -1,6 +1,5 @@
 'use client'
-// v2
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import axios from 'axios'
 
@@ -8,7 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 type CrmType = 'gohighlevel' | 'hubspot' | 'salesforce' | 'zoho' | 'none'
 
-export default function ConnectPage() {
+function ConnectPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
@@ -551,5 +550,13 @@ export default function ConnectPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function ConnectPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center"><div className="text-gray-500">Loading...</div></div>}>
+      <ConnectPageInner />
+    </Suspense>
   )
 }
