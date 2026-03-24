@@ -57,7 +57,7 @@ export interface CreateInboundAgentParams {
   clientId: string
   businessName: string
   transferNumber?: string
-  calendarWebhook?: string
+  callWebhook?: string
   country?: string
   address?: {
     street: string
@@ -95,7 +95,7 @@ export class VoiceService {
   }
 
   async createInboundAgent(params: CreateInboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, calendarWebhook, country, address } = params
+    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, callWebhook, country, address } = params
     const clientCountry = (country || 'AU').toUpperCase()
 
     // Step 1: create the LLM with the system prompt
@@ -108,7 +108,7 @@ export class VoiceService {
       voice_id: sanitizeVoiceId(voice),
       agent_name: `${businessName} Inbound - ${clientId}`,
       boosted_keywords: [businessName],
-      ...(calendarWebhook && { webhook_url: calendarWebhook }),
+      ...(callWebhook && { webhook_url: callWebhook }),
       ...(transferNumber && {
         post_call_analysis_data: [{ type: 'string', name: 'transfer_number', description: transferNumber }]
       })

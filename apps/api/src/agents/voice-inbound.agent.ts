@@ -94,7 +94,7 @@ Respond naturally as if in a real phone conversation.`
         clientId,
         businessName: typedConfig.businessName,
         transferNumber: typedConfig.escalation_number,
-        calendarWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-calendar-${clientId}`,
+        callWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-inbound-${clientId}`,
         country: typedConfig.country || 'AU',
         address: typedConfig.address
       })
