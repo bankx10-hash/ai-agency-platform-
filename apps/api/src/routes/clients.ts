@@ -10,7 +10,7 @@ const prisma = new PrismaClient()
 const updateClientSchema = z.object({
   businessName: z.string().min(1).optional(),
   phone: z.string().optional(),
-  crmType: z.string().nullable().optional()
+  crmType: z.string().nullable().optional().transform(v => (!v || v.toLowerCase() === 'none') ? null : v)
 })
 
 router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
