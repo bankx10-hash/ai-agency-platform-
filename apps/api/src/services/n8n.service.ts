@@ -826,6 +826,13 @@ export class N8NService {
     }
   }
 
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    // Deactivate first (required before delete in some N8N versions)
+    await this.client.post(`/workflows/${workflowId}/deactivate`).catch(() => {})
+    await this.client.delete(`/workflows/${workflowId}`)
+    logger.info('N8N workflow deleted', { workflowId })
+  }
+
   async triggerWorkflow(workflowId: string, payload: Record<string, unknown>): Promise<void> {
     await this.client.post(`/executions`, {
       workflowId,

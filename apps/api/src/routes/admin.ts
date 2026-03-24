@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { onboardingQueue } from '../queue/onboarding.queue'
+import { n8nService } from '../services/n8n.service'
 import { logger } from '../utils/logger'
 
 const router = Router()
@@ -69,7 +70,18 @@ router.post('/rerun/:clientId', async (req: Request, res: Response): Promise<voi
       return
     }
 
-    // 1. Remove existing agent deployments (N8N workflows will be cleaned up on next deploy)
+    // 1. Delete N8N workflows to clear webhook conflicts, then remove DB records
+    const existingDeployments = await prisma.agentDeployment.findMany({
+      where: { clientId },
+      select: { n8nWorkflowId: true }
+    })
+    for (const dep of existingDeployments) {
+      if (dep.n8nWorkflowId) {
+        await n8nService.deleteWorkflow(dep.n8nWorkflowId).catch((err) =>
+          logger.warn('Failed to delete N8N workflow during rerun', { workflowId: dep.n8nWorkflowId, err })
+        )
+      }
+    }
     const deleted = await prisma.agentDeployment.deleteMany({ where: { clientId } })
     logger.info('Cleared agent deployments for rerun', { clientId, count: deleted.count })
 
