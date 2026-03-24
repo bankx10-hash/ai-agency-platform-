@@ -6,7 +6,7 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 
 const retellApi = axios.create({
-  baseURL: 'https://api.retellai.com/v2',
+  baseURL: 'https://api.retellai.com',
   headers: {
     Authorization: `Bearer ${RETELL_API_KEY}`,
     'Content-Type': 'application/json'
@@ -42,7 +42,7 @@ export class VoiceService {
    * Retell v2 requires LLM creation as a separate step before agent creation.
    */
   private async createRetellLlm(systemPrompt: string, firstSentence: string): Promise<string> {
-    const llmRes = await retellApi.post('/retell-llm', {
+    const llmRes = await retellApi.post('/v2/retell-llm', {
       model: 'claude-3-5-sonnet',
       system_prompt: systemPrompt,
       begin_message: firstSentence
@@ -58,7 +58,7 @@ export class VoiceService {
     logger.info('Retell LLM created', { llmId, clientId })
 
     // Step 2: create the agent linked to the LLM
-    const agentRes = await retellApi.post('/agent', {
+    const agentRes = await retellApi.post('/v2/agent', {
       response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: voice || 'eleven_turbo_v2',
       agent_name: `${businessName} Inbound - ${clientId}`,
@@ -74,7 +74,7 @@ export class VoiceService {
 
     let phoneNumber: string | undefined
     try {
-      const phoneRes = await retellApi.post('/phone-number/import', {
+      const phoneRes = await retellApi.post('/v2/phone-number/import', {
         area_code: 512,
         inbound_agent_id: agentId,
         nickname: `${businessName} - ${clientId}`,
@@ -98,7 +98,7 @@ export class VoiceService {
     logger.info('Retell LLM created for outbound agent', { llmId, clientId })
 
     // Step 2: create the agent
-    const agentRes = await retellApi.post('/agent', {
+    const agentRes = await retellApi.post('/v2/agent', {
       response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: voice || 'eleven_turbo_v2',
       agent_name: `${businessName} Outbound - ${clientId}`,
@@ -112,7 +112,7 @@ export class VoiceService {
   }
 
   async launchCall(agentId: string, toNumber: string, fromNumber: string, requestData?: Record<string, unknown>): Promise<string> {
-    const res = await retellApi.post('/call', {
+    const res = await retellApi.post('/v2/call', {
       agent_id: agentId,
       to_number: toNumber,
       from_number: fromNumber,
@@ -122,13 +122,13 @@ export class VoiceService {
   }
 
   async getCallTranscript(callId: string): Promise<string> {
-    const res = await retellApi.get(`/call/${callId}`)
+    const res = await retellApi.get(`/v2/call/${callId}`)
     const transcript = res.data.transcript || ''
     return transcript
   }
 
   async deleteAgent(agentId: string): Promise<void> {
-    await retellApi.delete(`/agent/${agentId}`)
+    await retellApi.delete(`/v2/agent/${agentId}`)
     logger.info('Retell agent deleted', { agentId })
   }
 }

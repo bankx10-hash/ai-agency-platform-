@@ -730,12 +730,14 @@ export class N8NService {
 
     const workflowName = `[${clientConfig.clientId} | ${clientConfig.businessName || 'Unknown'}] ${(workflow as { name?: string }).name || templateName}`
 
-    // Tags must not be included in the create payload — N8N API manages them separately
-    const { tags: _tags, ...workflowBody } = workflowWithUUIDs as Record<string, unknown>
+    // Only send fields N8N accepts on POST /workflows — extra properties cause a 400
+    const wf = workflowWithUUIDs as Record<string, unknown>
     const deployPayload = {
-      ...workflowBody,
       name: workflowName,
-      active: false
+      nodes: wf.nodes,
+      connections: wf.connections,
+      settings: wf.settings ?? {},
+      ...(wf.staticData ? { staticData: wf.staticData } : {})
     }
 
     const createResponse = await this.client.post('/workflows', deployPayload)
