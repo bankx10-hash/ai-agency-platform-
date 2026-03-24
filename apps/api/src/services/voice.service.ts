@@ -42,7 +42,7 @@ export class VoiceService {
    * Retell v2 requires LLM creation as a separate step before agent creation.
    */
   private async createRetellLlm(systemPrompt: string, firstSentence: string): Promise<string> {
-    const llmRes = await retellApi.post('/v2/retell-llm', {
+    const llmRes = await retellApi.post('/create-retell-llm', {
       model: 'claude-3-5-sonnet',
       system_prompt: systemPrompt,
       begin_message: firstSentence
@@ -58,7 +58,7 @@ export class VoiceService {
     logger.info('Retell LLM created', { llmId, clientId })
 
     // Step 2: create the agent linked to the LLM
-    const agentRes = await retellApi.post('/v2/agent', {
+    const agentRes = await retellApi.post('/create-agent', {
       response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: voice || 'eleven_turbo_v2',
       agent_name: `${businessName} Inbound - ${clientId}`,
@@ -74,7 +74,7 @@ export class VoiceService {
 
     let phoneNumber: string | undefined
     try {
-      const phoneRes = await retellApi.post('/v2/phone-number/import', {
+      const phoneRes = await retellApi.post('/create-phone-number', {
         area_code: 512,
         inbound_agent_id: agentId,
         nickname: `${businessName} - ${clientId}`,
@@ -98,7 +98,7 @@ export class VoiceService {
     logger.info('Retell LLM created for outbound agent', { llmId, clientId })
 
     // Step 2: create the agent
-    const agentRes = await retellApi.post('/v2/agent', {
+    const agentRes = await retellApi.post('/create-agent', {
       response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: voice || 'eleven_turbo_v2',
       agent_name: `${businessName} Outbound - ${clientId}`,
@@ -112,7 +112,7 @@ export class VoiceService {
   }
 
   async launchCall(agentId: string, toNumber: string, fromNumber: string, requestData?: Record<string, unknown>): Promise<string> {
-    const res = await retellApi.post('/v2/call', {
+    const res = await retellApi.post('/create-call', {
       agent_id: agentId,
       to_number: toNumber,
       from_number: fromNumber,
@@ -122,13 +122,13 @@ export class VoiceService {
   }
 
   async getCallTranscript(callId: string): Promise<string> {
-    const res = await retellApi.get(`/v2/call/${callId}`)
+    const res = await retellApi.get(`/get-call/${callId}`)
     const transcript = res.data.transcript || ''
     return transcript
   }
 
   async deleteAgent(agentId: string): Promise<void> {
-    await retellApi.delete(`/v2/agent/${agentId}`)
+    await retellApi.delete(`/delete-agent/${agentId}`)
     logger.info('Retell agent deleted', { agentId })
   }
 }

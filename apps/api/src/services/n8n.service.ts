@@ -477,9 +477,12 @@ export class N8NService {
     }
 
     // 3. Attempt a test execution (manual trigger)
+    // N8N API uses POST /executions, not /workflows/{id}/execute
     if (active) {
       try {
-        const execResponse = await this.client.post(`/workflows/${workflowId}/execute`, {
+        const execResponse = await this.client.post(`/executions`, {
+          workflowId,
+          mode: 'manual',
           data: { _test: true, _source: 'pre-deployment-check' }
         })
         const executionId = execResponse.data?.executionId || execResponse.data?.id
@@ -824,7 +827,9 @@ export class N8NService {
   }
 
   async triggerWorkflow(workflowId: string, payload: Record<string, unknown>): Promise<void> {
-    await this.client.post(`/workflows/${workflowId}/execute`, {
+    await this.client.post(`/executions`, {
+      workflowId,
+      mode: 'manual',
       data: payload
     })
     logger.info('N8N workflow triggered', { workflowId })
