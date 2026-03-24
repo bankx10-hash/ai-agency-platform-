@@ -150,10 +150,16 @@ export class VoiceService {
         phoneNumber = purchased.phoneNumber
         logger.info('AU Twilio number purchased', { phoneNumber, clientId })
 
-        // Import into Retell and link to agent
-        // termination_uri is Retell's SIP address (from Retell dashboard → Phone Numbers → Import)
-        const terminationUri = process.env.RETELL_TERMINATION_URI
-        if (!terminationUri) throw new Error('RETELL_TERMINATION_URI env var not set')
+        // Import into Retell and link to agent.
+        // termination_uri = Twilio SIP trunk domain (fetched via TWILIO_SIP_TRUNK_SID)
+        const trunkSid = process.env.TWILIO_SIP_TRUNK_SID
+        if (!trunkSid) throw new Error('TWILIO_SIP_TRUNK_SID env var not set')
+
+        const trunk = await twilioClient.trunking.v1.trunks(trunkSid).fetch()
+        const terminationUri = trunk.domainName
+        if (!terminationUri) throw new Error('Twilio SIP trunk has no domain name configured')
+
+        logger.info('Using SIP trunk termination URI', { terminationUri, clientId })
 
         await retellApi.post('/import-phone-number', {
           phone_number: phoneNumber,
