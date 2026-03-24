@@ -50,18 +50,22 @@ export class N8NService {
   ): Record<string, unknown> {
     let workflowStr = JSON.stringify(workflow)
 
+    // Use JSON.stringify().slice(1,-1) to correctly escape ALL special characters
+    // (newlines, tabs, carriage returns, etc.) not just backslashes and quotes
+    const esc = (v: string) => JSON.stringify(v).slice(1, -1)
+
     const replacements: Record<string, string> = {
-      '{{CLIENT_ID}}': config.clientId,
-      '{{LOCATION_ID}}': config.locationId,
-      '{{AGENT_PROMPT}}': config.agentPrompt.replace(/\\/g, '\\\\').replace(/"/g, '\\"'),
-      '{{WEBHOOK_URL}}': config.webhookUrl || '',
-      '{{PHONE_NUMBER}}': config.phoneNumber || '',
-      '{{RETELL_AGENT_ID}}': config.retellAgentId || '',
-      '{{CALENDAR_ID}}': config.calendarId || '',
-      '{{PIPELINE_ID}}': config.pipelineId || '',
-      '{{API_KEY}}': config.apiKey || '',
-      '{{BUSINESS_NAME}}': config.businessName || '',
-      '{{ICP_DESCRIPTION}}': config.icpDescription?.replace(/\\/g, '\\\\').replace(/"/g, '\\"') || ''
+      '{{CLIENT_ID}}': esc(config.clientId),
+      '{{LOCATION_ID}}': esc(config.locationId),
+      '{{AGENT_PROMPT}}': esc(config.agentPrompt),
+      '{{WEBHOOK_URL}}': esc(config.webhookUrl || ''),
+      '{{PHONE_NUMBER}}': esc(config.phoneNumber || ''),
+      '{{RETELL_AGENT_ID}}': esc(config.retellAgentId || ''),
+      '{{CALENDAR_ID}}': esc(config.calendarId || ''),
+      '{{PIPELINE_ID}}': esc(config.pipelineId || ''),
+      '{{API_KEY}}': esc(config.apiKey || ''),
+      '{{BUSINESS_NAME}}': esc(config.businessName || ''),
+      '{{ICP_DESCRIPTION}}': esc(config.icpDescription || '')
     }
 
     for (const [placeholder, value] of Object.entries(replacements)) {
