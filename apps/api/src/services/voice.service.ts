@@ -1,10 +1,15 @@
 // Retell AI voice service — v1 endpoint names, v2 response_engine format
 import axios from 'axios'
+import twilio from 'twilio'
 import { logger } from '../utils/logger'
 
 const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
+
+function getTwilioClient() {
+  return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+}
 
 const DEFAULT_VOICE_ID = '11labs-Adrian'
 // Known-valid Retell voice IDs — any value not in this set is replaced with the default
@@ -108,26 +113,41 @@ export class VoiceService {
 
     let phoneNumber: string | undefined
     try {
-      // AU clients get Australian numbers (+61), US clients get US numbers by area code
-      const phonePayload = clientCountry === 'AU'
-        ? {
-            country_code: 'AU',
-            inbound_agent_id: agentId,
-            nickname: `${businessName} - ${clientId}`,
-            twilio_account_sid: TWILIO_ACCOUNT_SID,
-            twilio_auth_token: TWILIO_AUTH_TOKEN
-          }
-        : {
-            area_code: 512,
-            inbound_agent_id: agentId,
-            nickname: `${businessName} - ${clientId}`,
-            twilio_account_sid: TWILIO_ACCOUNT_SID,
-            twilio_auth_token: TWILIO_AUTH_TOKEN
-          }
+      if (clientCountry === 'AU') {
+        // Retell only supports US/CA auto-provisioning.
+        // For AU: buy from Twilio directly, then import into Retell.
+        const twilioClient = getTwilioClient()
+        const available = await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1 })
+        if (!available.length) throw new Error('No Australian Twilio numbers available')
 
-      const phoneRes = await retellApi.post('/create-phone-number', phonePayload)
-      phoneNumber = phoneRes.data.phone_number
-      logger.info('Phone number provisioned', { phoneNumber, clientId, country: clientCountry })
+        const purchased = await twilioClient.incomingPhoneNumbers.create({
+          phoneNumber: available[0].phoneNumber,
+          friendlyName: `${businessName} - ${clientId}`
+        })
+        phoneNumber = purchased.phoneNumber
+        logger.info('AU Twilio number purchased', { phoneNumber, clientId })
+
+        // Import into Retell and link to agent
+        await retellApi.post('/import-phone-number', {
+          phone_number: phoneNumber,
+          twilio_account_sid: TWILIO_ACCOUNT_SID,
+          twilio_auth_token: TWILIO_AUTH_TOKEN,
+          inbound_agent_id: agentId,
+          nickname: `${businessName} - ${clientId}`
+        })
+        logger.info('AU number imported to Retell and linked to agent', { phoneNumber, clientId })
+      } else {
+        // US/CA: Retell auto-provisions via Twilio
+        const phoneRes = await retellApi.post('/create-phone-number', {
+          area_code: 512,
+          inbound_agent_id: agentId,
+          nickname: `${businessName} - ${clientId}`,
+          twilio_account_sid: TWILIO_ACCOUNT_SID,
+          twilio_auth_token: TWILIO_AUTH_TOKEN
+        })
+        phoneNumber = phoneRes.data.phone_number
+        logger.info('Phone number provisioned via Retell', { phoneNumber, clientId })
+      }
     } catch (error) {
       logger.warn('Failed to provision phone number', { clientId, country: clientCountry, error })
     }
