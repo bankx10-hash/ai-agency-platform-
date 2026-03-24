@@ -118,7 +118,11 @@ export class VoiceService {
     logger.info('Retell inbound agent created', { agentId, clientId })
 
     let phoneNumber: string | undefined
-    try {
+    const provisionNumbers = process.env.VOICE_PROVISION_NUMBERS !== 'false'
+
+    if (!provisionNumbers) {
+      logger.info('Phone number provisioning disabled (VOICE_PROVISION_NUMBERS=false)', { clientId })
+    } else try {
       if (clientCountry === 'AU') {
         // Retell only supports US/CA auto-provisioning.
         // For AU: buy from Twilio directly, then import into Retell.
