@@ -15,14 +15,26 @@ import { logger } from './utils/logger'
 async function runStartupMigrations() {
   const prisma = new PrismaClient()
   try {
+    // Convert enum column to plain text so Prisma String? mapping works
+    await prisma.$executeRaw`ALTER TABLE "Client" ALTER COLUMN "crmType" TYPE TEXT USING "crmType"::text`
+    logger.info('Startup migration: crmType converted to TEXT')
+  } catch { /* already TEXT, skip */ }
+
+  try {
+    // Make nullable to match Prisma String?
     await prisma.$executeRaw`ALTER TABLE "Client" ALTER COLUMN "crmType" DROP NOT NULL`
+    logger.info('Startup migration: crmType made nullable')
+  } catch { /* already nullable, skip */ }
+
+  try {
+    // Null out any rows where crmType was stored as the string "NONE"
     await prisma.$executeRaw`UPDATE "Client" SET "crmType" = NULL WHERE "crmType" IN ('NONE', 'none')`
-    logger.info('Startup migrations complete')
+    logger.info('Startup migration: cleared invalid crmType values')
   } catch (err) {
-    logger.warn('Startup migration skipped (may already be applied)', { err })
-  } finally {
-    await prisma.$disconnect()
+    logger.warn('Startup migration: UPDATE failed', { err })
   }
+
+  await prisma.$disconnect()
 }
 
 const app = express()
