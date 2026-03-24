@@ -88,7 +88,7 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
     try {
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: outboundScript,
-        voice: 'nat',
+        voice: '11labs-Adrian',
         firstSentence: `Hi, is this a good time to chat for just 2 minutes? I'm calling from ${typedConfig.businessName}.`,
         clientId,
         businessName: typedConfig.businessName

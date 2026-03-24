@@ -101,7 +101,7 @@ Remember: Closing is about helping them make a decision that's right for them. B
     try {
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: closingScript,
-        voice: 'nat',
+        voice: '11labs-Adrian',
         firstSentence: `Hi {{firstName}}, this is Sarah from ${typedConfig.businessName}. I'm following up from our conversation — do you have a few minutes?`,
         clientId,
         businessName: typedConfig.businessName

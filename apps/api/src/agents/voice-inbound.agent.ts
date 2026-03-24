@@ -82,7 +82,7 @@ Respond naturally as if in a real phone conversation.`
     try {
       const voiceResult = await voiceService.createInboundAgent({
         prompt: voicePrompt,
-        voice: typedConfig.voice_id || 'nat',
+        voice: typedConfig.voice_id || '11labs-Adrian',
         firstSentence: typedConfig.greeting_script,
         clientId,
         businessName: typedConfig.businessName,
