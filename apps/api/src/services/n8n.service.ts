@@ -843,15 +843,22 @@ export class N8NService {
   }
 
   async listClientWorkflows(clientId: string): Promise<Array<{ id: string; name: string; active: boolean }>> {
-    const response = await this.client.get('/workflows', {
-      params: {
-        tags: clientId
-      }
-    })
-
-    return (response.data.data || []).filter(
-      (w: { name: string }) => w.name.includes(`[${clientId}]`)
+    const response = await this.client.get('/workflows', { params: { limit: 250 } })
+    return (response.data.data || response.data || []).filter(
+      (w: { name: string }) => w.name.includes(clientId)
     )
+  }
+
+  async deleteAllClientWorkflows(clientId: string): Promise<number> {
+    const workflows = await this.listClientWorkflows(clientId)
+    let deleted = 0
+    for (const wf of workflows) {
+      await this.deleteWorkflow(wf.id).catch((err) =>
+        logger.warn('Failed to delete N8N workflow during cleanup', { workflowId: wf.id, err })
+      )
+      deleted++
+    }
+    return deleted
   }
 }
 
