@@ -173,7 +173,8 @@ export class OnboardingService {
         faq_knowledge_base: (voiceConfig?.faqKnowledgeBase as string) || `${businessName} provides products and services. Answer questions helpfully based on the caller's needs.`,
         escalation_number: (voiceConfig?.escalationNumber as string) || '',
         voice_id: '11labs-Adrian',
-        calendar_id: ''
+        calendar_id: '',
+        address: voiceConfig?.address || undefined
       },
       [AgentType.VOICE_OUTBOUND]: {
         ...baseConfig,

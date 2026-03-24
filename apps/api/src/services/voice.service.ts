@@ -59,6 +59,12 @@ export interface CreateInboundAgentParams {
   transferNumber?: string
   calendarWebhook?: string
   country?: string
+  address?: {
+    street: string
+    city: string
+    state?: string
+    postcode?: string
+  }
 }
 
 export interface CreateOutboundAgentParams {
@@ -89,7 +95,7 @@ export class VoiceService {
   }
 
   async createInboundAgent(params: CreateInboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, calendarWebhook, country } = params
+    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, calendarWebhook, country, address } = params
     const clientCountry = (country || 'AU').toUpperCase()
 
     // Step 1: create the LLM with the system prompt
@@ -117,12 +123,29 @@ export class VoiceService {
         // Retell only supports US/CA auto-provisioning.
         // For AU: buy from Twilio directly, then import into Retell.
         const twilioClient = getTwilioClient()
+
+        // Create a Twilio address for this client (required for AU number purchase)
+        let addressSid: string | undefined
+        if (address?.street && address?.city) {
+          const created = await twilioClient.addresses.create({
+            customerName: businessName,
+            street: address.street,
+            city: address.city,
+            region: address.state || '',
+            postalCode: address.postcode || '',
+            isoCountry: 'AU'
+          })
+          addressSid = created.sid
+          logger.info('Twilio address created for AU client', { addressSid, clientId })
+        }
+
         const available = await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1 })
         if (!available.length) throw new Error('No Australian Twilio numbers available')
 
         const purchased = await twilioClient.incomingPhoneNumbers.create({
           phoneNumber: available[0].phoneNumber,
-          friendlyName: `${businessName} - ${clientId}`
+          friendlyName: `${businessName} - ${clientId}`,
+          ...(addressSid && { addressSid })
         })
         phoneNumber = purchased.phoneNumber
         logger.info('AU Twilio number purchased', { phoneNumber, clientId })

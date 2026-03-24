@@ -18,7 +18,13 @@ const startOnboardingSchema = z.object({
     greetingScript: z.string().optional(),
     faqKnowledgeBase: z.string().optional(),
     qualificationQuestions: z.array(z.string()).optional(),
-    escalationNumber: z.string().optional()
+    escalationNumber: z.string().optional(),
+    address: z.object({
+      street: z.string(),
+      city: z.string(),
+      state: z.string().optional(),
+      postcode: z.string().optional()
+    }).optional()
   }).optional()
 })
 

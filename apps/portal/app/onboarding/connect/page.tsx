@@ -22,7 +22,11 @@ export default function ConnectPage() {
     q1: '',
     q2: '',
     q3: '',
-    escalationNumber: ''
+    escalationNumber: '',
+    addressStreet: '',
+    addressCity: '',
+    addressState: '',
+    addressPostcode: ''
   })
   const [connected, setConnected] = useState<Record<string, boolean>>({})
 
@@ -103,7 +107,13 @@ export default function ConnectPage() {
           greetingScript: form.greetingScript.trim() || undefined,
           faqKnowledgeBase: form.faqKnowledgeBase.trim() || undefined,
           qualificationQuestions: qualificationQuestions.length ? qualificationQuestions : undefined,
-          escalationNumber: form.escalationNumber.trim() || undefined
+          escalationNumber: form.escalationNumber.trim() || undefined,
+          address: (form.addressStreet.trim() && form.addressCity.trim()) ? {
+            street: form.addressStreet.trim(),
+            city: form.addressCity.trim(),
+            state: form.addressState.trim(),
+            postcode: form.addressPostcode.trim()
+          } : undefined
         }
       }, { headers: { Authorization: `Bearer ${token}` } })
       router.push('/onboarding/complete')
@@ -477,6 +487,45 @@ export default function ConnectPage() {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
               />
               <p className="text-xs text-gray-400 mt-1">If a caller is upset or asks for a human, your agent will transfer to this number.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Business address <span className="text-indigo-600 font-normal">(required for your phone number)</span>
+              </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={form.addressStreet}
+                  onChange={e => setForm(f => ({ ...f, addressStreet: e.target.value }))}
+                  placeholder="Street address"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={form.addressCity}
+                    onChange={e => setForm(f => ({ ...f, addressCity: e.target.value }))}
+                    placeholder="Suburb / City"
+                    className="col-span-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={form.addressState}
+                    onChange={e => setForm(f => ({ ...f, addressState: e.target.value }))}
+                    placeholder="State (e.g. NSW)"
+                    className="col-span-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={form.addressPostcode}
+                    onChange={e => setForm(f => ({ ...f, addressPostcode: e.target.value }))}
+                    placeholder="Postcode"
+                    className="col-span-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Twilio requires a registered address to provision an Australian phone number.</p>
             </div>
 
           </div>
