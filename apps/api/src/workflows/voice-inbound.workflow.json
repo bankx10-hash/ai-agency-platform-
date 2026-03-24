@@ -9,6 +9,7 @@
       "typeVersion": 1,
       "position": [250, 300],
       "parameters": {
+        "httpMethod": "POST",
         "path": "voice-inbound-{{CLIENT_ID}}",
         "responseMode": "onReceived",
         "responseData": "allEntries"
@@ -134,6 +135,7 @@
       "typeVersion": 1,
       "position": [250, 500],
       "parameters": {
+        "httpMethod": "POST",
         "path": "voice-calendar-{{CLIENT_ID}}",
         "responseMode": "onReceived"
       },
