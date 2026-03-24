@@ -130,18 +130,32 @@ export class VoiceService {
 
         // Create a Twilio address for this client (required for AU number purchase)
         let addressSid: string | undefined
+        logger.info('AU address params', { address, clientId })
         if (address?.street && address?.city) {
-          const created = await twilioClient.addresses.create({
-            customerName: businessName,
-            street: address.street,
-            city: address.city,
-            region: address.state || '',
-            postalCode: address.postcode || '',
-            isoCountry: 'AU'
-          })
-          addressSid = created.sid
-          logger.info('Twilio address created for AU client', { addressSid, clientId })
+          try {
+            const created = await twilioClient.addresses.create({
+              customerName: businessName,
+              street: address.street,
+              city: address.city,
+              region: address.state || '',
+              postalCode: address.postcode || '',
+              isoCountry: 'AU'
+            })
+            addressSid = created.sid
+            logger.info('Twilio address created for AU client', { addressSid, clientId })
+          } catch (addrError) {
+            // Address may already exist — search for one matching this client
+            logger.warn('Address creation failed, searching for existing address', { clientId, addrError })
+            const existing = await twilioClient.addresses.list({ customerName: businessName, limit: 1 })
+            if (existing.length) {
+              addressSid = existing[0].sid
+              logger.info('Using existing Twilio address', { addressSid, clientId })
+            }
+          }
+        } else {
+          logger.warn('Address missing or incomplete — skipping address creation', { address, clientId })
         }
+        if (!addressSid) throw new Error('No Twilio address available for AU number purchase')
 
         const available = await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1 })
         if (!available.length) throw new Error('No Australian Twilio numbers available')
