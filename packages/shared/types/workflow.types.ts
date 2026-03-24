@@ -43,6 +43,10 @@ export interface WorkflowDeployConfig {
   businessName?: string
   icpDescription?: string
   platforms?: string
+  n8nApiSecret?: string
+  retellApiKey?: string
+  anthropicApiKey?: string
+  apiBaseUrl?: string
 }
 
 export interface WorkflowDeployResult {

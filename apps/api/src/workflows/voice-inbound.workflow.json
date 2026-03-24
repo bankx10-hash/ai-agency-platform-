@@ -28,7 +28,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.RETELL_API_KEY }}" }
+            { "name": "Authorization", "value": "Bearer {{RETELL_API_KEY}}" }
           ]
         }
       }
@@ -45,7 +45,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type", "value": "application/json" }
           ]
@@ -73,11 +73,11 @@
       "position": [1250, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.API_BASE_URL + '/n8n/{{CLIENT_ID}}/contacts' }}",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{ $env.N8N_API_SECRET }}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -94,11 +94,11 @@
       "position": [1500, 200],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.API_BASE_URL + '/n8n/{{CLIENT_ID}}/contacts/' + $json.id + '/notes' }}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.id + '/notes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{ $env.N8N_API_SECRET }}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -132,11 +132,11 @@
       "position": [1750, 400],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.API_BASE_URL + '/n8n/{{CLIENT_ID}}/appointments' }}",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{ $env.N8N_API_SECRET }}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
