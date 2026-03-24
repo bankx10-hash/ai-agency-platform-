@@ -24,11 +24,11 @@
       "position": [500, 300],
       "parameters": {
         "method": "GET",
-        "url": "=`https://api.retellai.com/v2/get-call/${$json.call_id}`",
+        "url": "={{ 'https://api.retellai.com/v2/get-call/' + $json.call_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.RETELL_API_KEY}}" }
+            { "name": "Authorization", "value": "=Bearer {{ $env.RETELL_API_KEY }}" }
           ]
         }
       }
@@ -45,14 +45,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Analyse this call transcript. Return JSON: { callerName, callerPhone, callerEmail, intent, appointmentRequested (boolean), summary, actionItems }. Transcript: \" + $json.transcript}]}"
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, system: '{{AGENT_PROMPT}}', messages: [{ role: 'user', content: 'Analyse this call transcript. Return only valid JSON (no markdown): { \"callerName\": string, \"callerPhone\": string, \"callerEmail\": string, \"intent\": string, \"appointmentRequested\": boolean, \"summary\": string, \"actionItems\": string }. Transcript: ' + $json.transcript }] }) }}"
       }
     },
     {
@@ -62,7 +62,7 @@
       "typeVersion": 2,
       "position": [1000, 300],
       "parameters": {
-        "jsCode": "const text = $input.first().json.content[0].text;\nlet result;\ntry { result = JSON.parse(text); } catch { result = { callerName: 'Unknown', callerPhone: '', callerEmail: '', intent: 'unknown', appointmentRequested: false, summary: text, actionItems: '' }; }\nreturn [{ json: result }];"
+        "jsCode": "const text = $input.first().json.content[0].text.trim();\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/,'').replace(/```\\s*$/,'');\n  result = JSON.parse(clean);\n} catch {\n  result = { callerName: 'Unknown', callerPhone: '', callerEmail: '', intent: 'unknown', appointmentRequested: false, summary: text, actionItems: '' };\n}\nreturn [{ json: result }];"
       }
     },
     {
@@ -70,62 +70,79 @@
       "name": "Save Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1250, 200],
+      "position": [1250, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
+        "url": "={{ $env.API_BASE_URL + '/n8n/{{CLIENT_ID}}/contacts' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "={{ $env.N8N_API_SECRET }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"name\":$json.callerName,\"phone\":$json.callerPhone,\"email\":$json.callerEmail,\"source\":\"Inbound Call\",\"tags\":[\"inbound-call\"],\"intent\":$json.intent}"
+        "jsonBody": "={{ JSON.stringify({ name: $('Parse Call Analysis').first().json.callerName, phone: $('Parse Call Analysis').first().json.callerPhone, email: $('Parse Call Analysis').first().json.callerEmail, source: 'Inbound Call', tags: ['inbound-call'], intent: $('Parse Call Analysis').first().json.intent }) }}"
       }
     },
     {
-      "id": "add-call-note",
+      "id": "save-call-note",
       "name": "Save Call Note",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1500, 200],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/={{$json.id}}/notes",
+        "url": "={{ $env.API_BASE_URL + '/n8n/{{CLIENT_ID}}/contacts/' + $json.id + '/notes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "={{ $env.N8N_API_SECRET }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"body\":\"Inbound call summary: \" + $('Parse Call Analysis').first().json.summary + \"\\nAction items: \" + $('Parse Call Analysis').first().json.actionItems}"
+        "jsonBody": "={{ JSON.stringify({ body: 'Inbound call summary: ' + $('Parse Call Analysis').first().json.summary + '\\nAction items: ' + $('Parse Call Analysis').first().json.actionItems }) }}"
+      }
+    },
+    {
+      "id": "check-appointment",
+      "name": "Appointment Requested?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1500, 400],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Parse Call Analysis').first().json.appointmentRequested }}",
+              "value2": true
+            }
+          ]
+        }
       }
     },
     {
       "id": "book-appointment",
-      "name": "Book Appointment if Requested",
+      "name": "Book Appointment",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1250, 400],
+      "position": [1750, 400],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
+        "url": "={{ $env.API_BASE_URL + '/n8n/{{CLIENT_ID}}/appointments' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "={{ $env.N8N_API_SECRET }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"contactId\":$json.id,\"calendarId\":\"{{CALENDAR_ID}}\",\"title\":\"Follow-up from Inbound Call\"}"
+        "jsonBody": "={{ JSON.stringify({ contactId: $('Save Contact').first().json.id, calendarId: '{{CALENDAR_ID}}', title: 'Follow-up from Inbound Call - ' + $('Parse Call Analysis').first().json.callerName }) }}"
       }
     },
     {
@@ -153,16 +170,24 @@
       "main": [[{ "node": "Parse Call Analysis", "type": "main", "index": 0 }]]
     },
     "Parse Call Analysis": {
-      "main": [
-        [{ "node": "Save Contact", "type": "main", "index": 0 }],
-        [{ "node": "Book Appointment if Requested", "type": "main", "index": 0 }]
-      ]
+      "main": [[{ "node": "Save Contact", "type": "main", "index": 0 }]]
     },
     "Save Contact": {
-      "main": [[{ "node": "Save Call Note", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          { "node": "Save Call Note", "type": "main", "index": 0 },
+          { "node": "Appointment Requested?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Appointment Requested?": {
+      "main": [
+        [{ "node": "Book Appointment", "type": "main", "index": 0 }],
+        []
+      ]
     },
     "Calendar Booking Webhook": {
-      "main": [[{ "node": "Book Appointment if Requested", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Book Appointment", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
