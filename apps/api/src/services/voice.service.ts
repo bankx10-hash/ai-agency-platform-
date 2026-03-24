@@ -151,10 +151,13 @@ export class VoiceService {
         logger.info('AU Twilio number purchased', { phoneNumber, clientId })
 
         // Import into Retell and link to agent
+        // termination_uri is Retell's SIP address (from Retell dashboard → Phone Numbers → Import)
+        const terminationUri = process.env.RETELL_TERMINATION_URI
+        if (!terminationUri) throw new Error('RETELL_TERMINATION_URI env var not set')
+
         await retellApi.post('/import-phone-number', {
           phone_number: phoneNumber,
-          twilio_account_sid: TWILIO_ACCOUNT_SID,
-          twilio_auth_token: TWILIO_AUTH_TOKEN,
+          termination_uri: terminationUri,
           inbound_agent_id: agentId,
           nickname: `${businessName} - ${clientId}`
         })
