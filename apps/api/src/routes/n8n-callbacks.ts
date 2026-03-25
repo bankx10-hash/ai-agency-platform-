@@ -189,8 +189,10 @@ router.post('/:clientId/contacts', async (req, res) => {
     })
     res.json({ success: true, id: contactId, crmType })
   } catch (err) {
-    logger.error('N8N contact save error', { clientId, err })
-    res.status(500).json({ error: 'Failed to save contact' })
+    const detail = err instanceof Error ? err.message : String(err)
+    const hsDetail = (err as { response?: { data?: unknown } })?.response?.data
+    logger.error('N8N contact save error', { clientId, err: detail, hsDetail })
+    res.status(500).json({ error: 'Failed to save contact', detail, hsDetail })
   }
 })
 
