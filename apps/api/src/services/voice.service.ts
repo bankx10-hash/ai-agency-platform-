@@ -50,6 +50,21 @@ const retellApi = axios.create({
   }
 })
 
+export interface RetellTool {
+  type: 'custom'
+  name: string
+  description: string
+  url: string
+  speak_during_execution: boolean
+  speak_after_execution: boolean
+  execution_message_description: string
+  parameters: {
+    type: 'object'
+    properties: Record<string, { type: string; description: string }>
+    required?: string[]
+  }
+}
+
 export interface CreateInboundAgentParams {
   prompt: string
   voice: string
@@ -59,6 +74,7 @@ export interface CreateInboundAgentParams {
   transferNumber?: string
   callWebhook?: string
   country?: string
+  tools?: RetellTool[]
   address?: {
     street: string
     city: string
@@ -85,21 +101,29 @@ export class VoiceService {
    * Creates a Retell LLM (v2) and returns its llm_id.
    * Retell v2 requires LLM creation as a separate step before agent creation.
    */
-  private async createRetellLlm(systemPrompt: string, firstSentence: string): Promise<string> {
-    const llmRes = await retellApi.post('/create-retell-llm', {
+  private async createRetellLlm(
+    systemPrompt: string,
+    firstSentence: string,
+    tools?: RetellTool[]
+  ): Promise<string> {
+    const payload: Record<string, unknown> = {
       model: 'claude-4.5-sonnet',
       general_prompt: systemPrompt,
       begin_message: firstSentence
-    })
+    }
+    if (tools && tools.length > 0) {
+      payload.general_tools = tools
+    }
+    const llmRes = await retellApi.post('/create-retell-llm', payload)
     return llmRes.data.llm_id as string
   }
 
   async createInboundAgent(params: CreateInboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, callWebhook, country, address } = params
+    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, callWebhook, country, tools, address } = params
     const clientCountry = (country || 'AU').toUpperCase()
 
-    // Step 1: create the LLM with the system prompt
-    const llmId = await this.createRetellLlm(prompt, firstSentence)
+    // Step 1: create the LLM with the system prompt (and optional tools)
+    const llmId = await this.createRetellLlm(prompt, firstSentence, tools)
     logger.info('Retell LLM created', { llmId, clientId })
 
     // Step 2: create the agent linked to the LLM

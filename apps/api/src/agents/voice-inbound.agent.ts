@@ -1,7 +1,8 @@
 import { BaseAgent } from './base.agent'
 import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { n8nService } from '../services/n8n.service'
-import { voiceService } from '../services/voice.service'
+import { voiceService, RetellTool } from '../services/voice.service'
+import { calendarService } from '../services/calendar.service'
 import { PrismaClient } from '@prisma/client'
 import { logger } from '../utils/logger'
 
@@ -46,11 +47,12 @@ Call handling rules:
 1. Always greet warmly and professionally
 2. Listen actively — do not interrupt
 3. Ask qualification questions naturally, not like a form
-4. If caller wants to book: collect their name and email, let them know you will send them a booking link immediately after the call to choose a time that suits them
-5. If question not in knowledge base: say you will have someone call back and take their contact info
-6. If caller is upset or frustrated: empathise, then offer to connect them with a human (transfer to ${config.escalation_number || 'manager'})
-7. Keep calls focused but never rushed
-8. Always end with a clear next step
+4. If caller wants to book an appointment: use the check_availability tool to find open slots, present them clearly, then use book_appointment once they confirm a time — collect their name, email and confirm the slot first
+5. If no calendar tool is available and caller wants to book: collect their name and email, let them know you will send them a booking link immediately after the call
+6. If question not in knowledge base: say you will have someone call back and take their contact info
+7. If caller is upset or frustrated: empathise, then offer to connect them with a human (transfer to ${config.escalation_number || 'manager'})
+8. Keep calls focused but never rushed
+9. Always end with a clear next step
 
 Caller context:
 ${JSON.stringify(caller, null, 2)}
@@ -62,6 +64,14 @@ Respond naturally as if in a real phone conversation.`
     const typedConfig = config as unknown as VoiceInboundConfig
     logger.info('Deploying Voice Inbound Agent', { clientId })
 
+    // Check calendar provider before generating prompt so we can embed correct booking instructions
+    const calendarProvider = await calendarService.getCalendarProvider(clientId)
+    const bookingInstruction = calendarProvider
+      ? `You have access to real-time calendar availability. When a caller wants to book an appointment, use the check_availability tool to fetch open slots, present them clearly, collect the caller's name and email, confirm the chosen slot, then use the book_appointment tool to lock it in and send a confirmation email.`
+      : typedConfig.booking_link
+        ? `When a caller wants to book, collect their name and email and let them know you will send a booking link to their email right after the call.`
+        : `When a caller wants to book, collect their name and email and let them know someone will follow up to confirm a time.`
+
     const voicePrompt = await this.callClaude(
       `Create a detailed, natural-sounding AI phone receptionist script for ${typedConfig.businessName}.
 
@@ -69,8 +79,8 @@ Respond naturally as if in a real phone conversation.`
        1. Answer calls professionally with: "${typedConfig.greeting_script}"
        2. Qualify callers with these questions (asked naturally): ${typedConfig.qualification_questions.join(', ')}
        3. Handle FAQs from this knowledge base: ${typedConfig.faq_knowledge_base}
-       4. Book appointments using calendar ID: ${typedConfig.calendar_id}
-       5. Escalate to human at: ${typedConfig.escalation_number}
+       4. ${bookingInstruction}
+       5. Escalate to human at: ${typedConfig.escalation_number || 'manager'}
 
        Create a comprehensive system prompt that makes the AI sound human, warm, and professional.
        Include specific language for handling common situations.
@@ -83,6 +93,49 @@ Respond naturally as if in a real phone conversation.`
        - Your introduction should always be: "Thank you for calling ${typedConfig.businessName}" — never reference any other company or system`,
       'You are an expert at creating AI voice agent prompts for businesses. Make them sound completely human and never break character.'
     )
+
+    // Build Retell tools if the client has a calendar connected (calendarProvider already fetched above)
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000'
+
+    const calendarTools: RetellTool[] = calendarProvider ? [
+      {
+        type: 'custom',
+        name: 'check_availability',
+        description: 'Check available appointment times in the calendar. Call this when the caller wants to book an appointment.',
+        url: `${apiBaseUrl}/calendar/${clientId}/availability`,
+        speak_during_execution: true,
+        speak_after_execution: false,
+        execution_message_description: "Let me check our available appointment times for you...",
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: []
+        }
+      },
+      {
+        type: 'custom',
+        name: 'book_appointment',
+        description: 'Book an appointment for the caller once they have confirmed a time slot. Requires their name, email, and chosen start time in ISO 8601 format.',
+        url: `${apiBaseUrl}/calendar/${clientId}/book`,
+        speak_during_execution: true,
+        speak_after_execution: false,
+        execution_message_description: "Let me lock that appointment in for you...",
+        parameters: {
+          type: 'object',
+          properties: {
+            start_time: { type: 'string', description: 'ISO 8601 datetime of the chosen appointment slot' },
+            caller_name: { type: 'string', description: 'Full name of the caller' },
+            caller_email: { type: 'string', description: 'Email address of the caller' },
+            caller_phone: { type: 'string', description: 'Phone number of the caller (optional)' }
+          },
+          required: ['start_time', 'caller_name', 'caller_email']
+        }
+      }
+    ] : []
+
+    if (calendarProvider) {
+      logger.info('Calendar tools enabled for voice agent', { clientId, calendarProvider })
+    }
 
     let retellAgentId: string | undefined
     let phoneNumber: string | undefined
@@ -97,6 +150,7 @@ Respond naturally as if in a real phone conversation.`
         transferNumber: typedConfig.escalation_number,
         callWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-inbound-${clientId}`,
         country: typedConfig.country || 'AU',
+        tools: calendarTools.length > 0 ? calendarTools : undefined,
         address: typedConfig.address
       })
 

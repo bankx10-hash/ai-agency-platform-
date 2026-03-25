@@ -590,6 +590,22 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
       create: { id: `${storePlatform}-${clientId}`, clientId, service: storePlatform, credentials: encrypted }
     })
 
+    // Auto-save Calendly scheduling URL as booking link in onboarding data
+    if (platform === 'calendly' && (credentials as Record<string, string>).schedulingUrl) {
+      const schedulingUrl = (credentials as Record<string, string>).schedulingUrl
+      const existing = await prisma.onboarding.findUnique({ where: { clientId } })
+      if (existing) {
+        const existingData = (existing.data as Record<string, unknown>) || {}
+        if (!existingData.bookingLink) {
+          await prisma.onboarding.update({
+            where: { clientId },
+            data: { data: { ...existingData, bookingLink: schedulingUrl } as never }
+          })
+          logger.info('Calendly scheduling URL saved as booking link', { clientId, schedulingUrl })
+        }
+      }
+    }
+
     logger.info('OAuth callback completed', { platform: storePlatform, clientId })
     res.redirect(`${portalBase}/onboarding/connect?connected=${storePlatform}`)
   } catch (error) {

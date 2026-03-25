@@ -23,7 +23,7 @@
       "typeVersion": 2,
       "position": [500, 300],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst call = data.body ? data.body.call : data.call;\nconst fromNumber = (call && call.from_number) ? call.from_number : 'unknown';\nconst transcript = (call && call.transcript) ? call.transcript : 'No transcript available';\n\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 1024,\n    system: 'You are a call analysis assistant. Extract caller information from business phone call transcripts. Always return valid JSON only — no markdown, no explanation, no code fences.',\n    messages: [{\n      role: 'user',\n      content: 'Analyse this inbound business phone call. The caller incoming phone number is: ' + fromNumber + '.\\n\\nReturn ONLY valid JSON with this exact structure:\\n{\"callerName\":\"string or Unknown\",\"callerPhone\":\"string — use incoming number if caller did not provide one\",\"callerEmail\":\"string or empty\",\"intent\":\"why they called\",\"appointmentRequested\":true or false,\"summary\":\"1-2 sentence summary\",\"actionItems\":\"next steps or empty string\"}\\n\\nTranscript:\\n' + transcript\n    }]\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nconst call = data.body ? data.body.call : data.call;\nconst fromNumber = (call && call.from_number) ? call.from_number : 'unknown';\nconst transcript = (call && call.transcript) ? call.transcript : 'No transcript available';\n\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 1024,\n    system: 'You are a call analysis assistant. Extract caller information from business phone call transcripts. Always return valid JSON only — no markdown, no explanation, no code fences.',\n    messages: [{\n      role: 'user',\n      content: 'Analyse this inbound business phone call. The caller incoming phone number is: ' + fromNumber + '.\\n\\nReturn ONLY valid JSON with this exact structure:\\n{\"callerName\":\"string or Unknown\",\"callerPhone\":\"string — use incoming number if caller did not provide one\",\"callerEmail\":\"string or empty\",\"intent\":\"why they called\",\"appointmentRequested\":true or false,\"appointmentBooked\":true or false,\"summary\":\"1-2 sentence summary\",\"actionItems\":\"next steps or empty string\"}\\n\\nSet appointmentBooked to true only if the transcript shows a specific time was confirmed and booked during the call.\\n\\nTranscript:\\n' + transcript\n    }]\n  }\n}];"
       }
     },
     {
@@ -55,7 +55,7 @@
       "typeVersion": 2,
       "position": [1000, 300],
       "parameters": {
-        "jsCode": "const text = $input.first().json.content[0].text.trim();\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/,'').replace(/```\\s*$/,'');\n  result = JSON.parse(clean);\n} catch {\n  result = { callerName: 'Unknown', callerPhone: '', callerEmail: '', intent: 'unknown', appointmentRequested: false, summary: text, actionItems: '' };\n}\nreturn [{ json: result }];"
+        "jsCode": "const text = $input.first().json.content[0].text.trim();\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/,'').replace(/```\\s*$/,'');\n  result = JSON.parse(clean);\n} catch {\n  result = { callerName: 'Unknown', callerPhone: '', callerEmail: '', intent: 'unknown', appointmentRequested: false, appointmentBooked: false, summary: text, actionItems: '' };\n}\nreturn [{ json: result }];"
       }
     },
     {
@@ -118,24 +118,20 @@
       }
     },
     {
-      "id": "book-appointment",
-      "name": "Book Appointment",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "id": "check-already-booked",
+      "name": "Already Booked During Call?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
       "position": [1750, 400],
       "parameters": {
-        "method": "POST",
-        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Parse Call Analysis').first().json.appointmentBooked }}",
+              "value2": true
+            }
           ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $('Save Contact').first().json.id, calendarId: '{{CALENDAR_ID}}', title: 'Follow-up from Inbound Call - ' + $('Parse Call Analysis').first().json.callerName }) }}"
+        }
       }
     },
     {
@@ -143,9 +139,9 @@
       "name": "Build Booking Link Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2000, 400],
+      "position": [2000, 500],
       "parameters": {
-        "jsCode": "const analysis = $('Parse Call Analysis').first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nconst bookingLink = \"{{BOOKING_LINK}}\";\nconst name = analysis.callerName || 'there';\nconst email = analysis.callerEmail || '';\nif (!email || !bookingLink) return [{ json: { skip: true, to: '', subject: '', html: '' } }];\nconst html = '<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px\">'\n  + '<div style=\"background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:10px;text-align:center;margin-bottom:30px\">'\n  + '<h1 style=\"color:white;margin:0\">Book Your Appointment</h1></div>'\n  + '<p style=\"font-size:16px;color:#333\">Hi ' + name + ',</p>'\n  + '<p style=\"font-size:16px;color:#333\">Thanks for calling <strong>' + businessName + '</strong>! As discussed, here is your link to book a time that suits you:</p>'\n  + '<div style=\"text-align:center;margin:30px 0\">'\n  + '<a href=\"' + bookingLink + '\" style=\"background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 30px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:bold\">Book Your Appointment</a></div>'\n  + '<p style=\"font-size:14px;color:#666\">If the button does not work, copy this link: ' + bookingLink + '</p>'\n  + '<p style=\"font-size:14px;color:#666\">Looking forward to speaking with you!<br><strong>The ' + businessName + ' Team</strong></p></div>';\nreturn [{ json: { to: email, subject: 'Book your appointment with ' + businessName, html, skip: false } }];"
+        "jsCode": "const analysis = $('Parse Call Analysis').first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nconst bookingLink = \"{{BOOKING_LINK}}\";\nconst name = analysis.callerName || 'there';\nconst email = analysis.callerEmail || '';\nif (!email || !bookingLink) return [];\nconst html = '<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px\">'\n  + '<div style=\"background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:10px;text-align:center;margin-bottom:30px\">'\n  + '<h1 style=\"color:white;margin:0\">Book Your Appointment</h1></div>'\n  + '<p style=\"font-size:16px;color:#333\">Hi ' + name + ',</p>'\n  + '<p style=\"font-size:16px;color:#333\">Thanks for calling <strong>' + businessName + '</strong>! As discussed, here is your link to book a time that suits you:</p>'\n  + '<div style=\"text-align:center;margin:30px 0\">'\n  + '<a href=\"' + bookingLink + '\" style=\"background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 30px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:bold\">Book Your Appointment</a></div>'\n  + '<p style=\"font-size:14px;color:#666\">If the button does not work, copy this link: ' + bookingLink + '</p>'\n  + '<p style=\"font-size:14px;color:#666\">Looking forward to speaking with you!<br><strong>The ' + businessName + ' Team</strong></p></div>';\nreturn [{ json: { to: email, subject: 'Book your appointment with ' + businessName, html } }];"
       }
     },
     {
@@ -153,7 +149,7 @@
       "name": "Send Booking Link Email",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2250, 400],
+      "position": [2250, 500],
       "parameters": {
         "method": "POST",
         "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
@@ -206,18 +202,21 @@
     },
     "Appointment Requested?": {
       "main": [
-        [{ "node": "Book Appointment", "type": "main", "index": 0 }],
+        [{ "node": "Already Booked During Call?", "type": "main", "index": 0 }],
         []
       ]
     },
-    "Book Appointment": {
-      "main": [[{ "node": "Build Booking Link Email", "type": "main", "index": 0 }]]
+    "Already Booked During Call?": {
+      "main": [
+        [],
+        [{ "node": "Build Booking Link Email", "type": "main", "index": 0 }]
+      ]
     },
     "Build Booking Link Email": {
       "main": [[{ "node": "Send Booking Link Email", "type": "main", "index": 0 }]]
     },
     "Calendar Booking Webhook": {
-      "main": [[{ "node": "Book Appointment", "type": "main", "index": 0 }]]
+      "main": [[]]
     }
   },
   "settings": {

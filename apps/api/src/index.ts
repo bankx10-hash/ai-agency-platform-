@@ -10,6 +10,7 @@ import onboardingRouter from './routes/onboarding'
 import webhooksRouter from './routes/webhooks'
 import n8nCallbacksRouter from './routes/n8n-callbacks'
 import adminRouter from './routes/admin'
+import calendarRouter from './routes/calendar'
 import { logger } from './utils/logger'
 
 async function runStartupMigrations() {
@@ -85,6 +86,7 @@ app.use('/onboarding', onboardingRouter)
 app.use('/webhooks', webhooksRouter)
 app.use('/n8n', n8nCallbacksRouter)
 app.use('/admin', adminRouter)
+app.use('/calendar', calendarRouter)
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', {

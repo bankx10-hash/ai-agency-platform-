@@ -33,8 +33,15 @@ export class OnboardingService {
 
     const onboardingData = (client.onboarding?.data ?? {}) as Record<string, unknown>
     const voiceConfig = onboardingData.voiceConfig as Record<string, unknown> | undefined
+    // Merge root-level bookingLink (auto-saved from Calendly OAuth) into voiceConfig so agents can use it
+    const rootBookingLink = onboardingData.bookingLink as string | undefined
+    const mergedVoiceConfig = voiceConfig
+      ? { ...voiceConfig, bookingLink: (voiceConfig.bookingLink as string) || rootBookingLink || '' }
+      : rootBookingLink
+        ? { bookingLink: rootBookingLink }
+        : undefined
 
-    await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client, (client as Record<string, unknown>).country as string | undefined, voiceConfig)
+    await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client, (client as Record<string, unknown>).country as string | undefined, mergedVoiceConfig)
 
     await this.updateOnboardingStep(clientId, 3, { agentsDeployed: true })
 
