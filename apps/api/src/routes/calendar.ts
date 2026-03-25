@@ -19,9 +19,10 @@ function retellAuth(req: Request, res: Response, next: () => void) {
   next()
 }
 
-// GET /calendar/:clientId/availability
+// POST /calendar/:clientId/availability
 // Returns available appointment slots as text suitable for the voice agent to read aloud.
-router.get('/:clientId/availability', retellAuth, async (req: Request, res: Response): Promise<void> => {
+// Retell tool calling always sends POST regardless of the operation.
+router.post('/:clientId/availability', retellAuth, async (req: Request, res: Response): Promise<void> => {
   const { clientId } = req.params
 
   try {
