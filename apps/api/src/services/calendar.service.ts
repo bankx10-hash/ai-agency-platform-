@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { google } from 'googleapis'
 import { PrismaClient } from '@prisma/client'
-import { decryptJSON } from '../utils/encrypt'
+import { decryptJSON, encryptJSON } from '../utils/encrypt'
 import { emailService } from './email.service'
 import { logger } from '../utils/logger'
 
@@ -25,12 +25,14 @@ interface CalendlyCredentials {
   refreshToken: string
   schedulingUrl: string
   userUri: string
+  connectedAt?: string
 }
 
 interface GoogleCalendarCredentials {
   accessToken: string
   refreshToken: string
   expiresIn?: string
+  connectedAt?: string
 }
 
 interface CalcomCredentials {
@@ -46,6 +48,80 @@ async function getCredentials<T>(clientId: string, service: string): Promise<T |
   } catch {
     return null
   }
+}
+
+async function saveCredentials(clientId: string, service: string, data: Record<string, unknown>): Promise<void> {
+  const encrypted = encryptJSON({ ...data, connectedAt: new Date().toISOString() })
+  await prisma.clientCredential.upsert({
+    where: { id: `${service}-${clientId}` },
+    update: { credentials: encrypted },
+    create: { id: `${service}-${clientId}`, clientId, service, credentials: encrypted }
+  })
+}
+
+// Refresh Calendly access token using refresh token
+async function refreshCalendlyToken(clientId: string, creds: CalendlyCredentials): Promise<CalendlyCredentials> {
+  try {
+    const res = await axios.post(
+      'https://auth.calendly.com/oauth/token',
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: process.env.CALENDLY_CLIENT_ID || '',
+        client_secret: process.env.CALENDLY_CLIENT_SECRET || '',
+        refresh_token: creds.refreshToken
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    )
+    const refreshed: CalendlyCredentials = {
+      ...creds,
+      accessToken: res.data.access_token,
+      refreshToken: res.data.refresh_token || creds.refreshToken
+    }
+    await saveCredentials(clientId, 'calendly', refreshed as unknown as Record<string, unknown>)
+    logger.info('Calendly token refreshed', { clientId })
+    return refreshed
+  } catch (error) {
+    logger.error('Calendly token refresh failed', { clientId, error })
+    return creds  // return original — API call will fail and we handle it upstream
+  }
+}
+
+// Get a valid Calendly access token, refreshing if needed
+async function getCalendlyToken(clientId: string): Promise<CalendlyCredentials | null> {
+  const creds = await getCredentials<CalendlyCredentials>(clientId, 'calendly')
+  if (!creds?.accessToken) return null
+
+  // Calendly access tokens last ~2 hours. Always refresh proactively to avoid mid-call failures.
+  return await refreshCalendlyToken(clientId, creds)
+}
+
+// Get a valid Google Calendar access token, letting googleapis handle refresh automatically
+async function getGoogleCalendarClient(clientId: string) {
+  const creds = await getCredentials<GoogleCalendarCredentials>(clientId, 'google-calendar')
+  if (!creds?.accessToken) return null
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET
+  )
+  oauth2Client.setCredentials({
+    access_token: creds.accessToken,
+    refresh_token: creds.refreshToken
+  })
+
+  // Persist refreshed tokens back to DB automatically
+  oauth2Client.on('tokens', async (tokens) => {
+    if (tokens.access_token) {
+      await saveCredentials(clientId, 'google-calendar', {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || creds.refreshToken,
+        expiresIn: String(tokens.expiry_date || '')
+      })
+      logger.info('Google Calendar token auto-refreshed', { clientId })
+    }
+  })
+
+  return oauth2Client
 }
 
 function formatSlotLabel(isoDate: string): string {
@@ -106,8 +182,8 @@ export class CalendarService {
   }
 
   async getAvailableSlots(clientId: string): Promise<{ provider: string; slots: TimeSlot[] }> {
-    // Try Calendly
-    const calendlyCreds = await getCredentials<CalendlyCredentials>(clientId, 'calendly')
+    // Try Calendly — uses refresh-aware token helper
+    const calendlyCreds = await getCalendlyToken(clientId)
     if (calendlyCreds?.accessToken && calendlyCreds.userUri) {
       try {
         const eventTypesRes = await axios.get('https://api.calendly.com/event_types', {
@@ -140,18 +216,10 @@ export class CalendarService {
       }
     }
 
-    // Try Google Calendar
-    const gcalCreds = await getCredentials<GoogleCalendarCredentials>(clientId, 'google-calendar')
-    if (gcalCreds?.accessToken) {
+    // Try Google Calendar — googleapis handles token refresh automatically
+    const oauth2Client = await getGoogleCalendarClient(clientId)
+    if (oauth2Client) {
       try {
-        const oauth2Client = new google.auth.OAuth2(
-          process.env.GMAIL_CLIENT_ID,
-          process.env.GMAIL_CLIENT_SECRET
-        )
-        oauth2Client.setCredentials({
-          access_token: gcalCreds.accessToken,
-          refresh_token: gcalCreds.refreshToken
-        })
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
         const now = new Date()
@@ -209,19 +277,11 @@ export class CalendarService {
   ): Promise<BookingResult> {
     const endTime = new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString()
 
-    // Try Google Calendar (direct booking)
-    const gcalCreds = await getCredentials<GoogleCalendarCredentials>(clientId, 'google-calendar')
-    if (gcalCreds?.accessToken) {
+    // Try Google Calendar (direct booking) — uses refresh-aware client helper
+    const gcalClient = await getGoogleCalendarClient(clientId)
+    if (gcalClient) {
       try {
-        const oauth2Client = new google.auth.OAuth2(
-          process.env.GMAIL_CLIENT_ID,
-          process.env.GMAIL_CLIENT_SECRET
-        )
-        oauth2Client.setCredentials({
-          access_token: gcalCreds.accessToken,
-          refresh_token: gcalCreds.refreshToken
-        })
-        const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+        const calendar = google.calendar({ version: 'v3', auth: gcalClient })
 
         const event = await calendar.events.insert({
           calendarId: 'primary',
@@ -279,8 +339,8 @@ export class CalendarService {
       }
     }
 
-    // Calendly: send scheduling link post-call
-    const calendlyCreds = await getCredentials<CalendlyCredentials>(clientId, 'calendly')
+    // Calendly: send scheduling link post-call — use refresh-aware helper to get latest schedulingUrl
+    const calendlyCreds = await getCalendlyToken(clientId)
     if (calendlyCreds?.schedulingUrl) {
       const slotLabel = formatSlotLabel(startTime)
       await this.sendSchedulingLinkEmail(contact, slotLabel, calendlyCreds.schedulingUrl, businessName)
