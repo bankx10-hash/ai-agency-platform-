@@ -33,7 +33,7 @@ export interface WorkflowVariable {
 export interface WorkflowDeployConfig {
   clientId: string
   locationId: string
-  agentPrompt: string
+  agentPrompt?: string
   webhookUrl?: string
   phoneNumber?: string
   retellAgentId?: string

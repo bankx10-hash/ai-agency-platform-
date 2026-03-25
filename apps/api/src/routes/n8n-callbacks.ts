@@ -164,7 +164,30 @@ router.get('/:clientId/contacts/:contactId', async (req, res) => {
   try {
     const crmType = await getClientCrmType(clientId)
     logger.info('N8N contact fetch', { clientId, contactId, crmType })
-    // TODO: fetch from connected CRM
+
+    if (crmType === 'hubspot') {
+      const token = await getHubSpotToken(clientId)
+      if (token) {
+        const hsRes = await axios.get(
+          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const p = hsRes.data.properties || {}
+        res.json({
+          contact: {
+            id: contactId,
+            name: [p.firstname, p.lastname].filter(Boolean).join(' ') || 'Unknown',
+            firstname: p.firstname || '',
+            lastname: p.lastname || '',
+            email: p.email || '',
+            phone: p.phone || ''
+          },
+          crmType
+        })
+        return
+      }
+    }
+
     res.json({ contact: { id: contactId }, crmType })
   } catch (err) {
     logger.error('N8N contact fetch error', { clientId, contactId, err })
@@ -277,7 +300,7 @@ router.post('/:clientId/messages/email', async (req, res) => {
       await emailService.sendSystemEmail(to, subject, emailBody)
       logger.info('N8N email sent', { clientId, to, subject })
     }
-    await updateAgentMetrics(clientId, 'CLIENT_SERVICES', {
+    await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
       lastEmailSent: { contactId, to, subject, sentAt: new Date().toISOString() }
     })
     res.json({ success: true })
@@ -320,7 +343,7 @@ router.post('/:clientId/appointments', async (req, res) => {
     await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
       lastAppointment: { contactId, calendarId, startTime, title, bookedAt: new Date().toISOString() }
     })
-    res.json({ success: true, appointmentId: `appt-${Date.now()}` })
+    res.json({ success: true, appointmentId: `appt-${Date.now()}`, startTime, contactId })
   } catch (err) {
     logger.error('N8N appointment error', { clientId, err })
     res.status(500).json({ error: 'Failed to book appointment' })

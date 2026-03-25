@@ -57,7 +57,7 @@ export class N8NService {
     const replacements: Record<string, string> = {
       '{{CLIENT_ID}}': esc(config.clientId),
       '{{LOCATION_ID}}': esc(config.locationId),
-      '{{AGENT_PROMPT}}': esc(config.agentPrompt),
+      '{{AGENT_PROMPT}}': esc(config.agentPrompt || ''),
       '{{WEBHOOK_URL}}': esc(config.webhookUrl || ''),
       '{{PHONE_NUMBER}}': esc(config.phoneNumber || ''),
       '{{RETELL_AGENT_ID}}': esc(config.retellAgentId || ''),
