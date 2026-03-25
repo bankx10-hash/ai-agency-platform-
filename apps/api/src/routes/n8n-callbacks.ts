@@ -39,6 +39,43 @@ async function getCrmCredentials<T>(clientId: string, service: string): Promise<
 
 // ── HubSpot helpers ──────────────────────────────────────────────────────────
 
+async function refreshHubSpotToken(clientId: string, refreshToken: string): Promise<string> {
+  const res = await axios.post(
+    'https://api.hubapi.com/oauth/v1/token',
+    new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: process.env.HUBSPOT_CLIENT_ID || '',
+      client_secret: process.env.HUBSPOT_CLIENT_SECRET || '',
+      refresh_token: refreshToken
+    }),
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  )
+  const { access_token, refresh_token } = res.data
+  // Save updated tokens back to DB
+  const cred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'hubspot' } })
+  if (cred) {
+    await prisma.clientCredential.update({
+      where: { id: cred.id },
+      data: { credentials: encryptJSON({ accessToken: access_token, refreshToken: refresh_token }) }
+    })
+  }
+  logger.info('HubSpot token refreshed', { clientId })
+  return access_token as string
+}
+
+async function getHubSpotToken(clientId: string): Promise<string | null> {
+  const creds = await getCrmCredentials<{ accessToken: string; refreshToken: string }>(clientId, 'hubspot')
+  if (!creds?.accessToken) return null
+  if (!creds.refreshToken) return creds.accessToken
+  // Always refresh — HubSpot tokens expire in 30 min, refresh tokens last 6 months
+  try {
+    return await refreshHubSpotToken(clientId, creds.refreshToken)
+  } catch {
+    // Refresh failed — try the existing access token as fallback
+    return creds.accessToken
+  }
+}
+
 async function hubspotCreateContact(
   accessToken: string,
   data: { name: string; phone: string; email: string; source: string }
@@ -51,8 +88,8 @@ async function hubspotCreateContact(
       properties: {
         firstname,
         lastname,
-        email: data.email || undefined,
-        phone: data.phone || undefined,
+        ...(data.email && { email: data.email }),
+        ...(data.phone && { phone: data.phone }),
         hs_lead_status: 'NEW',
         leadsource: data.source || 'Inbound Call'
       }
@@ -137,9 +174,9 @@ router.post('/:clientId/contacts', async (req, res) => {
     let contactId: string = `contact-${Date.now()}`
 
     if (crmType === 'hubspot') {
-      const creds = await getCrmCredentials<{ accessToken: string }>(clientId, 'hubspot')
-      if (creds?.accessToken) {
-        contactId = await hubspotCreateContact(creds.accessToken, contactData)
+      const token = await getHubSpotToken(clientId)
+      if (token) {
+        contactId = await hubspotCreateContact(token, contactData)
         logger.info('HubSpot contact created', { clientId, contactId })
       } else {
         logger.warn('HubSpot credentials not found', { clientId })
@@ -183,9 +220,9 @@ router.post('/:clientId/contacts/:contactId/notes', async (req, res) => {
     logger.info('N8N contact note', { clientId, contactId, crmType })
 
     if (crmType === 'hubspot') {
-      const creds = await getCrmCredentials<{ accessToken: string }>(clientId, 'hubspot')
-      if (creds?.accessToken) {
-        await hubspotAddNote(creds.accessToken, contactId, body)
+      const token = await getHubSpotToken(clientId)
+      if (token) {
+        await hubspotAddNote(token, contactId, body)
         logger.info('HubSpot note added', { clientId, contactId })
       } else {
         logger.warn('HubSpot credentials not found for note', { clientId })
