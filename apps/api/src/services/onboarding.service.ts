@@ -174,6 +174,7 @@ export class OnboardingService {
         escalation_number: (voiceConfig?.escalationNumber as string) || '',
         voice_id: '11labs-Adrian',
         calendar_id: '',
+        booking_link: (voiceConfig?.bookingLink as string) || '',
         address: voiceConfig?.address || undefined
       },
       [AgentType.VOICE_OUTBOUND]: {

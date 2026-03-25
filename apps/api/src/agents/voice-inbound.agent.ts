@@ -14,6 +14,7 @@ export interface VoiceInboundConfig {
   escalation_number: string
   voice_id: string
   calendar_id: string
+  booking_link?: string
   locationId: string
   businessName: string
   country?: string
@@ -45,7 +46,7 @@ Call handling rules:
 1. Always greet warmly and professionally
 2. Listen actively — do not interrupt
 3. Ask qualification questions naturally, not like a form
-4. If caller wants to book: collect name, email, and preferred time, then confirm calendar availability
+4. If caller wants to book: collect their name and email, let them know you will send them a booking link immediately after the call to choose a time that suits them
 5. If question not in knowledge base: say you will have someone call back and take their contact info
 6. If caller is upset or frustrated: empathise, then offer to connect them with a human (transfer to ${config.escalation_number || 'manager'})
 7. Keep calls focused but never rushed
@@ -118,7 +119,8 @@ Respond naturally as if in a real phone conversation.`
         phoneNumber,
         retellAgentId,
         calendarId: typedConfig.calendar_id,
-        businessName: typedConfig.businessName
+        businessName: typedConfig.businessName,
+        bookingLink: typedConfig.booking_link || ''
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })

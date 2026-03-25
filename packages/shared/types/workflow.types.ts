@@ -41,6 +41,7 @@ export interface WorkflowDeployConfig {
   pipelineId?: string
   apiKey?: string
   businessName?: string
+  bookingLink?: string
   icpDescription?: string
   platforms?: string
   n8nApiSecret?: string

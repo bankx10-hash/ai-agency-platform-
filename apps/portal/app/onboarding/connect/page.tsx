@@ -25,7 +25,9 @@ function ConnectPageInner() {
     addressStreet: '',
     addressCity: '',
     addressState: '',
-    addressPostcode: ''
+    addressPostcode: '',
+    bookingLink: '',
+    calcomApiKey: ''
   })
   const [connected, setConnected] = useState<Record<string, boolean>>({})
 
@@ -100,6 +102,14 @@ function ConnectPageInner() {
 
       const qualificationQuestions = [form.q1, form.q2, form.q3].filter(q => q.trim())
 
+      if (form.calcomApiKey.trim()) {
+        await axios.post(`${API_URL}/onboarding/${clientId}/connect-calendar`, {
+          provider: 'calcom',
+          apiKey: form.calcomApiKey.trim(),
+          bookingLink: form.bookingLink.trim() || undefined
+        }, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
+      }
+
       await axios.post(`${API_URL}/onboarding/start`, {
         clientId,
         voiceConfig: {
@@ -107,6 +117,7 @@ function ConnectPageInner() {
           faqKnowledgeBase: form.faqKnowledgeBase.trim() || undefined,
           qualificationQuestions: qualificationQuestions.length ? qualificationQuestions : undefined,
           escalationNumber: form.escalationNumber.trim() || undefined,
+          bookingLink: form.bookingLink.trim() || undefined,
           address: (form.addressStreet.trim() && form.addressCity.trim()) ? {
             street: form.addressStreet.trim(),
             city: form.addressCity.trim(),
@@ -422,6 +433,99 @@ function ConnectPageInner() {
                 rows={4} placeholder="Describe your ideal customer: industry, company size, role, pain points, budget, location..."
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-none"/>
               <p className="text-xs text-gray-400 mt-1">The more detail you provide, the better your AI agents will qualify leads.</p>
+            </div>
+          </div>
+
+          {/* ── SECTION: Calendar ── */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4">Calendar & Booking</p>
+          <p className="text-xs text-gray-500 -mt-2">Connect your calendar so your AI voice agent can send callers a booking link after each call.</p>
+
+          {/* Calendly */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#006BFF">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4a8 8 0 110 16A8 8 0 0112 4zm0 2a6 6 0 100 12A6 6 0 0012 6zm-1 3h2v4l3 1.5-.9 1.8L11 14.5V9z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">Calendly</p>
+                <p className="text-xs text-gray-500">Connect your Calendly account</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {connected['calendly'] && <ConnectedBadge />}
+              <button type="button" onClick={() => oauthConnect('calendly')}
+                className="flex items-center gap-2 px-4 py-2 bg-[#006BFF] text-white text-sm font-medium rounded-lg hover:bg-[#0055cc] transition">
+                Connect Calendly
+              </button>
+            </div>
+          </div>
+
+          {/* Google Calendar */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M21 6H3a1 1 0 00-1 1v14a1 1 0 001 1h18a1 1 0 001-1V7a1 1 0 00-1-1z"/>
+                  <path fill="#fff" d="M3 10h18v2H3z"/>
+                  <rect x="7" y="2" width="2" height="5" rx="1" fill="#4285F4"/>
+                  <rect x="15" y="2" width="2" height="5" rx="1" fill="#4285F4"/>
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">Google Calendar</p>
+                <p className="text-xs text-gray-500">Connect your Google Calendar</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {connected['google-calendar'] && <ConnectedBadge />}
+              <button type="button" onClick={() => oauthConnect('google-calendar')}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#4285F4"/>
+                  <path d="M17.64 12.2c0-.38-.034-.74-.096-1.1H12v2.08h3.16a2.7 2.7 0 01-1.17 1.77v1.47h1.9c1.1-1.01 1.74-2.5 1.74-4.24z" fill="#4285F4"/>
+                </svg>
+                Connect with Google
+              </button>
+            </div>
+          </div>
+
+          {/* Cal.com */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-xs">Cal</span>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">Cal.com</p>
+                <p className="text-xs text-gray-500">Enter your Cal.com API key</p>
+              </div>
+            </div>
+            <input
+              type="password"
+              value={form.calcomApiKey}
+              onChange={e => setForm(f => ({ ...f, calcomApiKey: e.target.value }))}
+              placeholder="cal_live_xxxxxxxxxxxx"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm font-mono"
+            />
+            <p className="text-xs text-gray-400">Find your API key at cal.com/settings/developer/api-keys</p>
+          </div>
+
+          {/* Booking link fallback */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Booking link <span className="text-gray-400 font-normal">(optional fallback)</span>
+              </label>
+              <input
+                type="url"
+                value={form.bookingLink}
+                onChange={e => setForm(f => ({ ...f, bookingLink: e.target.value }))}
+                placeholder="https://calendly.com/yourbusiness or any booking URL"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">After every call where a caller wants to book, your AI agent will email them this link. Works with Calendly, Acuity, GHL, or any booking page.</p>
             </div>
           </div>
 

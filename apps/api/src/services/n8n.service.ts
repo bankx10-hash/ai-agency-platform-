@@ -65,6 +65,7 @@ export class N8NService {
       '{{PIPELINE_ID}}': esc(config.pipelineId || ''),
       '{{API_KEY}}': esc(config.apiKey || ''),
       '{{BUSINESS_NAME}}': esc(config.businessName || ''),
+      '{{BOOKING_LINK}}': esc(config.bookingLink || ''),
       '{{ICP_DESCRIPTION}}': esc(config.icpDescription || ''),
       '{{N8N_API_SECRET}}': esc(config.n8nApiSecret || process.env.N8N_API_SECRET || ''),
       '{{RETELL_API_KEY}}': esc(config.retellApiKey || process.env.RETELL_API_KEY || ''),

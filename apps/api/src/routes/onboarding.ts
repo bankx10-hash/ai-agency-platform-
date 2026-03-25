@@ -19,6 +19,7 @@ const startOnboardingSchema = z.object({
     faqKnowledgeBase: z.string().optional(),
     qualificationQuestions: z.array(z.string()).optional(),
     escalationNumber: z.string().optional(),
+    bookingLink: z.string().optional(),
     address: z.object({
       street: z.string(),
       city: z.string(),
@@ -173,6 +174,37 @@ router.get('/:clientId/status', authMiddleware, async (req: AuthRequest, res: Re
     })
   } catch (error) {
     logger.error('Error fetching onboarding status', { error, clientId: req.params.clientId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.post('/:clientId/connect-calendar', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { clientId } = req.params
+    if (req.clientId !== clientId) { res.status(403).json({ error: 'Forbidden' }); return }
+
+    const { provider, apiKey, bookingLink } = req.body as { provider: string; apiKey?: string; bookingLink?: string }
+
+    if (provider === 'calcom' && apiKey) {
+      const encrypted = encryptJSON({ apiKey, provider: 'calcom' })
+      await prisma.clientCredential.upsert({
+        where: { id: `calcom-${clientId}` },
+        update: { credentials: encrypted, service: 'calcom' },
+        create: { id: `calcom-${clientId}`, clientId, service: 'calcom', credentials: encrypted }
+      })
+    }
+
+    if (bookingLink) {
+      await prisma.onboarding.updateMany({
+        where: { clientId },
+        data: { data: { bookingLink } as never }
+      })
+    }
+
+    logger.info('Calendar connected', { clientId, provider })
+    res.json({ message: 'Calendar connected', provider })
+  } catch (error) {
+    logger.error('Error connecting calendar', { error })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -366,6 +398,30 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         url = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&client_id=${ghlClientId}&redirect_uri=${redirect}&scope=contacts.readonly%20contacts.write%20opportunities.readonly%20opportunities.write&state=${state}`
         break
       }
+      case 'calendly': {
+        const calendlyClientId = process.env.CALENDLY_CLIENT_ID
+        if (!calendlyClientId) { res.status(500).json({ error: 'CALENDLY_CLIENT_ID not configured' }); return }
+        const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/calendly/callback`)
+        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        url = `https://auth.calendly.com/oauth/authorize?client_id=${calendlyClientId}&redirect_uri=${redirect}&response_type=code&state=${state}`
+        break
+      }
+      case 'google-calendar': {
+        const gcalClientId = process.env.GMAIL_CLIENT_ID
+        const gcalClientSecret = process.env.GMAIL_CLIENT_SECRET
+        if (!gcalClientId || !gcalClientSecret) { res.status(500).json({ error: 'Google credentials not configured' }); return }
+        const { OAuth2 } = (await import('googleapis')).google.auth
+        const redirectUri = `${apiBase}/onboarding/oauth/google-calendar/callback`
+        const oauth2Client = new OAuth2(gcalClientId, gcalClientSecret, redirectUri)
+        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        url = oauth2Client.generateAuthUrl({
+          access_type: 'offline',
+          scope: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/userinfo.email'],
+          prompt: 'consent',
+          state
+        })
+        break
+      }
       case 'hubspot': {
         const hubspotClientId = process.env.HUBSPOT_CLIENT_ID
         if (!hubspotClientId) { res.status(500).json({ error: 'HUBSPOT_CLIENT_ID not configured' }); return }
@@ -440,6 +496,38 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         email: tokens.email
+      }
+    } else if (platform === 'calendly') {
+      const tokenRes = await axios.post(
+        'https://auth.calendly.com/oauth/token',
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: process.env.CALENDLY_CLIENT_ID || '',
+          client_secret: process.env.CALENDLY_CLIENT_SECRET || '',
+          redirect_uri: `${apiBase}/onboarding/oauth/calendly/callback`,
+          code
+        }),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      )
+      // Fetch user info to get scheduling URL
+      const userRes = await axios.get('https://api.calendly.com/users/me', {
+        headers: { Authorization: `Bearer ${tokenRes.data.access_token}` }
+      })
+      credentials = {
+        accessToken: tokenRes.data.access_token,
+        refreshToken: tokenRes.data.refresh_token || '',
+        schedulingUrl: userRes.data.resource?.scheduling_url || '',
+        userUri: userRes.data.resource?.uri || ''
+      }
+    } else if (platform === 'google-calendar') {
+      const { OAuth2 } = (await import('googleapis')).google.auth
+      const redirectUri = `${apiBase}/onboarding/oauth/google-calendar/callback`
+      const oauth2Client = new OAuth2(process.env.GMAIL_CLIENT_ID, process.env.GMAIL_CLIENT_SECRET, redirectUri)
+      const { tokens } = await oauth2Client.getToken(code)
+      credentials = {
+        accessToken: tokens.access_token || '',
+        refreshToken: tokens.refresh_token || '',
+        expiresIn: String(tokens.expiry_date || '')
       }
     } else if (platform === 'meta') {
       const metaAppId = process.env.META_APP_ID
