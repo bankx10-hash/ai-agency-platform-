@@ -69,7 +69,14 @@ export class OnboardingService {
 
     logger.info('Deploying agents for plan', { clientId, plan, agentCount: agentTypes.length })
 
-    for (const agentType of agentTypes) {
+    for (let i = 0; i < agentTypes.length; i++) {
+      const agentType = agentTypes[i]
+
+      // Stagger Claude API calls — wait 10s between agents to avoid 529 overload
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 10000))
+      }
+
       try {
         const AgentClass = AGENT_REGISTRY[agentType]
         if (!AgentClass) {
