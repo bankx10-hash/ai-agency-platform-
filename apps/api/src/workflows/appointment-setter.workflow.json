@@ -7,8 +7,9 @@
       "name": "New Lead Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 300],
+      "position": [250, 200],
       "parameters": {
+        "httpMethod": "POST",
         "path": "appointments-{{CLIENT_ID}}",
         "responseMode": "onReceived",
         "responseData": "allEntries"
@@ -20,38 +21,58 @@
       "name": "Get Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 300],
+      "position": [500, 200],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/={{$json.contactId}}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.contactId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         }
       }
     },
     {
+      "id": "build-followup-request",
+      "name": "Build Follow-up Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 200],
+      "parameters": {
+        "jsCode": "const contact = $input.first().json;\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 500,\n    system: '{{AGENT_PROMPT}}',\n    messages: [{\n      role: 'user',\n      content: 'Write a short, friendly follow-up SMS for this new lead. Be conversational and invite them to book a time. Return ONLY the SMS message text — no explanation, no quotes.\\n\\nLead details:\\n' + JSON.stringify(contact)\n    }]\n  }\n}];"
+      }
+    },
+    {
       "id": "claude-write-followup",
-      "name": "Claude - Write Follow-up Message",
+      "name": "Claude - Write Follow-up",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [750, 300],
+      "position": [1000, 200],
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Write a follow-up SMS for this lead (day 0 initial outreach): \" + JSON.stringify($json.contact)}]}"
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      }
+    },
+    {
+      "id": "parse-followup",
+      "name": "Parse Follow-up Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content[0].text.trim();\nreturn [{ json: { message: text } }];"
       }
     },
     {
@@ -59,20 +80,20 @@
       "name": "Send Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 300],
+      "position": [1500, 200],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"contactId\":$json.contactId,\"type\":\"SMS\",\"message\":$json.content[0].text}"
+        "jsonBody": "={{ JSON.stringify({ contactId: $('New Lead Webhook').first().json.contactId, type: 'SMS', message: $('Parse Follow-up Message').first().json.message }) }}"
       }
     },
     {
@@ -82,31 +103,70 @@
       "typeVersion": 1,
       "position": [250, 500],
       "parameters": {
+        "httpMethod": "POST",
         "path": "appt-reply-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
       },
       "webhookId": "appt-reply-{{CLIENT_ID}}"
+    },
+    {
+      "id": "build-classify-request",
+      "name": "Build Classify Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 500],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\nconst message = body.message || '';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 500,\n    system: 'You are a reply classifier for a sales appointment workflow. Analyse the lead reply and return ONLY valid JSON — no markdown, no explanation, no code fences.',\n    messages: [{\n      role: 'user',\n      content: 'Classify this reply from a lead and decide the next action. Return ONLY valid JSON with this exact structure: {\"appointmentRequested\":true or false,\"intent\":\"interested|not_interested|needs_more_info|other\",\"responseMessage\":\"a brief friendly reply to send them\"}\\n\\nLead reply: ' + message\n    }]\n  }\n}];"
+      }
     },
     {
       "id": "claude-classify-reply",
       "name": "Claude - Classify Reply",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 500],
+      "position": [750, 500],
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":500,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Classify this reply and provide a response: \" + $json.message}]}"
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      }
+    },
+    {
+      "id": "parse-classification",
+      "name": "Parse Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 500],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content[0].text.trim();\nconst replyData = $('Handle Lead Reply').first().json;\nconst body = replyData.body || replyData;\nconst contactId = body.contactId || '';\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/, '').replace(/```\\s*$/, '');\n  result = JSON.parse(clean);\n} catch {\n  result = { appointmentRequested: false, intent: 'other', responseMessage: '' };\n}\nresult.contactId = contactId;\nreturn [{ json: result }];"
+      }
+    },
+    {
+      "id": "check-appointment",
+      "name": "Appointment Requested?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 500],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.appointmentRequested }}",
+              "value2": true
+            }
+          ]
+        }
       }
     },
     {
@@ -114,14 +174,14 @@
       "name": "Get Calendar Slots",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [750, 500],
+      "position": [1500, 400],
       "parameters": {
         "method": "GET",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/calendar-slots",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/calendar-slots",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendQuery": true,
@@ -137,20 +197,20 @@
       "name": "Book Appointment",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 500],
+      "position": [1750, 400],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"contactId\":$json.contactId,\"calendarId\":\"{{CALENDAR_ID}}\",\"startTime\":$json.slots?.[0],\"title\":\"Appointment via AI Agent\"}"
+        "jsonBody": "={{ JSON.stringify({ contactId: $('Parse Classification').first().json.contactId, calendarId: '{{CALENDAR_ID}}', startTime: $json.slots && $json.slots[0] ? $json.slots[0] : null, title: 'Appointment via AI Agent' }) }}"
       }
     }
   ],
@@ -159,16 +219,34 @@
       "main": [[{ "node": "Get Contact", "type": "main", "index": 0 }]]
     },
     "Get Contact": {
-      "main": [[{ "node": "Claude - Write Follow-up Message", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Build Follow-up Request", "type": "main", "index": 0 }]]
     },
-    "Claude - Write Follow-up Message": {
+    "Build Follow-up Request": {
+      "main": [[{ "node": "Claude - Write Follow-up", "type": "main", "index": 0 }]]
+    },
+    "Claude - Write Follow-up": {
+      "main": [[{ "node": "Parse Follow-up Message", "type": "main", "index": 0 }]]
+    },
+    "Parse Follow-up Message": {
       "main": [[{ "node": "Send Message", "type": "main", "index": 0 }]]
     },
     "Handle Lead Reply": {
+      "main": [[{ "node": "Build Classify Request", "type": "main", "index": 0 }]]
+    },
+    "Build Classify Request": {
       "main": [[{ "node": "Claude - Classify Reply", "type": "main", "index": 0 }]]
     },
     "Claude - Classify Reply": {
-      "main": [[{ "node": "Get Calendar Slots", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Parse Classification", "type": "main", "index": 0 }]]
+    },
+    "Parse Classification": {
+      "main": [[{ "node": "Appointment Requested?", "type": "main", "index": 0 }]]
+    },
+    "Appointment Requested?": {
+      "main": [
+        [{ "node": "Get Calendar Slots", "type": "main", "index": 0 }],
+        []
+      ]
     },
     "Get Calendar Slots": {
       "main": [[{ "node": "Book Appointment", "type": "main", "index": 0 }]]
