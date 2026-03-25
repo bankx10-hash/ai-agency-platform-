@@ -82,6 +82,8 @@ export class EmailService {
       return
     }
 
+    const smtpFrom = process.env.SMTP_FROM || smtpUser
+
     const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: smtpPort,
@@ -93,7 +95,7 @@ export class EmailService {
     })
 
     await transporter.sendMail({
-      from: smtpUser,
+      from: smtpFrom,
       to,
       subject,
       html
@@ -116,7 +118,7 @@ export class EmailService {
         </head>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
-            <h1 style="color: white; margin: 0;">Welcome to AI Agency Platform!</h1>
+            <h1 style="color: white; margin: 0;">Welcome to Nodus AI Systems!</h1>
           </div>
 
           <p style="font-size: 16px; color: #333;">Hi ${businessName} team,</p>
@@ -145,7 +147,7 @@ export class EmailService {
 
           <p style="font-size: 14px; color: #666;">
             Best regards,<br>
-            The AI Agency Platform Team
+            The Nodus AI Systems Team
           </p>
         </body>
       </html>
@@ -153,7 +155,7 @@ export class EmailService {
 
     await this.sendSystemEmail(
       clientEmail,
-      `Welcome to AI Agency Platform — Your agents are being deployed, ${businessName}!`,
+      `Welcome to Nodus AI Systems — Your agents are being deployed, ${businessName}!`,
       html
     )
   }
