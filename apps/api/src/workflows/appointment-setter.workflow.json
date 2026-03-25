@@ -49,6 +49,9 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [1000, 200],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
@@ -126,6 +129,9 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [750, 500],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",

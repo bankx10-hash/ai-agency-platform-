@@ -94,6 +94,12 @@ Respond naturally as if in a real phone conversation.`
       'You are an expert at creating AI voice agent prompts for businesses. Make them sound completely human and never break character.'
     )
 
+    // Append explicit tool-calling rules directly to prompt — Claude's generated script alone
+    // is not reliable enough to trigger Retell tool calls when needed.
+    const finalPrompt = calendarProvider
+      ? voicePrompt + `\n\n## TOOL CALLING — MANDATORY RULES (these override everything above)\n\nYou have two tools available and MUST use them:\n\n**check_availability** — Call this tool IMMEDIATELY when the caller:\n- Asks what times or dates are available\n- Says they want to book an appointment\n- Asks to schedule a meeting or visit\nDo NOT say you cannot check the calendar. Do NOT say you will transfer them to a scheduling team. CALL THE TOOL — it will return real available slots you can read aloud.\n\n**book_appointment** — Call this tool once the caller confirms a specific time. Before calling it you must have collected: their full name, email address, and the chosen start_time in ISO 8601 format (e.g. 2026-03-26T09:00:00.000Z).\n\nNEVER tell the caller you lack calendar access. NEVER offer to transfer them for scheduling purposes. ALWAYS use the tools.`
+      : voicePrompt
+
     // Build Retell tools if the client has a calendar connected (calendarProvider already fetched above)
     const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000'
 
@@ -142,7 +148,7 @@ Respond naturally as if in a real phone conversation.`
 
     try {
       const voiceResult = await voiceService.createInboundAgent({
-        prompt: voicePrompt,
+        prompt: finalPrompt,
         voice: typedConfig.voice_id || '11labs-Adrian',
         firstSentence: typedConfig.greeting_script,
         clientId,
