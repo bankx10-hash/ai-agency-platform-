@@ -5,6 +5,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth'
 import { onboardingQueue } from '../queue/onboarding.queue'
 import { encryptJSON } from '../utils/encrypt'
 import { emailService } from '../services/email.service'
+import { google } from 'googleapis'
 import { logger } from '../utils/logger'
 import { z } from 'zod'
 
@@ -410,9 +411,8 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const gcalClientId = process.env.GMAIL_CLIENT_ID
         const gcalClientSecret = process.env.GMAIL_CLIENT_SECRET
         if (!gcalClientId || !gcalClientSecret) { res.status(500).json({ error: 'Google credentials not configured' }); return }
-        const { OAuth2 } = (await import('googleapis')).google.auth
         const redirectUri = `${apiBase}/onboarding/oauth/google-calendar/callback`
-        const oauth2Client = new OAuth2(gcalClientId, gcalClientSecret, redirectUri)
+        const oauth2Client = new google.auth.OAuth2(gcalClientId, gcalClientSecret, redirectUri)
         const state = encodeURIComponent(JSON.stringify({ clientId }))
         url = oauth2Client.generateAuthUrl({
           access_type: 'offline',
@@ -520,9 +520,8 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
         userUri: userRes.data.resource?.uri || ''
       }
     } else if (platform === 'google-calendar') {
-      const { OAuth2 } = (await import('googleapis')).google.auth
       const redirectUri = `${apiBase}/onboarding/oauth/google-calendar/callback`
-      const oauth2Client = new OAuth2(process.env.GMAIL_CLIENT_ID, process.env.GMAIL_CLIENT_SECRET, redirectUri)
+      const oauth2Client = new google.auth.OAuth2(process.env.GMAIL_CLIENT_ID, process.env.GMAIL_CLIENT_SECRET, redirectUri)
       const { tokens } = await oauth2Client.getToken(code)
       credentials = {
         accessToken: tokens.access_token || '',
