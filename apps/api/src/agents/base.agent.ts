@@ -43,24 +43,39 @@ export abstract class BaseAgent {
     logger.info('Agent torn down', { deploymentId, agentType: deployment.agentType })
   }
 
-  async callClaude(prompt: string, systemPrompt?: string): Promise<string> {
+  async callClaude(prompt: string, systemPrompt?: string, retries = 3): Promise<string> {
     const messages: Anthropic.MessageParam[] = [
       { role: 'user', content: prompt }
     ]
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      system: systemPrompt || 'You are an expert AI business automation assistant. Generate professional, human-sounding content.',
-      messages
-    })
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2048,
+          system: systemPrompt || 'You are an expert AI business automation assistant. Generate professional, human-sounding content.',
+          messages
+        })
 
-    const content = response.content[0]
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude')
+        const content = response.content[0]
+        if (content.type !== 'text') {
+          throw new Error('Unexpected response type from Claude')
+        }
+
+        return content.text
+      } catch (error: unknown) {
+        const isOverloaded = error instanceof Error && error.message.includes('529')
+        if (isOverloaded && attempt < retries) {
+          const delay = attempt * 8000  // 8s, 16s
+          logger.warn(`Claude overloaded, retrying in ${delay / 1000}s`, { attempt, retries })
+          await new Promise(resolve => setTimeout(resolve, delay))
+          continue
+        }
+        throw error
+      }
     }
 
-    return content.text
+    throw new Error('callClaude exhausted all retries')
   }
 
   async updateMetrics(deploymentId: string, metrics: Record<string, unknown>): Promise<void> {
