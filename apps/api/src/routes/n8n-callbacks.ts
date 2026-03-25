@@ -82,21 +82,30 @@ async function hubspotCreateContact(
 ): Promise<string> {
   const [firstname, ...rest] = (data.name || 'Unknown').split(' ')
   const lastname = rest.join(' ') || ''
-  const res = await axios.post(
-    'https://api.hubapi.com/crm/v3/objects/contacts',
-    {
-      properties: {
-        firstname,
-        lastname,
-        ...(data.email && { email: data.email }),
-        ...(data.phone && { phone: data.phone }),
-        hs_lead_status: 'NEW',
-        leadsource: data.source || 'Inbound Call'
-      }
-    },
-    { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
-  )
-  return String(res.data.id)
+  try {
+    const res = await axios.post(
+      'https://api.hubapi.com/crm/v3/objects/contacts',
+      {
+        properties: {
+          firstname,
+          lastname,
+          ...(data.email && { email: data.email }),
+          ...(data.phone && { phone: data.phone }),
+          hs_lead_status: 'NEW'
+        }
+      },
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+    )
+    return String(res.data.id)
+  } catch (err) {
+    // 409 = contact already exists — extract the existing ID and return it
+    const hsErr = (err as { response?: { status?: number; data?: { message?: string } } })?.response
+    if (hsErr?.status === 409 && hsErr?.data?.message) {
+      const match = hsErr.data.message.match(/Existing ID:\s*(\d+)/)
+      if (match) return match[1]
+    }
+    throw err
+  }
 }
 
 async function hubspotAddNote(accessToken: string, contactId: string, body: string): Promise<void> {
