@@ -17,11 +17,21 @@
       "webhookId": "voice-inbound-{{CLIENT_ID}}"
     },
     {
+      "id": "build-claude-request",
+      "name": "Build Claude Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": {
+        "jsCode": "const call = $input.first().json.call;\nconst fromNumber = call.from_number || 'unknown';\nconst transcript = call.transcript || 'No transcript available';\n\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 1024,\n    system: 'You are a call analysis assistant. Extract caller information from business phone call transcripts. Always return valid JSON only — no markdown, no explanation, no code fences.',\n    messages: [{\n      role: 'user',\n      content: 'Analyse this inbound business phone call. The caller incoming phone number is: ' + fromNumber + '.\\n\\nReturn ONLY valid JSON with this exact structure:\\n{\"callerName\":\"string or Unknown\",\"callerPhone\":\"string — use incoming number if caller did not provide one\",\"callerEmail\":\"string or empty\",\"intent\":\"why they called\",\"appointmentRequested\":true or false,\"summary\":\"1-2 sentence summary\",\"actionItems\":\"next steps or empty string\"}\\n\\nTranscript:\\n' + transcript\n    }]\n  }\n}];"
+      }
+    },
+    {
       "id": "claude-analyse-call",
       "name": "Claude - Analyse Call",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 300],
+      "position": [750, 300],
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
@@ -35,7 +45,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, system: '{{AGENT_PROMPT}}', messages: [{ role: 'user', content: 'Analyse this call transcript. The caller phone number is ' + $json.call.from_number + '. Return only valid JSON (no markdown): { \"callerName\": string, \"callerPhone\": string, \"callerEmail\": string, \"intent\": string, \"appointmentRequested\": boolean, \"summary\": string, \"actionItems\": string }. Use the caller phone number provided if no name/phone is mentioned. Transcript: ' + $json.call.transcript }] }) }}"
+        "jsonBody": "={{ JSON.stringify($json) }}"
       }
     },
     {
@@ -43,7 +53,7 @@
       "name": "Parse Call Analysis",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [750, 300],
+      "position": [1000, 300],
       "parameters": {
         "jsCode": "const text = $input.first().json.content[0].text.trim();\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/,'').replace(/```\\s*$/,'');\n  result = JSON.parse(clean);\n} catch {\n  result = { callerName: 'Unknown', callerPhone: '', callerEmail: '', intent: 'unknown', appointmentRequested: false, summary: text, actionItems: '' };\n}\nreturn [{ json: result }];"
       }
@@ -53,7 +63,7 @@
       "name": "Save Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 300],
+      "position": [1250, 300],
       "parameters": {
         "method": "POST",
         "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
@@ -74,7 +84,7 @@
       "name": "Save Call Note",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1250, 200],
+      "position": [1500, 200],
       "parameters": {
         "method": "POST",
         "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.id + '/notes' }}",
@@ -95,7 +105,7 @@
       "name": "Appointment Requested?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1250, 400],
+      "position": [1500, 400],
       "parameters": {
         "conditions": {
           "boolean": [
@@ -112,7 +122,7 @@
       "name": "Book Appointment",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1500, 400],
+      "position": [1750, 400],
       "parameters": {
         "method": "POST",
         "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
@@ -144,6 +154,9 @@
   ],
   "connections": {
     "Call Completed Webhook": {
+      "main": [[{ "node": "Build Claude Request", "type": "main", "index": 0 }]]
+    },
+    "Build Claude Request": {
       "main": [[{ "node": "Claude - Analyse Call", "type": "main", "index": 0 }]]
     },
     "Claude - Analyse Call": {
