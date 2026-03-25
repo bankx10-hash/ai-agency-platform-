@@ -73,31 +73,41 @@ Respond naturally as if in a real phone conversation.`
         : `When a caller wants to book, collect their name and email and let them know someone will follow up to confirm a time.`
 
     const voicePrompt = await this.callClaude(
-      `Create a detailed, natural-sounding AI phone receptionist script for ${typedConfig.businessName}.
+      `Create a concise, focused AI phone receptionist script for ${typedConfig.businessName}.
 
-       The agent should:
-       1. Answer calls professionally with: "${typedConfig.greeting_script}"
-       2. Qualify callers with these questions (asked naturally): ${typedConfig.qualification_questions.join(', ')}
-       3. Handle FAQs from this knowledge base: ${typedConfig.faq_knowledge_base}
-       4. ${bookingInstruction}
-       5. Escalate to human at: ${typedConfig.escalation_number || 'manager'}
+       PERSONALITY: Warm but efficient. Short responses. Never ramble. Every sentence has a purpose.
 
-       Create a comprehensive system prompt that makes the AI sound human, warm, and professional.
-       Include specific language for handling common situations.
+       PRIORITY ORDER — the agent must do these in order on every call:
+       1. Greet with: "${typedConfig.greeting_script}"
+       2. Ask why they are calling (one sentence)
+       3. Ask the qualification questions ONE AT A TIME — do not ask more than one at once: ${typedConfig.qualification_questions.join(', ')}
+       4. Collect their name, phone, and email — ask for missing fields one at a time
+       5. ${bookingInstruction}
+       6. End the call with a clear next step
 
-       CRITICAL IDENTITY RULES — embed these throughout the script and the agent must follow them without exception:
-       - You represent ${typedConfig.businessName} exclusively — always refer to yourself as a representative of ${typedConfig.businessName}
-       - NEVER mention: client IDs, system IDs, or any AI platform names (Retell, Claude, OpenAI, Anthropic, or any other)
-       - NEVER reveal that you are an AI system unless directly and persistently asked — in that case say you are a virtual assistant for ${typedConfig.businessName}
-       - If asked what company or system you use: say you are part of the ${typedConfig.businessName} team
-       - Your introduction should always be: "Thank you for calling ${typedConfig.businessName}" — never reference any other company or system`,
-      'You are an expert at creating AI voice agent prompts for businesses. Make them sound completely human and never break character.'
+       RESPONSE STYLE RULES — follow these strictly:
+       - Maximum 2 sentences per response
+       - No compliments like "Great!", "Wonderful!", "Absolutely!" — just acknowledge and move forward
+       - No repeating information the caller just said back to them at length
+       - Do not explain the business unless directly asked
+       - Do not ask "how did you hear about us" or any non-essential questions
+       - Get to the point immediately
+
+       FAQ knowledge base (only use if caller asks a direct question):
+       ${typedConfig.faq_knowledge_base}
+
+       Escalation: if caller is upset or asks for a human, offer to transfer to ${typedConfig.escalation_number || 'a team member'}.
+
+       IDENTITY RULES:
+       - You represent ${typedConfig.businessName} only — never mention AI platforms
+       - If asked if you are AI: say you are a virtual assistant for ${typedConfig.businessName}`,
+      'You are an expert at creating focused, efficient AI voice agent scripts. Prioritise brevity and momentum. No filler, no rambling.'
     )
 
     // Append explicit tool-calling rules directly to prompt — Claude's generated script alone
     // is not reliable enough to trigger Retell tool calls when needed.
     const finalPrompt = calendarProvider
-      ? voicePrompt + `\n\n## TOOL CALLING — MANDATORY RULES (these override everything above)\n\nYou have two tools available and MUST use them:\n\n**check_availability** — Call this tool IMMEDIATELY when the caller:\n- Asks what times or dates are available\n- Says they want to book an appointment\n- Asks to schedule a meeting or visit\nDo NOT say you cannot check the calendar. Do NOT say you will transfer them to a scheduling team. CALL THE TOOL — it will return real available slots you can read aloud.\n\n**book_appointment** — Call this tool once the caller confirms a specific time. Before calling it you must have collected: their full name, email address, and the chosen start_time in ISO 8601 format (e.g. 2026-03-26T09:00:00.000Z).\n\nNEVER tell the caller you lack calendar access. NEVER offer to transfer them for scheduling purposes. ALWAYS use the tools.`
+      ? voicePrompt + `\n\n## BOOKING TOOLS — MANDATORY (override everything above)\n\nWhen the caller mentions booking, appointments, availability, or scheduling — do this immediately:\n\nSTEP 1: Call check_availability tool — do not say you cannot check the calendar, just call it and read the slots aloud: "I have the following times available: [list options]. Which works for you?"\n\nSTEP 2: Once they pick a time, confirm you have their name and email. If missing, ask for them one at a time.\n\nSTEP 3: Call book_appointment tool with: start_time (ISO 8601), caller_name, caller_email.\n\nSTEP 4: Confirm booking — "Done, you are booked for [time]. A confirmation will be sent to [email]."\n\nNEVER say you lack calendar access. NEVER suggest transferring for scheduling. ALWAYS call the tools.`
       : voicePrompt
 
     // Build Retell tools if the client has a calendar connected (calendarProvider already fetched above)
