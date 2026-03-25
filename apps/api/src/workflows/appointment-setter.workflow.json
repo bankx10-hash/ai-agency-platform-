@@ -40,7 +40,7 @@
       "typeVersion": 2,
       "position": [750, 200],
       "parameters": {
-        "jsCode": "const contact = $input.first().json;\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 500,\n    system: '{{AGENT_PROMPT}}',\n    messages: [{\n      role: 'user',\n      content: 'Write a short, friendly follow-up SMS for this new lead. Be conversational and invite them to book a time. Return ONLY the SMS message text — no explanation, no quotes.\\n\\nLead details:\\n' + JSON.stringify(contact)\n    }]\n  }\n}];"
+        "jsCode": "const contact = $input.first().json;\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 500,\n    system: 'You are a friendly appointment-setting assistant for {{BUSINESS_NAME}}. Your job is to write short, warm, conversational follow-up SMS messages to new leads. Always personalise with their first name if available. Keep messages under 160 characters. Return ONLY the SMS message text — no explanation, no quotes, no markdown.',\n    messages: [{\n      role: 'user',\n      content: 'Write a follow-up SMS for this new lead to invite them to book a time with us.\\n\\nLead details:\\n' + JSON.stringify(contact)\n    }]\n  }\n}];"
       }
     },
     {

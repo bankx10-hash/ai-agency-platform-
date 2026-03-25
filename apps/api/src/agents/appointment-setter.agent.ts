@@ -85,7 +85,6 @@ Respond with JSON:
       workflowResult = await n8nService.deployWorkflow('appointment-setter', {
         clientId,
         locationId: typedConfig.locationId,
-        agentPrompt: followUpSequencePrompt,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/appointments-${clientId}`,
         calendarId: typedConfig.calendar_id,
         businessName: typedConfig.businessName
