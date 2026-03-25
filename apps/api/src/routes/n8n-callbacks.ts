@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { emailService } from '../services/email.service'
 import { encryptJSON, decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
+import axios from 'axios'
 
 const router = express.Router()
 const prisma = new PrismaClient()
@@ -19,15 +20,65 @@ router.use(n8nAuth)
 
 async function getClientCrmType(clientId: string): Promise<string> {
   try {
-    const cred = await prisma.clientCredential.findFirst({
-      where: { clientId, service: 'crm-selection' }
-    })
-    if (!cred) return 'internal'
-    const data = decryptJSON<{ crmType: string }>(cred.credentials)
-    return data.crmType || 'internal'
+    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { crmType: true } })
+    return client?.crmType || 'internal'
   } catch {
     return 'internal'
   }
+}
+
+async function getCrmCredentials<T>(clientId: string, service: string): Promise<T | null> {
+  try {
+    const cred = await prisma.clientCredential.findFirst({ where: { clientId, service } })
+    if (!cred) return null
+    return decryptJSON<T>(cred.credentials)
+  } catch {
+    return null
+  }
+}
+
+// ── HubSpot helpers ──────────────────────────────────────────────────────────
+
+async function hubspotCreateContact(
+  accessToken: string,
+  data: { name: string; phone: string; email: string; source: string }
+): Promise<string> {
+  const [firstname, ...rest] = (data.name || 'Unknown').split(' ')
+  const lastname = rest.join(' ') || ''
+  const res = await axios.post(
+    'https://api.hubapi.com/crm/v3/objects/contacts',
+    {
+      properties: {
+        firstname,
+        lastname,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+        hs_lead_status: 'NEW',
+        leadsource: data.source || 'Inbound Call'
+      }
+    },
+    { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+  )
+  return String(res.data.id)
+}
+
+async function hubspotAddNote(accessToken: string, contactId: string, body: string): Promise<void> {
+  const noteRes = await axios.post(
+    'https://api.hubapi.com/crm/v3/objects/notes',
+    {
+      properties: {
+        hs_note_body: body,
+        hs_timestamp: String(Date.now())
+      }
+    },
+    { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+  )
+  const noteId = noteRes.data.id
+  await axios.put(
+    `https://api.hubapi.com/crm/v3/objects/notes/${noteId}/associations/contacts/${contactId}/202`,
+    {},
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
 }
 
 async function updateAgentMetrics(
@@ -82,12 +133,24 @@ router.post('/:clientId/contacts', async (req, res) => {
   try {
     const crmType = await getClientCrmType(clientId)
     logger.info('N8N contact save', { clientId, crmType, name: contactData.name })
-    // TODO: create in connected CRM
+
+    let contactId: string = `contact-${Date.now()}`
+
+    if (crmType === 'hubspot') {
+      const creds = await getCrmCredentials<{ accessToken: string }>(clientId, 'hubspot')
+      if (creds?.accessToken) {
+        contactId = await hubspotCreateContact(creds.accessToken, contactData)
+        logger.info('HubSpot contact created', { clientId, contactId })
+      } else {
+        logger.warn('HubSpot credentials not found', { clientId })
+      }
+    }
+
     await updateAgentMetrics(clientId, 'LEAD_GENERATION', {
-      lastContactSaved: { name: contactData.name, source: contactData.source },
+      lastContactSaved: { name: contactData.name, source: contactData.source, crmId: contactId },
       lastContactAt: new Date().toISOString()
     })
-    res.json({ success: true, id: `contact-${Date.now()}`, crmType })
+    res.json({ success: true, id: contactId, crmType })
   } catch (err) {
     logger.error('N8N contact save error', { clientId, err })
     res.status(500).json({ error: 'Failed to save contact' })
@@ -116,7 +179,19 @@ router.post('/:clientId/contacts/:contactId/notes', async (req, res) => {
   const { clientId, contactId } = req.params
   const { body } = req.body
   try {
-    logger.info('N8N contact note', { clientId, contactId })
+    const crmType = await getClientCrmType(clientId)
+    logger.info('N8N contact note', { clientId, contactId, crmType })
+
+    if (crmType === 'hubspot') {
+      const creds = await getCrmCredentials<{ accessToken: string }>(clientId, 'hubspot')
+      if (creds?.accessToken) {
+        await hubspotAddNote(creds.accessToken, contactId, body)
+        logger.info('HubSpot note added', { clientId, contactId })
+      } else {
+        logger.warn('HubSpot credentials not found for note', { clientId })
+      }
+    }
+
     await updateAgentMetrics(clientId, 'VOICE_INBOUND', {
       lastNote: { contactId, body, addedAt: new Date().toISOString() }
     })
