@@ -72,36 +72,29 @@ export class EmailService {
   }
 
   async sendSystemEmail(to: string, subject: string, html: string): Promise<void> {
-    const smtpUser = process.env.SMTP_USER
-    const smtpPass = process.env.SMTP_PASSWORD
-    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com'
-    const smtpPort = parseInt(process.env.SMTP_PORT || '587')
+    const resendApiKey = process.env.SMTP_PASSWORD
+    const from = process.env.SMTP_FROM || 'Nodus AI Systems <hello@nodusaisystems.com>'
 
-    if (!smtpUser || !smtpPass) {
-      logger.warn('SMTP credentials not configured, skipping email', { to, subject })
+    if (!resendApiKey) {
+      logger.warn('Resend API key not configured, skipping email', { to, subject })
       return
     }
 
-    const smtpFrom = process.env.SMTP_FROM || smtpUser
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass
-      }
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ from, to, subject, html })
     })
 
-    await transporter.sendMail({
-      from: smtpFrom,
-      to,
-      subject,
-      html
-    })
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Resend API error: ${error}`)
+    }
 
-    logger.info('System email sent', { to, subject })
+    logger.info('System email sent via Resend', { to, subject })
   }
 
   async sendWelcomeEmail(
