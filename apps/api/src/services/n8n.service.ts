@@ -70,7 +70,8 @@ export class N8NService {
       '{{N8N_API_SECRET}}': esc(config.n8nApiSecret || process.env.N8N_API_SECRET || ''),
       '{{RETELL_API_KEY}}': esc(config.retellApiKey || process.env.RETELL_API_KEY || ''),
       '{{ANTHROPIC_API_KEY}}': esc(config.anthropicApiKey || process.env.ANTHROPIC_API_KEY || ''),
-      '{{API_BASE_URL}}': esc(config.apiBaseUrl || process.env.API_BASE_URL || '')
+      '{{API_BASE_URL}}': esc(config.apiBaseUrl || process.env.API_BASE_URL || ''),
+      '{{N8N_BASE_URL}}': esc(process.env.N8N_BASE_URL || '')
     }
 
     for (const [placeholder, value] of Object.entries(replacements)) {
