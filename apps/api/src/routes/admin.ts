@@ -155,6 +155,42 @@ router.get('/client/:clientId', async (req: Request, res: Response): Promise<voi
 })
 
 /**
+ * POST /admin/test-claude-score
+ * Calls Claude directly with a sample lead to verify the API key works
+ * and the response format is what the N8N workflow expects.
+ */
+router.post('/test-claude-score', async (_req: Request, res: Response): Promise<void> => {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' })
+    return
+  }
+  try {
+    const body = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 512,
+      system: 'You are a lead qualification specialist. Score leads 0-100 based on ICP fit. Always return valid JSON only — no markdown, no explanation.',
+      messages: [{
+        role: 'user',
+        content: 'Score this lead 0-100. Return ONLY valid JSON with this exact structure: {"score":number,"summary":"string","nextAction":"string","tags":["string"]}.\n\nLead data:\n{"name":"James Carter","company":"Carter Consulting","industry":"Business Consulting","employees":12,"message":"We need help automating our lead follow-up and sales process"}'
+      }]
+    }
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    const data = await response.json() as Record<string, unknown>
+    const content = (data.content as Array<{ text: string }>)?.[0]?.text || ''
+    let parsed = null
+    try { parsed = JSON.parse(content.replace(/^```json\s*/, '').replace(/```\s*$/, '')) } catch {}
+    res.json({ status: response.status, rawResponse: content, parsed, claudeWorking: response.ok })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+/**
  * POST /admin/test-lead-score/:clientId
  * Simulates an N8N lead score callback — useful for verifying the score
  * endpoint and metrics update work end-to-end without needing N8N.
