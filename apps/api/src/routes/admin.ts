@@ -155,6 +155,32 @@ router.get('/client/:clientId', async (req: Request, res: Response): Promise<voi
 })
 
 /**
+ * POST /admin/test-lead-score/:clientId
+ * Simulates an N8N lead score callback — useful for verifying the score
+ * endpoint and metrics update work end-to-end without needing N8N.
+ */
+router.post('/test-lead-score/:clientId', async (req: Request, res: Response): Promise<void> => {
+  const { clientId } = req.params
+  const secret = process.env.N8N_API_SECRET
+  if (!secret) {
+    res.status(500).json({ error: 'N8N_API_SECRET not configured on server' })
+    return
+  }
+  try {
+    const payload = { contactId: 'admin-test-001', score: 85, tags: ['high-score-lead'], summary: 'Admin test lead', nextAction: 'Book a call' }
+    const response = await fetch(`${process.env.API_BASE_URL || 'http://localhost:4000'}/n8n/${clientId}/contacts/score`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-api-secret': secret },
+      body: JSON.stringify(payload)
+    })
+    const result = await response.json()
+    res.json({ status: response.status, result, secretConfigured: true, apiBaseUrl: process.env.API_BASE_URL || 'not set' })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+/**
  * POST /admin/fix-crm-nulls
  * Two-step fix:
  * 1. ALTER the crmType column to be nullable (in case db push didn't apply it)
