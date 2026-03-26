@@ -178,6 +178,20 @@ router.get('/:clientId/contacts/:contactId', async (req, res) => {
     const crmType = await getClientCrmType(clientId)
     logger.info('N8N contact fetch', { clientId, contactId, crmType })
 
+    // Always check internal DB first
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>`
+      SELECT "id", "name", "email", "phone", "source", "stage", "score", "crmId"
+      FROM "Contact"
+      WHERE "id" = ${contactId} AND "clientId" = ${clientId}
+      LIMIT 1
+    `
+    if (rows.length > 0) {
+      const c = rows[0]
+      res.json({ contact: { id: c.id, name: c.name, email: c.email, phone: c.phone, stage: c.stage, score: c.score, crmId: c.crmId }, crmType })
+      return
+    }
+
+    // Fallback: try HubSpot if contactId looks like a HubSpot numeric ID
     if (crmType === 'hubspot') {
       const token = await getHubSpotToken(clientId)
       if (token) {
@@ -190,8 +204,6 @@ router.get('/:clientId/contacts/:contactId', async (req, res) => {
           contact: {
             id: contactId,
             name: [p.firstname, p.lastname].filter(Boolean).join(' ') || 'Unknown',
-            firstname: p.firstname || '',
-            lastname: p.lastname || '',
             email: p.email || '',
             phone: p.phone || ''
           },
