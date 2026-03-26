@@ -31,7 +31,8 @@ export class LinkedInAgent extends BaseAgent {
         clientId,
         locationId: typedConfig.locationId || '',
         businessName: typedConfig.businessName,
-        connectionTemplate: typedConfig.connection_message_template || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!'
+        connectionTemplate: typedConfig.connection_message_template || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!',
+        apiKey: process.env.PHANTOMBUSTER_LEADOUTREACH_ID || ''
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
