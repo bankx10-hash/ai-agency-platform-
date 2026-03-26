@@ -59,7 +59,7 @@
       "typeVersion": 2,
       "position": [750, 300],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\n// Webhook gives direct lead object; Fetch Leads gives { contacts: [...] }\nlet lead;\nif (Array.isArray(input.contacts)) {\n  lead = input.contacts[0] || null;\n} else {\n  lead = input;\n}\nif (!lead || (!lead.name && !lead.email && !lead.phone)) return [];\nreturn [{ json: { lead } }];"
+        "jsCode": "const raw = $input.first().json;\n// N8N wraps webhook POST body under { body: {...} } — unwrap if present\nconst input = raw.body || raw;\n// Webhook gives direct lead object; Fetch Leads gives { contacts: [...] }\nlet lead;\nif (Array.isArray(input.contacts)) {\n  lead = input.contacts[0] || null;\n} else {\n  lead = input;\n}\nif (!lead || (!lead.name && !lead.email && !lead.phone)) return [];\nreturn [{ json: { lead } }];"
       }
     },
     {
