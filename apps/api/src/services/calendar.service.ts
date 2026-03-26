@@ -318,6 +318,10 @@ export class CalendarService {
   ): Promise<BookingResult> {
     const endTime = new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString()
 
+    // Fetch client's email to use as reply-to on all booking emails
+    const clientRecord = await prisma.client.findUnique({ where: { id: clientId }, select: { email: true } })
+    const replyTo = clientRecord?.email || undefined
+
     // Try Google Calendar (direct booking) — uses refresh-aware client helper
     const gcalClient = await getGoogleCalendarClient(clientId)
     if (gcalClient) {
@@ -337,7 +341,7 @@ export class CalendarService {
         })
 
         const slotLabel = formatSlotLabel(startTime)
-        await this.sendConfirmationEmail(contact, slotLabel, businessName, event.data.htmlLink || undefined, startTime, endTime)
+        await this.sendConfirmationEmail(contact, slotLabel, businessName, event.data.htmlLink || undefined, startTime, endTime, replyTo)
 
         return {
           success: true,
@@ -367,7 +371,7 @@ export class CalendarService {
           }
         )
         const slotLabel = formatSlotLabel(startTime)
-        await this.sendConfirmationEmail(contact, slotLabel, businessName, undefined, startTime, endTime)
+        await this.sendConfirmationEmail(contact, slotLabel, businessName, undefined, startTime, endTime, replyTo)
 
         return {
           success: true,
@@ -384,7 +388,7 @@ export class CalendarService {
     const calendlyCreds = await getCalendlyToken(clientId)
     if (calendlyCreds?.schedulingUrl) {
       const slotLabel = formatSlotLabel(startTime)
-      await this.sendSchedulingLinkEmail(contact, slotLabel, calendlyCreds.schedulingUrl, businessName, startTime, endTime)
+      await this.sendSchedulingLinkEmail(contact, slotLabel, calendlyCreds.schedulingUrl, businessName, startTime, endTime, replyTo)
 
       return {
         success: true,
@@ -397,7 +401,7 @@ export class CalendarService {
     const onboarding = await prisma.onboarding.findUnique({ where: { clientId } })
     const bookingLink = (onboarding?.data as Record<string, unknown>)?.bookingLink as string | undefined
     if (bookingLink) {
-      await this.sendSchedulingLinkEmail(contact, formatSlotLabel(startTime), bookingLink, businessName, startTime, endTime)
+      await this.sendSchedulingLinkEmail(contact, formatSlotLabel(startTime), bookingLink, businessName, startTime, endTime, replyTo)
       return {
         success: true,
         booked: false,
@@ -418,7 +422,8 @@ export class CalendarService {
     businessName: string,
     eventLink?: string,
     startTime?: string,
-    endTime?: string
+    endTime?: string,
+    replyTo?: string
   ): Promise<void> {
     try {
       const html = `
@@ -442,7 +447,7 @@ export class CalendarService {
           }]
         : undefined
 
-      await emailService.sendSystemEmail(contact.email, `Your appointment with ${businessName} is confirmed`, html, attachments, businessName)
+      await emailService.sendSystemEmail(contact.email, `Your appointment with ${businessName} is confirmed`, html, attachments, businessName, replyTo)
     } catch (error) {
       logger.error('Failed to send booking confirmation email', { error })
     }
@@ -454,7 +459,8 @@ export class CalendarService {
     bookingLink: string,
     businessName: string,
     startTime?: string,
-    endTime?: string
+    endTime?: string,
+    replyTo?: string
   ): Promise<void> {
     try {
       const html = `
@@ -479,7 +485,7 @@ export class CalendarService {
           }]
         : undefined
 
-      await emailService.sendSystemEmail(contact.email, `Confirm your appointment with ${businessName}`, html, attachments, businessName)
+      await emailService.sendSystemEmail(contact.email, `Confirm your appointment with ${businessName}`, html, attachments, businessName, replyTo)
     } catch (error) {
       logger.error('Failed to send scheduling link email', { error })
     }

@@ -76,7 +76,8 @@ export class EmailService {
     subject: string,
     html: string,
     attachments?: Array<{ filename: string; content: string }>,
-    fromName?: string
+    fromName?: string,
+    replyTo?: string
   ): Promise<void> {
     const resendApiKey = process.env.SMTP_PASSWORD
     const defaultFrom = process.env.SMTP_FROM || 'Nodus AI Systems <hello@nodusaisystems.com>'
@@ -91,6 +92,9 @@ export class EmailService {
     const payload: Record<string, unknown> = { from, to, subject, html }
     if (attachments && attachments.length > 0) {
       payload.attachments = attachments
+    }
+    if (replyTo) {
+      payload.reply_to = replyTo
     }
 
     const response = await fetch('https://api.resend.com/emails', {
