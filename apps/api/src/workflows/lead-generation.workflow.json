@@ -163,7 +163,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $('Parse Lead Score').first().json.contactId, score: $('Parse Lead Score').first().json.score, summary: $('Parse Lead Score').first().json.summary }) }}"
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, score: $json.score, summary: $json.summary }) }}"
       }
     },
     {
@@ -185,6 +185,27 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, score: $json.score, tags: ['medium-score-lead'], summary: $json.summary }) }}"
+      }
+    },
+    {
+      "id": "update-lead-low",
+      "name": "Update Lead - Low Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 450],
+      "parameters": {
+        "method": "PATCH",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/score",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, score: $json.score, tags: ['low-score-lead'], summary: $json.summary }) }}"
       }
     }
   ],
@@ -213,7 +234,8 @@
     "Route by Score": {
       "main": [
         [{ "node": "Update Lead - High Score", "type": "main", "index": 0 }],
-        [{ "node": "Update Lead - Medium Score", "type": "main", "index": 0 }]
+        [{ "node": "Update Lead - Medium Score", "type": "main", "index": 0 }],
+        [{ "node": "Update Lead - Low Score", "type": "main", "index": 0 }]
       ]
     },
     "Update Lead - High Score": {
