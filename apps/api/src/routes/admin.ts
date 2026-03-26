@@ -167,11 +167,16 @@ router.get('/n8n-executions/:workflowId', async (req: Request, res: Response): P
     return
   }
   try {
-    const response = await fetch(`${n8nUrl}/api/v1/executions?workflowId=${workflowId}&limit=5`, {
+    const listRes = await fetch(`${n8nUrl}/api/v1/executions?workflowId=${workflowId}&limit=3`, {
       headers: { 'X-N8N-API-KEY': n8nKey }
     })
-    const data = await response.json()
-    res.json({ status: response.status, data })
+    const listData = await listRes.json() as { data: Array<{ id: string }> }
+    const executions = listData.data || []
+    // Fetch full detail for the most recent execution
+    const detail = executions[0]?.id
+      ? await fetch(`${n8nUrl}/api/v1/executions/${executions[0].id}`, { headers: { 'X-N8N-API-KEY': n8nKey } }).then(r => r.json())
+      : null
+    res.json({ status: listRes.status, executions, detail })
   } catch (error) {
     res.status(500).json({ error: String(error) })
   }
