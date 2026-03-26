@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
 import { onboardingQueue } from '../queue/onboarding.queue'
 import { n8nService } from '../services/n8n.service'
 import { logger } from '../utils/logger'
@@ -26,20 +25,14 @@ function adminAuth(req: Request, res: Response, next: () => void) {
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body as { email: string; password: string }
   const adminEmail = process.env.ADMIN_EMAIL
-  const adminHash = process.env.ADMIN_PASSWORD_HASH
+  const adminPassword = process.env.ADMIN_PASSWORD
 
-  if (!adminEmail || !adminHash) {
+  if (!adminEmail || !adminPassword) {
     res.status(500).json({ error: 'Admin credentials not configured' })
     return
   }
 
-  if (!email || !password || email !== adminEmail) {
-    res.status(401).json({ error: 'Invalid credentials' })
-    return
-  }
-
-  const valid = await bcrypt.compare(password, adminHash)
-  if (!valid) {
+  if (!email || !password || email !== adminEmail || password !== adminPassword) {
     res.status(401).json({ error: 'Invalid credentials' })
     return
   }
