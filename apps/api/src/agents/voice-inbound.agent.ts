@@ -46,9 +46,9 @@ ${config.faq_knowledge_base || 'Answer common questions about the business.'}
 Call handling rules:
 1. Always greet warmly and professionally
 2. Listen actively — do not interrupt
-3. Ask qualification questions naturally, not like a form
-4. If caller wants to book an appointment: use the check_availability tool to find open slots, present them clearly, then use book_appointment once they confirm a time — collect their name, email and confirm the slot first
-5. If no calendar tool is available and caller wants to book: collect their name and email, let them know you will send them a booking link immediately after the call
+3. Early in every call, collect the caller's name, phone number, and email address — ask for each one at a time, never skip email
+4. If caller wants to book an appointment: use the check_availability tool to find open slots, present them clearly, then use book_appointment once they confirm a time — name/email should already be collected
+5. If no calendar tool is available and caller wants to book: ensure you have their name and email, then let them know you will send them a booking link immediately after the call
 6. If question not in knowledge base: say you will have someone call back and take their contact info
 7. If caller is upset or frustrated: empathise, then offer to connect them with a human (transfer to ${config.escalation_number || 'manager'})
 8. Keep calls focused but never rushed
@@ -80,8 +80,8 @@ Respond naturally as if in a real phone conversation.`
        PRIORITY ORDER — the agent must do these in order on every call:
        1. Greet with: "${typedConfig.greeting_script}"
        2. Ask why they are calling (one sentence)
-       3. Ask the qualification questions ONE AT A TIME — do not ask more than one at once: ${typedConfig.qualification_questions.join(', ')}
-       4. Collect their name, phone, and email — ask for missing fields one at a time
+       3. Collect their name, phone number, and email address — ask for each one at a time, do not skip any of these three fields
+       4. Ask the qualification questions ONE AT A TIME — do not ask more than one at once: ${typedConfig.qualification_questions.join(', ')}
        5. ${bookingInstruction}
        6. End the call with a clear next step
 
@@ -107,7 +107,7 @@ Respond naturally as if in a real phone conversation.`
     // Append explicit tool-calling rules directly to prompt — Claude's generated script alone
     // is not reliable enough to trigger Retell tool calls when needed.
     const finalPrompt = calendarProvider
-      ? voicePrompt + `\n\n## BOOKING TOOLS — MANDATORY (override everything above)\n\nWhen the caller mentions booking, appointments, availability, or scheduling — do this immediately:\n\nSTEP 1: Call check_availability tool — do not say you cannot check the calendar, just call it and read the slots aloud: "I have the following times available: [list options]. Which works for you?"\n\nSTEP 2: Once they pick a time, confirm you have their name and email. If missing, ask for them one at a time.\n\nSTEP 3: Call book_appointment tool with: start_time (ISO 8601), caller_name, caller_email.\n\nSTEP 4: Confirm booking — "Done, you are booked for [time]. A confirmation will be sent to [email]."\n\nNEVER say you lack calendar access. NEVER suggest transferring for scheduling. ALWAYS call the tools.`
+      ? voicePrompt + `\n\n## BOOKING TOOLS — MANDATORY (override everything above)\n\nWhen the caller mentions booking, appointments, availability, or scheduling — do this immediately:\n\nSTEP 1: Call check_availability tool — do not say you cannot check the calendar, just call it and read the slots aloud: "I have the following times available: [list options]. Which works for you?"\n\nSTEP 2: Once they pick a time, confirm you have their name and email (you should already have these from earlier in the call — if somehow missing, ask for them one at a time before proceeding).\n\nSTEP 3: Call book_appointment tool with: start_time (ISO 8601), caller_name, caller_email.\n\nSTEP 4: Confirm booking — "Done, you are booked for [time]. A confirmation will be sent to [email]."\n\nNEVER say you lack calendar access. NEVER suggest transferring for scheduling. ALWAYS call the tools.`
       : voicePrompt
 
     // Build Retell tools if the client has a calendar connected (calendarProvider already fetched above)

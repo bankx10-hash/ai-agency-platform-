@@ -169,6 +169,37 @@
       }
     },
     {
+      "id": "build-call-confirmation",
+      "name": "Build Call Booking Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300],
+      "parameters": {
+        "jsCode": "const analysis = $('Parse Call Analysis').first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nconst name = analysis.callerName || 'there';\nconst email = analysis.callerEmail || '';\nif (!email) return [];\nconst summary = analysis.summary || '';\nconst html = '<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px\">'\n  + '<div style=\"background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:10px;text-align:center;margin-bottom:30px\">'\n  + '<h1 style=\"color:white;margin:0\">Appointment Confirmed!</h1></div>'\n  + '<p style=\"font-size:16px;color:#333\">Hi ' + name + ',</p>'\n  + '<p style=\"font-size:16px;color:#333\">Your appointment with <strong>' + businessName + '</strong> has been confirmed. A calendar invitation has been sent to this email address.</p>'\n  + '<div style=\"background:#f8f9fa;border-left:4px solid #667eea;padding:15px;margin:20px 0;border-radius:4px\">'\n  + '<p style=\"margin:0;color:#333;font-size:14px\">' + summary + '</p></div>'\n  + '<p style=\"font-size:14px;color:#666\">If you need to reschedule or have any questions, please reply to this email or call us directly.</p>'\n  + '<p style=\"font-size:14px;color:#666\">We look forward to seeing you!<br><strong>The ' + businessName + ' Team</strong></p></div>';\nreturn [{ json: { to: email, subject: 'Appointment confirmed with ' + businessName, html } }];"
+      }
+    },
+    {
+      "id": "send-call-confirmation",
+      "name": "Send Call Booking Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2250, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $json.to, subject: $json.subject, body: $json.html }) }}"
+      }
+    },
+    {
       "id": "calendar-webhook",
       "name": "Calendar Booking Webhook",
       "type": "n8n-nodes-base.webhook",
@@ -211,9 +242,12 @@
     },
     "Already Booked During Call?": {
       "main": [
-        [],
+        [{ "node": "Build Call Booking Confirmation", "type": "main", "index": 0 }],
         [{ "node": "Build Booking Link Email", "type": "main", "index": 0 }]
       ]
+    },
+    "Build Call Booking Confirmation": {
+      "main": [[{ "node": "Send Call Booking Confirmation", "type": "main", "index": 0 }]]
     },
     "Build Booking Link Email": {
       "main": [[{ "node": "Send Booking Link Email", "type": "main", "index": 0 }]]
