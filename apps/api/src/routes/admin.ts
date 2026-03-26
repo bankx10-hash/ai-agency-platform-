@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client'
 import { onboardingQueue } from '../queue/onboarding.queue'
 import { n8nService } from '../services/n8n.service'
 import { logger } from '../utils/logger'
+import { AGENT_REGISTRY } from '../agents'
+import { AgentType } from '../../../../packages/shared/types/agent.types'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -279,6 +281,94 @@ router.post('/fix-crm-nulls', async (_req: Request, res: Response): Promise<void
   } catch (error) {
     logger.error('Failed to fix crmType nulls', { error })
     res.status(500).json({ error: 'Failed to fix crmType nulls' })
+  }
+})
+
+/**
+ * GET /admin/agents/:clientId
+ * Returns all agent types with their current deployment status for a client.
+ */
+router.get('/agents/:clientId', async (req: Request, res: Response): Promise<void> => {
+  const { clientId } = req.params
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, businessName: true, email: true, plan: true, country: true }
+    })
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' })
+      return
+    }
+    const deployments = await prisma.agentDeployment.findMany({
+      where: { clientId },
+      select: { agentType: true, status: true, n8nWorkflowId: true, retellAgentId: true, createdAt: true, metrics: true }
+    })
+    const deployedMap = Object.fromEntries(deployments.map(d => [d.agentType, d]))
+    const allAgentTypes = Object.values(AgentType)
+    const agents = allAgentTypes.map(agentType => ({
+      agentType,
+      deployed: !!deployedMap[agentType],
+      status: deployedMap[agentType]?.status || null,
+      n8nWorkflowId: deployedMap[agentType]?.n8nWorkflowId || null,
+      retellAgentId: deployedMap[agentType]?.retellAgentId || null,
+      createdAt: deployedMap[agentType]?.createdAt || null
+    }))
+    res.json({ client, agents })
+  } catch (error) {
+    logger.error('Failed to fetch agent status', { clientId, error })
+    res.status(500).json({ error: 'Failed to fetch agent status' })
+  }
+})
+
+/**
+ * POST /admin/deploy-agent/:clientId
+ * Deploys any specific agent for a client regardless of plan.
+ * Body: { agentType: string, config?: Record<string, unknown> }
+ */
+router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Promise<void> => {
+  const { clientId } = req.params
+  const { agentType, config = {} } = req.body as { agentType: string; config?: Record<string, unknown> }
+
+  if (!agentType) {
+    res.status(400).json({ error: 'agentType is required' })
+    return
+  }
+
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, businessName: true, email: true, country: true }
+    })
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' })
+      return
+    }
+
+    const AgentClass = AGENT_REGISTRY[agentType as AgentType]
+    if (!AgentClass) {
+      res.status(400).json({ error: `Unknown agent type: ${agentType}` })
+      return
+    }
+
+    // Remove existing deployment record so deploy() can create a fresh one
+    await prisma.agentDeployment.deleteMany({ where: { clientId, agentType: agentType as never } })
+
+    const agent = new AgentClass()
+    const mergedConfig = {
+      locationId: '',
+      businessName: client.businessName,
+      country: client.country || 'AU',
+      ...config
+    }
+
+    const result = await agent.deploy(clientId, mergedConfig)
+
+    logger.info('Admin deployed agent', { clientId, agentType, result })
+    res.json({ success: true, agentType, clientId, result })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error('Admin deploy-agent failed', { clientId, agentType, error: msg })
+    res.status(500).json({ error: msg })
   }
 })
 
