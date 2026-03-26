@@ -7,7 +7,7 @@
       "name": "Daily Schedule",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
-      "position": [250, 300],
+      "position": [250, 200],
       "parameters": {
         "rule": {
           "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1-5" }]
@@ -15,129 +15,367 @@
       }
     },
     {
-      "id": "get-prospects",
-      "name": "Get Prospects via Phantombuster",
+      "id": "launch-autoconnect",
+      "name": "Launch Auto Connect",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 300],
+      "position": [500, 200],
       "parameters": {
         "method": "POST",
         "url": "https://api.phantombuster.com/api/v2/agents/launch",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Phantombuster-Key", "value": "={{$env.PHANTOMBUSTER_API_KEY}}" }
+            { "name": "X-Phantombuster-Key", "value": "{{PHANTOMBUSTER_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"id\":\"{{API_KEY}}\",\"argument\":{\"searchUrl\":\"{{WEBHOOK_URL}}\",\"numberOfProfiles\":20}}"
+        "specifyBody": "string",
+        "body": "{\"id\":\"{{PHANTOMBUSTER_AUTOCONNECT_ID}}\"}"
       }
     },
     {
-      "id": "wait-for-results",
-      "name": "Wait 60s",
+      "id": "wait-for-autoconnect",
+      "name": "Wait 10 Minutes",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [750, 300],
+      "position": [750, 200],
       "parameters": {
-        "unit": "seconds",
-        "amount": 60
+        "resume": "timeInterval",
+        "amount": 10,
+        "unit": "minutes"
       }
     },
     {
-      "id": "claude-personalise",
-      "name": "Claude - Personalise Message",
+      "id": "fetch-autoconnect-output",
+      "name": "Fetch Auto Connect Output",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 300],
+      "position": [1000, 200],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.phantombuster.com/api/v2/agents/fetch-output?id={{PHANTOMBUSTER_AUTOCONNECT_ID}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Phantombuster-Key", "value": "{{PHANTOMBUSTER_API_KEY}}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "parse-profiles",
+      "name": "Parse Profiles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst resultObject = data.data?.resultObject || data.resultObject || '[]';\nlet profiles = [];\ntry {\n  profiles = typeof resultObject === 'string' ? JSON.parse(resultObject) : resultObject;\n} catch { profiles = []; }\nif (!Array.isArray(profiles) || profiles.length === 0) {\n  return [{ json: { skipped: true, reason: 'No profiles returned from Phantombuster' } }];\n}\n// Filter out errors\nconst valid = profiles.filter(p => !p.error && (p.firstName || p.lastName || p.profileUrl));\nreturn valid.map(p => ({ json: { firstName: p.firstName || '', lastName: p.lastName || '', fullName: ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || 'Unknown', headline: p.headline || p.title || '', company: p.company || '', location: p.location || '', profileUrl: p.profileUrl || '', source: 'LinkedIn Outreach' } }));"
+      }
+    },
+    {
+      "id": "build-followup-request",
+      "name": "Build Follow-up Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 200],
+      "parameters": {
+        "jsCode": "const profile = $input.first().json;\nif (profile.skipped) return [{ json: profile }];\nconst businessName = \"{{BUSINESS_NAME}}\";\nconst template = \"{{CONNECTION_TEMPLATE}}\";\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 300,\n    system: 'You are a LinkedIn outreach specialist for ' + businessName + '. Write a warm, personalised follow-up message for a new LinkedIn connection. Keep it under 200 characters. Sound human, not salesy. Return ONLY the message text — no quotes, no explanation.',\n    messages: [{ role: 'user', content: 'Write a follow-up message for this new connection using the template as inspiration.\\n\\nTemplate: ' + template + '\\n\\nProfile:\\n' + JSON.stringify({ firstName: profile.firstName, headline: profile.headline, company: profile.company, location: profile.location }) }],\n    profile: profile\n  }\n}];"
+      }
+    },
+    {
+      "id": "claude-followup",
+      "name": "Claude - Generate Follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1750, 200],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":300,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Write a LinkedIn connection request for: \" + JSON.stringify($json)}]}"
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ model: $json.model, max_tokens: $json.max_tokens, system: $json.system, messages: $json.messages }) }}"
       }
     },
     {
-      "id": "save-prospect",
-      "name": "Save LinkedIn Prospect",
+      "id": "parse-followup",
+      "name": "Parse Follow-up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 200],
+      "parameters": {
+        "jsCode": "const message = $input.first().json.content?.[0]?.text?.trim() || '';\nconst profile = $('Build Follow-up Request').first().json.profile || {};\nreturn [{ json: { message, profile } }];"
+      }
+    },
+    {
+      "id": "save-contact",
+      "name": "Save Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1250, 300],
+      "position": [2250, 200],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"firstName\":$json.firstName,\"lastName\":$json.lastName,\"source\":\"LinkedIn Outreach\",\"tags\":[\"linkedin-prospect\"],\"message\":$('Claude - Personalise Message').first().json.content[0].text}"
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ name: $json.profile.fullName, source: 'LinkedIn Outreach', tags: ['linkedin-connected'], intent: 'connection_sent' }) }}"
       }
     },
     {
-      "id": "webhook-reply-handler",
-      "name": "Handle LinkedIn Reply",
-      "type": "n8n-nodes-base.webhook",
+      "id": "save-connection-note",
+      "name": "Save Connection Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2500, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.id + '/notes' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ body: 'LinkedIn connection sent.\\nProfile: ' + $('Parse Follow-up').first().json.profile.profileUrl + '\\nHeadline: ' + $('Parse Follow-up').first().json.profile.headline + '\\nGenerated follow-up message: ' + $('Parse Follow-up').first().json.message }) }}"
+      }
+    },
+    {
+      "id": "schedule-messagesender",
+      "name": "Follow-up Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
       "position": [250, 500],
       "parameters": {
-        "path": "linkedin-reply-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      },
-      "webhookId": "linkedin-reply-{{CLIENT_ID}}"
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 10 * * 3" }]
+        }
+      }
     },
     {
-      "id": "claude-classify-reply",
-      "name": "Claude - Classify Reply",
+      "id": "launch-messagesender",
+      "name": "Launch Message Sender",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 500],
       "parameters": {
         "method": "POST",
+        "url": "https://api.phantombuster.com/api/v2/agents/launch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Phantombuster-Key", "value": "{{PHANTOMBUSTER_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "{\"id\":\"{{PHANTOMBUSTER_MESSAGESENDER_ID}}\"}"
+      }
+    },
+    {
+      "id": "wait-for-messagesender",
+      "name": "Wait 15 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [750, 500],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 15,
+        "unit": "minutes"
+      }
+    },
+    {
+      "id": "fetch-messagesender-output",
+      "name": "Fetch Message Sender Output",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 500],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.phantombuster.com/api/v2/agents/fetch-output?id={{PHANTOMBUSTER_MESSAGESENDER_ID}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Phantombuster-Key", "value": "{{PHANTOMBUSTER_API_KEY}}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "log-messages-sent",
+      "name": "Log Messages Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1250, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/activity",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ type: 'linkedin_followup_sent', output: $json.data?.resultObject || '', sentAt: new Date().toISOString() }) }}"
+      }
+    },
+    {
+      "id": "reply-webhook",
+      "name": "Handle LinkedIn Reply",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 800],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linkedin-reply-{{CLIENT_ID}}",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      },
+      "webhookId": "linkedin-reply-{{CLIENT_ID}}"
+    },
+    {
+      "id": "build-classify-request",
+      "name": "Build Classify Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 800],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\nconst message = body.message || '';\nconst contactId = body.contactId || '';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 300,\n    system: 'You are a LinkedIn reply classifier. Analyse the reply and return ONLY valid JSON — no markdown, no explanation.',\n    messages: [{ role: 'user', content: 'Classify this LinkedIn reply. Return ONLY valid JSON: {\"intent\":\"interested|not_interested|question|other\",\"responseMessage\":\"suggested reply under 200 chars\"}\\n\\nReply: ' + message }],\n    contactId: contactId,\n    originalMessage: message\n  }\n}];"
+      }
+    },
+    {
+      "id": "claude-classify",
+      "name": "Claude - Classify Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 800],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":200,\"system\":\"Classify LinkedIn replies as: INTERESTED, QUESTION, NOT_INTERESTED, or NEUTRAL. Return JSON with classification and suggested_response.\",\"messages\":[{\"role\":\"user\",\"content\":\"Classify this reply: \" + $json.message}]}"
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ model: $json.model, max_tokens: $json.max_tokens, system: $json.system, messages: $json.messages }) }}"
+      }
+    },
+    {
+      "id": "parse-classification",
+      "name": "Parse Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 800],
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content?.[0]?.text?.trim() || '';\nconst contactId = $('Build Classify Request').first().json.contactId;\nconst originalMessage = $('Build Classify Request').first().json.originalMessage;\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/, '').replace(/```\\s*$/, '');\n  result = JSON.parse(clean);\n} catch {\n  result = { intent: 'other', responseMessage: '' };\n}\nresult.contactId = contactId;\nresult.originalMessage = originalMessage;\nreturn [{ json: result }];"
+      }
+    },
+    {
+      "id": "save-reply-note",
+      "name": "Save Reply Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1250, 800],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.contactId + '/notes' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ body: 'LinkedIn reply received. Intent: ' + $json.intent + '.\\nMessage: ' + $json.originalMessage + '\\nSuggested response: ' + $json.responseMessage }) }}"
       }
     }
   ],
   "connections": {
     "Daily Schedule": {
-      "main": [[{ "node": "Get Prospects via Phantombuster", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Launch Auto Connect", "type": "main", "index": 0 }]]
     },
-    "Get Prospects via Phantombuster": {
-      "main": [[{ "node": "Wait 60s", "type": "main", "index": 0 }]]
+    "Launch Auto Connect": {
+      "main": [[{ "node": "Wait 10 Minutes", "type": "main", "index": 0 }]]
     },
-    "Wait 60s": {
-      "main": [[{ "node": "Claude - Personalise Message", "type": "main", "index": 0 }]]
+    "Wait 10 Minutes": {
+      "main": [[{ "node": "Fetch Auto Connect Output", "type": "main", "index": 0 }]]
     },
-    "Claude - Personalise Message": {
-      "main": [[{ "node": "Save LinkedIn Prospect", "type": "main", "index": 0 }]]
+    "Fetch Auto Connect Output": {
+      "main": [[{ "node": "Parse Profiles", "type": "main", "index": 0 }]]
+    },
+    "Parse Profiles": {
+      "main": [[{ "node": "Build Follow-up Request", "type": "main", "index": 0 }]]
+    },
+    "Build Follow-up Request": {
+      "main": [[{ "node": "Claude - Generate Follow-up", "type": "main", "index": 0 }]]
+    },
+    "Claude - Generate Follow-up": {
+      "main": [[{ "node": "Parse Follow-up", "type": "main", "index": 0 }]]
+    },
+    "Parse Follow-up": {
+      "main": [[{ "node": "Save Contact", "type": "main", "index": 0 }]]
+    },
+    "Save Contact": {
+      "main": [[{ "node": "Save Connection Note", "type": "main", "index": 0 }]]
+    },
+    "Follow-up Schedule": {
+      "main": [[{ "node": "Launch Message Sender", "type": "main", "index": 0 }]]
+    },
+    "Launch Message Sender": {
+      "main": [[{ "node": "Wait 15 Minutes", "type": "main", "index": 0 }]]
+    },
+    "Wait 15 Minutes": {
+      "main": [[{ "node": "Fetch Message Sender Output", "type": "main", "index": 0 }]]
+    },
+    "Fetch Message Sender Output": {
+      "main": [[{ "node": "Log Messages Sent", "type": "main", "index": 0 }]]
     },
     "Handle LinkedIn Reply": {
+      "main": [[{ "node": "Build Classify Request", "type": "main", "index": 0 }]]
+    },
+    "Build Classify Request": {
       "main": [[{ "node": "Claude - Classify Reply", "type": "main", "index": 0 }]]
+    },
+    "Claude - Classify Reply": {
+      "main": [[{ "node": "Parse Classification", "type": "main", "index": 0 }]]
+    },
+    "Parse Classification": {
+      "main": [[{ "node": "Save Reply Note", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

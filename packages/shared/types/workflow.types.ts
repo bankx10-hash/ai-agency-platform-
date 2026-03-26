@@ -43,6 +43,7 @@ export interface WorkflowDeployConfig {
   businessName?: string
   bookingLink?: string
   icpDescription?: string
+  connectionTemplate?: string
   platforms?: string
   n8nApiSecret?: string
   retellApiKey?: string

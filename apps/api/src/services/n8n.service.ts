@@ -71,7 +71,11 @@ export class N8NService {
       '{{RETELL_API_KEY}}': esc(config.retellApiKey || process.env.RETELL_API_KEY || ''),
       '{{ANTHROPIC_API_KEY}}': esc(config.anthropicApiKey || process.env.ANTHROPIC_API_KEY || ''),
       '{{API_BASE_URL}}': esc(config.apiBaseUrl || process.env.API_BASE_URL || ''),
-      '{{N8N_BASE_URL}}': esc(process.env.N8N_BASE_URL || '')
+      '{{N8N_BASE_URL}}': esc(process.env.N8N_BASE_URL || ''),
+      '{{PHANTOMBUSTER_API_KEY}}': esc(process.env.PHANTOMBUSTER_API_KEY || ''),
+      '{{PHANTOMBUSTER_AUTOCONNECT_ID}}': esc(process.env.PHANTOMBUSTER_AUTOCONNECT_ID || ''),
+      '{{PHANTOMBUSTER_MESSAGESENDER_ID}}': esc(process.env.PHANTOMBUSTER_MESSAGESENDER_ID || ''),
+      '{{CONNECTION_TEMPLATE}}': esc(config.connectionTemplate || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!')
     }
 
     for (const [placeholder, value] of Object.entries(replacements)) {

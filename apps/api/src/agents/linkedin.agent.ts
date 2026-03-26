@@ -16,52 +16,22 @@ export interface LinkedInAgentConfig {
 export class LinkedInAgent extends BaseAgent {
   agentType = AgentType.LINKEDIN_OUTREACH
 
-  generatePrompt(config: Partial<LinkedInAgentConfig>, contactData?: Record<string, unknown>): string {
-    const contact = contactData || {}
-
-    return `You are a LinkedIn outreach specialist for ${config.businessName || 'our business'}.
-
-Your goal is to write personalized, human-sounding LinkedIn messages that get responses.
-
-Contact information:
-- Name: ${contact.firstName || ''} ${contact.lastName || ''}
-- Headline: ${contact.headline || ''}
-- Company: ${contact.company || ''}
-- Location: ${contact.location || ''}
-
-Message type: ${contact.messageType || 'connection request'}
-Template to personalize: ${config.connection_message_template || ''}
-
-Rules:
-1. Keep connection requests under 300 characters
-2. Reference something specific about their profile
-3. Be warm, not salesy
-4. Do not mention money or services directly in first message
-5. Sound like a genuine human reaching out
-
-Generate only the message text, nothing else.`
+  generatePrompt(config: Partial<LinkedInAgentConfig>): string {
+    return `LinkedIn outreach agent for ${config.businessName || 'our business'}. Daily limit: ${config.daily_limit || 20}.`
   }
 
   async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
     const typedConfig = config as unknown as LinkedInAgentConfig
     logger.info('Deploying LinkedIn Outreach Agent', { clientId })
 
-    const connectionPrompt = await this.callClaude(
-      `Create 3 variations of a LinkedIn connection request for ${typedConfig.businessName}.
-       Each should be under 300 characters, personalized, and human-sounding.
-       Return as a JSON array of strings.`,
-      'You are an expert LinkedIn marketer. Write in a genuine, human way.'
-    )
-
     let workflowResult: { workflowId: string } | undefined
 
     try {
       workflowResult = await n8nService.deployWorkflow('linkedin-outreach', {
         clientId,
-        locationId: typedConfig.locationId,
-        agentPrompt: connectionPrompt,
-        webhookUrl: `${process.env.N8N_BASE_URL}/webhook/linkedin-${clientId}`,
-        businessName: typedConfig.businessName
+        locationId: typedConfig.locationId || '',
+        businessName: typedConfig.businessName,
+        connectionTemplate: typedConfig.connection_message_template || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!'
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })
@@ -71,8 +41,8 @@ Generate only the message text, nothing else.`
       clientId,
       {
         ...typedConfig,
-        generatedPrompt: connectionPrompt,
-        linkedin_cookie: typedConfig.linkedin_cookie
+        phantomAutoConnectId: process.env.PHANTOMBUSTER_AUTOCONNECT_ID,
+        phantomMessageSenderId: process.env.PHANTOMBUSTER_MESSAGESENDER_ID
       },
       workflowResult?.workflowId
     )
