@@ -75,6 +75,7 @@ export class N8NService {
       '{{PHANTOMBUSTER_API_KEY}}': esc(process.env.PHANTOMBUSTER_API_KEY || ''),
       '{{PHANTOMBUSTER_AUTOCONNECT_ID}}': esc(process.env.PHANTOMBUSTER_AUTOCONNECT_ID || ''),
       '{{PHANTOMBUSTER_MESSAGESENDER_ID}}': esc(process.env.PHANTOMBUSTER_MESSAGESENDER_ID || ''),
+      '{{PHANTOMBUSTER_LEADOUTREACH_ID}}': esc(process.env.PHANTOMBUSTER_LEADOUTREACH_ID || ''),
       '{{CONNECTION_TEMPLATE}}': esc(config.connectionTemplate || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!')
     }
 
