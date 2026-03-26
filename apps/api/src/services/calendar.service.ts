@@ -442,7 +442,7 @@ export class CalendarService {
           }]
         : undefined
 
-      await emailService.sendSystemEmail(contact.email, `Your appointment with ${businessName} is confirmed`, html, attachments)
+      await emailService.sendSystemEmail(contact.email, `Your appointment with ${businessName} is confirmed`, html, attachments, businessName)
     } catch (error) {
       logger.error('Failed to send booking confirmation email', { error })
     }
@@ -479,7 +479,7 @@ export class CalendarService {
           }]
         : undefined
 
-      await emailService.sendSystemEmail(contact.email, `Confirm your appointment with ${businessName}`, html, attachments)
+      await emailService.sendSystemEmail(contact.email, `Confirm your appointment with ${businessName}`, html, attachments, businessName)
     } catch (error) {
       logger.error('Failed to send scheduling link email', { error })
     }

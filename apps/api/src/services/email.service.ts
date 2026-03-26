@@ -75,10 +75,13 @@ export class EmailService {
     to: string,
     subject: string,
     html: string,
-    attachments?: Array<{ filename: string; content: string }>
+    attachments?: Array<{ filename: string; content: string }>,
+    fromName?: string
   ): Promise<void> {
     const resendApiKey = process.env.SMTP_PASSWORD
-    const from = process.env.SMTP_FROM || 'Nodus AI Systems <hello@nodusaisystems.com>'
+    const defaultFrom = process.env.SMTP_FROM || 'Nodus AI Systems <hello@nodusaisystems.com>'
+    const sendingEmail = defaultFrom.match(/<(.+)>/)?.[1] || 'hello@nodusaisystems.com'
+    const from = fromName ? `${fromName} <${sendingEmail}>` : defaultFrom
 
     if (!resendApiKey) {
       logger.warn('Resend API key not configured, skipping email', { to, subject })
