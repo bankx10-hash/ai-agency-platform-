@@ -69,7 +69,7 @@
       "typeVersion": 2,
       "position": [1000, 300],
       "parameters": {
-        "jsCode": "const agentPrompt = \"{{AGENT_PROMPT}}\";\nconst icpDescription = \"{{ICP_DESCRIPTION}}\";\nconst lead = $input.first().json.lead;\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 1024,\n    system: agentPrompt || ('You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Always return valid JSON only.'),\n    messages: [{\n      role: 'user',\n      content: 'Score this lead 0-100. Return ONLY valid JSON with this exact structure: {\"score\":number,\"summary\":\"brief qualification summary\",\"nextAction\":\"recommended next step\",\"tags\":[\"tag1\",\"tag2\"]}\\n\\nLead data:\\n' + JSON.stringify(lead, null, 2)\n    }]\n  }\n}];"
+        "jsCode": "const agentPrompt = \"{{AGENT_PROMPT}}\";\nconst icpDescription = \"{{ICP_DESCRIPTION}}\";\nconst lead = $input.first().json.lead;\nconst contactId = lead.id || lead.contactId || '';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 1024,\n    system: agentPrompt || ('You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Always return valid JSON only — no markdown, no code fences.'),\n    messages: [{\n      role: 'user',\n      content: 'Score this lead 0-100. Return ONLY valid JSON with this exact structure: {\"score\":number,\"summary\":\"brief qualification summary\",\"nextAction\":\"recommended next step\",\"tags\":[\"tag1\"],\"contactId\":\"' + contactId + '\"}\\n\\nLead data:\\n' + JSON.stringify(lead, null, 2)\n    }]\n  }\n}];"
       }
     },
     {
@@ -104,7 +104,7 @@
       "typeVersion": 2,
       "position": [1500, 300],
       "parameters": {
-        "jsCode": "const text = $input.first().json.content[0].text.trim();\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/,'').replace(/```\\s*$/,'');\n  result = JSON.parse(clean);\n} catch {\n  result = { score: 0, summary: 'Parse error', nextAction: 'manual review', tags: [] };\n}\nconst lead = $('Prepare Lead Data').first().json.lead || {};\nconst contactId = lead.id || lead.contactId || '';\nreturn [{ json: { ...result, contactId } }];"
+        "jsCode": "const response = $input.first().json;\nconst text = (response.content && response.content[0] && response.content[0].text) ? response.content[0].text.trim() : '';\nif (!text) return [{ json: { score: 0, summary: 'No response from Claude', nextAction: 'manual review', tags: [], contactId: '' } }];\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/,'').replace(/```\\s*$/,'');\n  result = JSON.parse(clean);\n} catch {\n  result = { score: 0, summary: 'Parse error: ' + text.slice(0, 100), nextAction: 'manual review', tags: [] };\n}\nreturn [{ json: { ...result, contactId: result.contactId || '' } }];"
       }
     },
     {
