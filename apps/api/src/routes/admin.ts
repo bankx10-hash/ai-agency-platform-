@@ -172,11 +172,26 @@ router.get('/n8n-executions/:workflowId', async (req: Request, res: Response): P
     })
     const listData = await listRes.json() as { data: Array<{ id: string }> }
     const executions = listData.data || []
-    // Fetch full detail for the most recent execution
+    // Fetch full execution detail
     const detail = executions[0]?.id
       ? await fetch(`${n8nUrl}/api/v1/executions/${executions[0].id}`, { headers: { 'X-N8N-API-KEY': n8nKey } }).then(r => r.json())
       : null
-    res.json({ status: listRes.status, executions, detail })
+    // Also fetch the workflow itself to inspect injected nodes
+    const workflowRes = await fetch(`${n8nUrl}/api/v1/workflows/${workflowId}`, {
+      headers: { 'X-N8N-API-KEY': n8nKey }
+    })
+    const workflowData = await workflowRes.json() as { nodes?: Array<{ name: string; parameters?: Record<string, unknown> }> }
+    const prepareNode = workflowData.nodes?.find(n => n.name === 'Prepare Lead Data')
+    const buildNode = workflowData.nodes?.find(n => n.name === 'Build Claude Request')
+    res.json({
+      status: listRes.status,
+      executions,
+      detail,
+      injectedNodes: {
+        prepareLeadData: prepareNode?.parameters?.jsCode,
+        buildClaudeRequest: buildNode?.parameters?.jsCode
+      }
+    })
   } catch (error) {
     res.status(500).json({ error: String(error) })
   }
