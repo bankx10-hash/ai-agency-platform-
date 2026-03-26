@@ -99,7 +99,7 @@
         300
       ],
       "parameters": {
-        "jsCode": "const icpDescription = \"{{ICP_DESCRIPTION}}\";\nconst item = $input.first();\nif (!item) return [];\nconst lead = item.json.lead;\nif (!lead) return [];\nconst contactId = lead.id || lead.contactId || '';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 1024,\n    system: 'You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Always return valid JSON only.',\n    messages: [{\n      role: 'user',\n      content: 'Score this lead 0-100. Return ONLY valid JSON: {\"score\":number,\"summary\":\"string\",\"nextAction\":\"string\",\"tags\":[\"string\"],\"contactId\":\"' + contactId + '\"}. Lead: ' + JSON.stringify(lead)\n    }]\n  }\n}];"
+        "jsCode": "const icpDescription = \"{{ICP_DESCRIPTION}}\";\nconst item = $('Prepare Lead Data').first();\nif (!item) return [];\nconst lead = item.json.lead;\nif (!lead) return [];\nconst saved = $('Save Contact').first(); const contactId = (saved && saved.json && saved.json.id) ? saved.json.id : (lead.id || lead.contactId || '');\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 1024,\n    system: 'You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Always return valid JSON only.',\n    messages: [{\n      role: 'user',\n      content: 'Score this lead 0-100. Return ONLY valid JSON: {\"score\":number,\"summary\":\"string\",\"nextAction\":\"string\",\"tags\":[\"string\"],\"contactId\":\"' + contactId + '\"}. Lead: ' + JSON.stringify(lead)\n    }]\n  }\n}];"
       }
     },
     {
@@ -296,6 +296,36 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, score: $json.score, tags: ['low-score-lead'], summary: $json.summary }) }}"
       }
+    },
+    {
+      "id": "save-contact",
+      "name": "Save Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        875,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-secret",
+              "value": "{{N8N_API_SECRET}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: .lead.name || \"\", email: .lead.email || \"\", phone: .lead.phone || \"\", source: .lead.source || \"Lead Form\", tags: [\"unscored\"] }) }}"
+      }
     }
   ],
   "connections": {
@@ -336,7 +366,7 @@
       "main": [
         [
           {
-            "node": "Build Claude Request",
+            "node": "Save Contact",
             "type": "main",
             "index": 0
           }
@@ -406,6 +436,17 @@
         [
           {
             "node": "Notify Appointment Setter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Contact": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request",
             "type": "main",
             "index": 0
           }

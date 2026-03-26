@@ -73,6 +73,12 @@ async function runStartupMigrations() {
           REFERENCES "Contact"("id") ON DELETE CASCADE ON UPDATE CASCADE
       )
     `
+    // Unique index so upsert-by-email works without duplicates
+    await prisma.$executeRaw`
+      CREATE UNIQUE INDEX IF NOT EXISTS "Contact_clientId_email_key"
+      ON "Contact"("clientId", "email")
+      WHERE "email" IS NOT NULL
+    `
     logger.info('Startup migration: Contact and ContactNote tables ensured')
   } catch { /* already exist, skip */ }
 

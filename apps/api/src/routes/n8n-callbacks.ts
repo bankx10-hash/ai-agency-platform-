@@ -216,15 +216,22 @@ router.post('/:clientId/contacts', async (req, res) => {
     const crmType = await getClientCrmType(clientId)
     logger.info('N8N contact save', { clientId, crmType, name })
 
-    // Always save to internal DB first
-    const id = randomUUID()
+    // Upsert to internal DB — deduplicates by email within the same client
+    const newId = randomUUID()
     const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : [])
-    await prisma.$executeRaw`
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
       INSERT INTO "Contact" ("id", "clientId", "name", "email", "phone", "source", "tags", "stage", "updatedAt")
-      VALUES (${id}, ${clientId}, ${name || null}, ${email || null}, ${phone || null},
+      VALUES (${newId}, ${clientId}, ${name || null}, ${email || null}, ${phone || null},
               ${source || null}, ${tagsJson}::jsonb, 'new', NOW())
+      ON CONFLICT ("clientId", "email") WHERE "email" IS NOT NULL
+      DO UPDATE SET
+        "name"      = COALESCE(EXCLUDED."name", "Contact"."name"),
+        "phone"     = COALESCE(EXCLUDED."phone", "Contact"."phone"),
+        "updatedAt" = NOW()
+      RETURNING "id"
     `
-    logger.info('Contact saved to DB', { clientId, id })
+    const id = rows[0]?.id || newId
+    logger.info('Contact upserted to DB', { clientId, id })
 
     // Sync to HubSpot if connected
     let crmId: string | undefined
