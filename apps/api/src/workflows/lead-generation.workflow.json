@@ -323,8 +323,8 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ name: .lead.name || \"\", email: .lead.email || \"\", phone: .lead.phone || \"\", source: .lead.source || \"Lead Form\", tags: [\"unscored\"] }) }}"
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ name: $json.lead.name || \"\", email: $json.lead.email || \"\", phone: $json.lead.phone || \"\", source: $json.lead.source || \"Lead Form\", tags: [\"unscored\"] }) }}"
       }
     }
   ],
