@@ -8,6 +8,7 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
       "position": [250, 400],
+      "disabled": true,
       "parameters": {
         "rule": {
           "interval": [{ "field": "hours", "hoursInterval": 2 }]
@@ -69,7 +70,7 @@
       "typeVersion": 2,
       "position": [1000, 300],
       "parameters": {
-        "jsCode": "const agentPrompt = \"{{AGENT_PROMPT}}\";\nconst icpDescription = \"{{ICP_DESCRIPTION}}\";\nconst lead = $input.first().json.lead;\nconst contactId = lead.id || lead.contactId || '';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 1024,\n    system: agentPrompt || ('You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Always return valid JSON only — no markdown, no code fences.'),\n    messages: [{\n      role: 'user',\n      content: 'Score this lead 0-100. Return ONLY valid JSON with this exact structure: {\"score\":number,\"summary\":\"brief qualification summary\",\"nextAction\":\"recommended next step\",\"tags\":[\"tag1\"],\"contactId\":\"' + contactId + '\"}\\n\\nLead data:\\n' + JSON.stringify(lead, null, 2)\n    }]\n  }\n}];"
+        "jsCode": "const agentPrompt = \"{{AGENT_PROMPT}}\";\nconst icpDescription = \"{{ICP_DESCRIPTION}}\";\nconst item = $input.first();\nif (!item) return [];\nconst lead = item.json.lead;\nif (!lead) return [];\nconst contactId = lead.id || lead.contactId || '';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 1024,\n    system: agentPrompt || ('You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Always return valid JSON only.'),\n    messages: [{\n      role: 'user',\n      content: 'Score this lead 0-100. Return ONLY valid JSON: {\"score\":number,\"summary\":\"string\",\"nextAction\":\"string\",\"tags\":[\"string\"],\"contactId\":\"' + contactId + '\"}. Lead: ' + JSON.stringify(lead)\n    }]\n  }\n}];"
       }
     },
     {
