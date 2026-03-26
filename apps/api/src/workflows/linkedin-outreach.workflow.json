@@ -32,7 +32,7 @@
         },
         "sendBody": true,
         "specifyBody": "string",
-        "body": "{\"id\":\"{{PHANTOMBUSTER_LEADOUTREACH_ID}}\"}"
+        "body": "={{ JSON.stringify({ id: '{{PHANTOMBUSTER_LEADOUTREACH_ID}}' }) }}"
       }
     },
     {
@@ -55,7 +55,7 @@
       "position": [1000, 200],
       "parameters": {
         "method": "GET",
-        "url": "https://api.phantombuster.com/api/v2/agents/fetch-output?id={{PHANTOMBUSTER_LEADOUTREACH_ID}}",
+        "url": "={{ 'https://api.phantombuster.com/api/v2/agents/fetch-output?id={{PHANTOMBUSTER_LEADOUTREACH_ID}}' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
