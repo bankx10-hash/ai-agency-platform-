@@ -155,6 +155,29 @@ router.get('/client/:clientId', async (req: Request, res: Response): Promise<voi
 })
 
 /**
+ * GET /admin/n8n-executions/:workflowId
+ * Proxies to N8N executions API using the server's N8N_API_KEY.
+ */
+router.get('/n8n-executions/:workflowId', async (req: Request, res: Response): Promise<void> => {
+  const { workflowId } = req.params
+  const n8nKey = process.env.N8N_API_KEY
+  const n8nUrl = process.env.N8N_BASE_URL
+  if (!n8nKey || !n8nUrl) {
+    res.status(500).json({ error: 'N8N_API_KEY or N8N_BASE_URL not configured' })
+    return
+  }
+  try {
+    const response = await fetch(`${n8nUrl}/api/v1/executions?workflowId=${workflowId}&limit=5`, {
+      headers: { 'X-N8N-API-KEY': n8nKey }
+    })
+    const data = await response.json()
+    res.json({ status: response.status, data })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+/**
  * POST /admin/test-claude-score
  * Calls Claude directly with a sample lead to verify the API key works
  * and the response format is what the N8N workflow expects.
