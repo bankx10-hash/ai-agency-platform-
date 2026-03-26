@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-const ADMIN_SECRET = process.env.NEXT_PUBLIC_ADMIN_SECRET || ''
 
 type AgentStatus = 'ACTIVE' | 'PAUSED' | 'ERROR' | 'INACTIVE' | null
 
@@ -92,8 +92,9 @@ const AGENT_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; ty
 }
 
 export default function AdminConfigurePage() {
+  const router = useRouter()
   const [clientId, setClientId] = useState('')
-  const [secret, setSecret] = useState(ADMIN_SECRET)
+  const [secret, setSecret] = useState('')
   const [client, setClient] = useState<ClientInfo | null>(null)
   const [agents, setAgents] = useState<AgentRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -102,6 +103,21 @@ export default function AdminConfigurePage() {
   const [configs, setConfigs] = useState<Record<string, Record<string, string>>>({})
   const [deploying, setDeploying] = useState<string | null>(null)
   const [deployResults, setDeployResults] = useState<Record<string, { success: boolean; message: string }>>({})
+
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken')
+    if (!token) {
+      router.replace('/admin/login')
+      return
+    }
+    setSecret(token)
+  }, [router])
+
+  function handleSignOut() {
+    localStorage.removeItem('adminToken')
+    localStorage.removeItem('adminEmail')
+    router.push('/admin/login')
+  }
 
   async function loadClient() {
     if (!clientId.trim() || !secret.trim()) return
@@ -165,11 +181,16 @@ export default function AdminConfigurePage() {
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: 900, margin: '0 auto', padding: 24, background: '#f9fafb', minHeight: '100vh' }}>
-      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: 24, borderRadius: 12, marginBottom: 24 }}>
-        <h1 style={{ color: 'white', margin: 0, fontSize: 24 }}>Admin — Agent Configuration</h1>
-        <p style={{ color: 'rgba(255,255,255,0.8)', margin: '8px 0 0', fontSize: 14 }}>
-          Deploy any agent for any client regardless of plan
-        </p>
+      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: 24, borderRadius: 12, marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ color: 'white', margin: 0, fontSize: 24 }}>Admin — Agent Configuration</h1>
+          <p style={{ color: 'rgba(255,255,255,0.8)', margin: '8px 0 0', fontSize: 14 }}>
+            Deploy any agent for any client regardless of plan
+          </p>
+        </div>
+        <button onClick={handleSignOut} style={{ padding: '8px 18px', background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+          Sign Out
+        </button>
       </div>
 
       {/* Client Lookup */}
@@ -180,18 +201,11 @@ export default function AdminConfigurePage() {
             value={clientId}
             onChange={e => setClientId(e.target.value)}
             placeholder="Client ID"
-            style={{ flex: 1, minWidth: 240, padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
-          />
-          <input
-            value={secret}
-            onChange={e => setSecret(e.target.value)}
-            placeholder="Admin Secret"
-            type="password"
-            style={{ flex: 1, minWidth: 200, padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
+            style={{ flex: 1, minWidth: 280, padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
           />
           <button
             onClick={loadClient}
-            disabled={loading}
+            disabled={loading || !secret}
             style={{ padding: '10px 24px', background: '#667eea', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
           >
             {loading ? 'Loading...' : 'Load'}
