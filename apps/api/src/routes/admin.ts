@@ -138,7 +138,7 @@ router.get('/client/:clientId', async (req: Request, res: Response): Promise<voi
     const client = await prisma.client.findUnique({
       where: { id: clientId },
       include: {
-        agents: { select: { agentType: true, status: true, n8nWorkflowId: true, retellAgentId: true, createdAt: true } },
+        agents: { select: { agentType: true, status: true, n8nWorkflowId: true, retellAgentId: true, metrics: true, createdAt: true } },
         credentials: { select: { service: true, createdAt: true } },
         onboarding: { select: { step: true, status: true, completedAt: true, data: true } }
       }
