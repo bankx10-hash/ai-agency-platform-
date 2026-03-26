@@ -21,10 +21,10 @@ export default function AdminLoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       })
-      const data = await res.json() as { token?: string; error?: string }
+      const data = await res.json() as { token?: string; email?: string; error?: string }
       if (!res.ok) throw new Error(data.error || 'Login failed')
       localStorage.setItem('adminToken', data.token!)
-      localStorage.setItem('adminEmail', data.email as string || email)
+      localStorage.setItem('adminEmail', data.email || email)
       router.push('/admin/configure')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed')
