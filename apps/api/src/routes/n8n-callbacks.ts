@@ -1,5 +1,6 @@
 import express from 'express'
 import { PrismaClient } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import { emailService } from '../services/email.service'
 import { encryptJSON, decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
@@ -146,12 +147,24 @@ async function updateAgentMetrics(
 // GET /:clientId/contacts
 router.get('/:clientId/contacts', async (req, res) => {
   const { clientId } = req.params
-  const { stage, limit, tag } = req.query
+  const { stage, limit } = req.query
   try {
     const crmType = await getClientCrmType(clientId)
-    logger.info('N8N contacts fetch', { clientId, crmType, stage, limit, tag })
-    // TODO: route to connected CRM service (hubspot, salesforce, zoho) based on crmType
-    res.json({ contacts: [], total: 0, crmType })
+    const take = Math.min(parseInt(String(limit || '50'), 10) || 50, 200)
+    const stageFilter = String(stage || 'new')
+
+    const contacts = await prisma.$queryRaw<Array<Record<string, unknown>>>`
+      SELECT "id", "clientId", "name", "email", "phone", "source", "stage",
+             "score", "tags", "summary", "nextAction", "crmId", "createdAt"
+      FROM "Contact"
+      WHERE "clientId" = ${clientId}
+        AND "stage" = ${stageFilter}
+      ORDER BY "createdAt" DESC
+      LIMIT ${take}
+    `
+
+    logger.info('N8N contacts fetch', { clientId, crmType, stage: stageFilter, count: contacts.length })
+    res.json({ contacts, total: contacts.length, crmType })
   } catch (err) {
     logger.error('N8N contacts fetch error', { clientId, err })
     res.status(500).json({ error: 'Failed to fetch contacts' })
@@ -198,33 +211,45 @@ router.get('/:clientId/contacts/:contactId', async (req, res) => {
 // POST /:clientId/contacts
 router.post('/:clientId/contacts', async (req, res) => {
   const { clientId } = req.params
-  const contactData = req.body
+  const { name, email, phone, source, tags = [], intent } = req.body
   try {
     const crmType = await getClientCrmType(clientId)
-    logger.info('N8N contact save', { clientId, crmType, name: contactData.name })
+    logger.info('N8N contact save', { clientId, crmType, name })
 
-    let contactId: string = `contact-${Date.now()}`
+    // Always save to internal DB first
+    const id = randomUUID()
+    const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : [])
+    await prisma.$executeRaw`
+      INSERT INTO "Contact" ("id", "clientId", "name", "email", "phone", "source", "tags", "stage", "updatedAt")
+      VALUES (${id}, ${clientId}, ${name || null}, ${email || null}, ${phone || null},
+              ${source || null}, ${tagsJson}::jsonb, 'new', NOW())
+    `
+    logger.info('Contact saved to DB', { clientId, id })
 
+    // Sync to HubSpot if connected
+    let crmId: string | undefined
     if (crmType === 'hubspot') {
       const token = await getHubSpotToken(clientId)
       if (token) {
-        contactId = await hubspotCreateContact(token, contactData)
-        logger.info('HubSpot contact created', { clientId, contactId })
-      } else {
-        logger.warn('HubSpot credentials not found', { clientId })
+        try {
+          crmId = await hubspotCreateContact(token, { name: name || '', email: email || '', phone: phone || '', source: source || '' })
+          await prisma.$executeRaw`UPDATE "Contact" SET "crmId" = ${crmId} WHERE "id" = ${id}`
+          logger.info('HubSpot contact created', { clientId, crmId })
+        } catch (hsErr) {
+          logger.warn('HubSpot sync failed, contact still saved locally', { clientId, hsErr })
+        }
       }
     }
 
-    await updateAgentMetrics(clientId, 'LEAD_GENERATION', {
-      lastContactSaved: { name: contactData.name, source: contactData.source, crmId: contactId },
+    await updateAgentMetrics(clientId, 'VOICE_INBOUND', {
+      lastContactSaved: { name, source, id, crmId },
       lastContactAt: new Date().toISOString()
     })
-    res.json({ success: true, id: contactId, crmType })
+    res.json({ success: true, id, crmId, crmType })
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
-    const hsDetail = (err as { response?: { data?: unknown } })?.response?.data
-    logger.error('N8N contact save error', { clientId, err: detail, hsDetail })
-    res.status(500).json({ error: 'Failed to save contact', detail, hsDetail })
+    logger.error('N8N contact save error', { clientId, err: detail })
+    res.status(500).json({ error: 'Failed to save contact', detail })
   }
 })
 
@@ -233,12 +258,44 @@ router.patch('/:clientId/contacts/score', async (req, res) => {
   const { clientId } = req.params
   const { contactId, score, tags, summary, nextAction } = req.body
   try {
+    const crmType = await getClientCrmType(clientId)
     logger.info('N8N lead score update', { clientId, contactId, score })
+
+    const stage = score >= 70 ? 'hot' : score >= 40 ? 'warm' : 'cold'
+    const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : [])
+
+    // Update in internal DB
+    await prisma.$executeRaw`
+      UPDATE "Contact"
+      SET "score" = ${score}, "stage" = ${stage}, "tags" = ${tagsJson}::jsonb,
+          "summary" = ${summary || null}, "nextAction" = ${nextAction || null}, "updatedAt" = NOW()
+      WHERE "id" = ${contactId} AND "clientId" = ${clientId}
+    `
+
+    // Push score to HubSpot if connected
+    if (crmType === 'hubspot') {
+      const token = await getHubSpotToken(clientId)
+      if (token) {
+        const rows = await prisma.$queryRaw<Array<{ crmId: string | null }>>`
+          SELECT "crmId" FROM "Contact" WHERE "id" = ${contactId} AND "clientId" = ${clientId}
+        `
+        const crmId = rows[0]?.crmId
+        if (crmId) {
+          const hsStatus = score >= 70 ? 'IN_PROGRESS' : score >= 40 ? 'OPEN' : 'UNQUALIFIED'
+          await axios.patch(
+            `https://api.hubapi.com/crm/v3/objects/contacts/${crmId}`,
+            { properties: { hs_lead_status: hsStatus } },
+            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+          ).catch(e => logger.warn('HubSpot score update failed', { clientId, e: String(e) }))
+        }
+      }
+    }
+
     await updateAgentMetrics(clientId, 'LEAD_GENERATION', {
-      lastScoredContact: { contactId, score, tags, summary, nextAction },
+      lastScoredContact: { contactId, score, stage, tags, summary, nextAction },
       lastScoredAt: new Date().toISOString()
     })
-    res.json({ success: true, contactId, score })
+    res.json({ success: true, contactId, score, stage })
   } catch (err) {
     logger.error('N8N score update error', { clientId, err })
     res.status(500).json({ error: 'Failed to update score' })
@@ -253,18 +310,30 @@ router.post('/:clientId/contacts/:contactId/notes', async (req, res) => {
     const crmType = await getClientCrmType(clientId)
     logger.info('N8N contact note', { clientId, contactId, crmType })
 
+    // Save note to internal DB
+    const noteId = randomUUID()
+    await prisma.$executeRaw`
+      INSERT INTO "ContactNote" ("id", "contactId", "body", "createdAt")
+      VALUES (${noteId}, ${contactId}, ${body || ''}, NOW())
+    `
+
+    // Sync to HubSpot using the stored crmId (not the internal UUID)
     if (crmType === 'hubspot') {
       const token = await getHubSpotToken(clientId)
       if (token) {
-        await hubspotAddNote(token, contactId, body)
-        logger.info('HubSpot note added', { clientId, contactId })
-      } else {
-        logger.warn('HubSpot credentials not found for note', { clientId })
+        const rows = await prisma.$queryRaw<Array<{ crmId: string | null }>>`
+          SELECT "crmId" FROM "Contact" WHERE "id" = ${contactId} AND "clientId" = ${clientId}
+        `
+        const crmId = rows[0]?.crmId
+        if (crmId) {
+          await hubspotAddNote(token, crmId, body)
+          logger.info('HubSpot note added', { clientId, crmId })
+        }
       }
     }
 
     await updateAgentMetrics(clientId, 'VOICE_INBOUND', {
-      lastNote: { contactId, body, addedAt: new Date().toISOString() }
+      lastNote: { contactId, addedAt: new Date().toISOString() }
     })
     res.json({ success: true })
   } catch (err) {

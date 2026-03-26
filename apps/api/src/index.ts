@@ -40,6 +40,42 @@ async function runStartupMigrations() {
     logger.info('Startup migration: country column ensured')
   } catch { /* already exists, skip */ }
 
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Contact" (
+        "id"         TEXT        NOT NULL,
+        "clientId"   TEXT        NOT NULL,
+        "name"       TEXT,
+        "email"      TEXT,
+        "phone"      TEXT,
+        "source"     TEXT,
+        "stage"      TEXT        NOT NULL DEFAULT 'new',
+        "score"      INTEGER,
+        "tags"       JSONB       NOT NULL DEFAULT '[]',
+        "summary"    TEXT,
+        "nextAction" TEXT,
+        "crmId"      TEXT,
+        "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "Contact_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "Contact_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ContactNote" (
+        "id"        TEXT        NOT NULL,
+        "contactId" TEXT        NOT NULL,
+        "body"      TEXT        NOT NULL,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "ContactNote_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "ContactNote_contactId_fkey" FOREIGN KEY ("contactId")
+          REFERENCES "Contact"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    logger.info('Startup migration: Contact and ContactNote tables ensured')
+  } catch { /* already exist, skip */ }
+
   await prisma.$disconnect()
 }
 
