@@ -71,7 +71,12 @@ export class EmailService {
     logger.info('Email sent via Gmail OAuth2', { to, subject })
   }
 
-  async sendSystemEmail(to: string, subject: string, html: string): Promise<void> {
+  async sendSystemEmail(
+    to: string,
+    subject: string,
+    html: string,
+    attachments?: Array<{ filename: string; content: string }>
+  ): Promise<void> {
     const resendApiKey = process.env.SMTP_PASSWORD
     const from = process.env.SMTP_FROM || 'Nodus AI Systems <hello@nodusaisystems.com>'
 
@@ -80,13 +85,18 @@ export class EmailService {
       return
     }
 
+    const payload: Record<string, unknown> = { from, to, subject, html }
+    if (attachments && attachments.length > 0) {
+      payload.attachments = attachments
+    }
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ from, to, subject, html })
+      body: JSON.stringify(payload)
     })
 
     if (!response.ok) {

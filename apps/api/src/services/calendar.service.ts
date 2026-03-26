@@ -124,6 +124,47 @@ async function getGoogleCalendarClient(clientId: string) {
   return oauth2Client
 }
 
+function toICalDate(iso: string): string {
+  // Convert ISO 8601 to iCal UTC format: YYYYMMDDTHHMMSSZ
+  return iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '').replace('Z', 'Z').slice(0, 16) + '00Z'
+}
+
+function generateICalContent(
+  startTime: string,
+  endTime: string,
+  contactName: string,
+  contactEmail: string,
+  businessName: string,
+  status: 'CONFIRMED' | 'TENTATIVE' = 'CONFIRMED'
+): string {
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@nodusaisystems.com`
+  const dtStamp = toICalDate(new Date().toISOString())
+  const dtStart = toICalDate(startTime)
+  const dtEnd = toICalDate(endTime)
+  const fromEmail = (process.env.SMTP_FROM || 'hello@nodusaisystems.com').match(/<(.+)>/)?.[1] || 'hello@nodusaisystems.com'
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Nodus AI Systems//Appointment Booking//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `DTSTAMP:${dtStamp}`,
+    `UID:${uid}`,
+    `SUMMARY:Appointment with ${businessName}`,
+    `DESCRIPTION:Your appointment with ${businessName} has been confirmed.`,
+    `ORGANIZER;CN=${businessName}:mailto:${fromEmail}`,
+    `ATTENDEE;CN=${contactName};RSVP=FALSE:mailto:${contactEmail}`,
+    `STATUS:${status}`,
+    'SEQUENCE:0',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n')
+}
+
 function formatSlotLabel(isoDate: string): string {
   const d = new Date(isoDate)
   return d.toLocaleString('en-AU', {
@@ -296,7 +337,7 @@ export class CalendarService {
         })
 
         const slotLabel = formatSlotLabel(startTime)
-        await this.sendConfirmationEmail(contact, slotLabel, businessName, event.data.htmlLink || undefined)
+        await this.sendConfirmationEmail(contact, slotLabel, businessName, event.data.htmlLink || undefined, startTime, endTime)
 
         return {
           success: true,
@@ -326,7 +367,7 @@ export class CalendarService {
           }
         )
         const slotLabel = formatSlotLabel(startTime)
-        await this.sendConfirmationEmail(contact, slotLabel, businessName)
+        await this.sendConfirmationEmail(contact, slotLabel, businessName, undefined, startTime, endTime)
 
         return {
           success: true,
@@ -343,7 +384,7 @@ export class CalendarService {
     const calendlyCreds = await getCalendlyToken(clientId)
     if (calendlyCreds?.schedulingUrl) {
       const slotLabel = formatSlotLabel(startTime)
-      await this.sendSchedulingLinkEmail(contact, slotLabel, calendlyCreds.schedulingUrl, businessName)
+      await this.sendSchedulingLinkEmail(contact, slotLabel, calendlyCreds.schedulingUrl, businessName, startTime, endTime)
 
       return {
         success: true,
@@ -356,7 +397,7 @@ export class CalendarService {
     const onboarding = await prisma.onboarding.findUnique({ where: { clientId } })
     const bookingLink = (onboarding?.data as Record<string, unknown>)?.bookingLink as string | undefined
     if (bookingLink) {
-      await this.sendSchedulingLinkEmail(contact, formatSlotLabel(startTime), bookingLink, businessName)
+      await this.sendSchedulingLinkEmail(contact, formatSlotLabel(startTime), bookingLink, businessName, startTime, endTime)
       return {
         success: true,
         booked: false,
@@ -375,7 +416,9 @@ export class CalendarService {
     contact: { name: string; email: string },
     slotLabel: string,
     businessName: string,
-    eventLink?: string
+    eventLink?: string,
+    startTime?: string,
+    endTime?: string
   ): Promise<void> {
     try {
       const html = `
@@ -392,7 +435,14 @@ export class CalendarService {
   <p style="font-size:14px;color:#666">We look forward to speaking with you.<br><strong>The ${businessName} Team</strong></p>
 </div>`
 
-      await emailService.sendSystemEmail(contact.email, `Your appointment with ${businessName} is confirmed`, html)
+      const attachments = startTime && endTime
+        ? [{
+            filename: 'appointment.ics',
+            content: Buffer.from(generateICalContent(startTime, endTime, contact.name, contact.email, businessName, 'CONFIRMED')).toString('base64')
+          }]
+        : undefined
+
+      await emailService.sendSystemEmail(contact.email, `Your appointment with ${businessName} is confirmed`, html, attachments)
     } catch (error) {
       logger.error('Failed to send booking confirmation email', { error })
     }
@@ -402,7 +452,9 @@ export class CalendarService {
     contact: { name: string; email: string },
     slotLabel: string,
     bookingLink: string,
-    businessName: string
+    businessName: string,
+    startTime?: string,
+    endTime?: string
   ): Promise<void> {
     try {
       const html = `
@@ -420,7 +472,14 @@ export class CalendarService {
   <p style="font-size:14px;color:#666">Looking forward to speaking with you!<br><strong>The ${businessName} Team</strong></p>
 </div>`
 
-      await emailService.sendSystemEmail(contact.email, `Confirm your appointment with ${businessName}`, html)
+      const attachments = startTime && endTime
+        ? [{
+            filename: 'appointment.ics',
+            content: Buffer.from(generateICalContent(startTime, endTime, contact.name, contact.email, businessName, 'TENTATIVE')).toString('base64')
+          }]
+        : undefined
+
+      await emailService.sendSystemEmail(contact.email, `Confirm your appointment with ${businessName}`, html, attachments)
     } catch (error) {
       logger.error('Failed to send scheduling link email', { error })
     }
