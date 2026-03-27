@@ -48,13 +48,16 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "keypair",
-        "bodyParameters": {
-          "parameters": [
-            { "name": "model", "value": "claude-sonnet-4-20250514" },
-            { "name": "max_tokens", "value": 4096 },
-            { "name": "system", "value": "{{AGENT_PROMPT}}" },
-            { "name": "messages", "value": "=[{\"role\":\"user\",\"content\":\"Create today's social media posts for {{BUSINESS_NAME}}. Platforms: {{PLATFORMS}}. Return a single JSON object with keys for each platform (facebook, instagram, linkedin). Each value should be an object with: content (the post text), hashtags (array), image_prompt (detailed prompt for AI image generation). Only include platforms listed above.\"}]" }
+        "specifyBody": "json",
+        "body": {
+          "model": "claude-sonnet-4-20250514",
+          "max_tokens": 4096,
+          "system": "{{AGENT_PROMPT}}",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Create today's social media posts for {{BUSINESS_NAME}}. Platforms: {{PLATFORMS}}. Return a single JSON object with keys for each platform. Each value should be an object with: content (the post text), hashtags (array), image_prompt (detailed prompt for AI image generation). Only include platforms listed above."
+            }
           ]
         }
       }
