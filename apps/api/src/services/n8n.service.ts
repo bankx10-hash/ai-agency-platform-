@@ -76,7 +76,8 @@ export class N8NService {
       '{{PHANTOMBUSTER_AUTOCONNECT_ID}}': esc(process.env.PHANTOMBUSTER_AUTOCONNECT_ID || ''),
       '{{PHANTOMBUSTER_MESSAGESENDER_ID}}': esc(process.env.PHANTOMBUSTER_MESSAGESENDER_ID || ''),
       '{{PHANTOMBUSTER_LEADOUTREACH_ID}}': esc(process.env.PHANTOMBUSTER_LEADOUTREACH_ID || ''),
-      '{{CONNECTION_TEMPLATE}}': esc(config.connectionTemplate || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!')
+      '{{CONNECTION_TEMPLATE}}': esc(config.connectionTemplate || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!'),
+      '{{PLATFORMS}}': esc(config.platforms || 'facebook,instagram,linkedin')
     }
 
     for (const [placeholder, value] of Object.entries(replacements)) {
