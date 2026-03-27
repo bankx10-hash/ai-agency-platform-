@@ -51,19 +51,6 @@ FORMAT RULES:
 - Avoid links in the post body (add to first comment instead)
 VIRALITY LEVERS: Debate-starting questions, relatable life moments, "agree or disagree?" prompts`,
 
-  tiktok: `
-PLATFORM: TikTok (video script)
-FORMAT RULES:
-- Output a VIDEO SCRIPT, not a caption
-- Structure: Hook (0-3s) → Value delivery (3-45s) → CTA (last 3s)
-- Hook must create pattern interrupt: start mid-sentence, use "POV:", "Story time:", or a bold claim
-- Speak in second person ("you", "your") throughout
-- Use the Rule of 3: give exactly 3 tips, 3 reasons, or 3 steps — TikTok users remember lists
-- Include [B-ROLL SUGGESTION] notes for visual variety
-- End CTA: "Follow for more [topic]" or "Comment [word] and I'll send you..."
-- Caption (separate from script): 100 chars max + 3-5 hashtags only
-VIRALITY LEVERS: "Things nobody tells you about...", "I tried X for 30 days", POV formats, comment bait`,
-
   linkedin: `
 PLATFORM: LinkedIn
 FORMAT RULES:
@@ -74,18 +61,7 @@ FORMAT RULES:
 - End with an open question that professionals will want to answer
 - 3-5 hashtags maximum — place at very end
 - Never use "Excited to share" or corporate filler phrases
-VIRALITY LEVERS: Contrarian career takes, salary transparency, "unpopular opinion:", behind-the-scenes business numbers`,
-
-  twitter: `
-PLATFORM: Twitter/X
-FORMAT RULES:
-- Option A (single tweet): Under 280 characters, punchy, no fluff
-- Option B (thread): 5-8 tweets, each self-contained; Tweet 1 = hook promise ("Here's X things about Y (thread 🧵)")
-- Use numbers: "7 lessons", "3 mistakes", "1 thing"
-- Each tweet must be able to stand alone and be retweetable
-- No hashtags (they reduce reach on X in 2024) — exception: 1 trending tag if highly relevant
-- End tweet or thread: direct ask to repost ("RT if this helped someone you know")
-VIRALITY LEVERS: Threads with numbered insights, "hot takes", question tweets, quote-tweet bait`
+VIRALITY LEVERS: Contrarian career takes, salary transparency, "unpopular opinion:", behind-the-scenes business numbers`
 }
 
 export class SocialMediaAgent extends BaseAgent {
