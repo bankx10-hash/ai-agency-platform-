@@ -387,7 +387,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         if (!linkedinClientId) { res.status(500).json({ error: 'LINKEDIN_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/linkedin/callback`)
         const state = encodeURIComponent(JSON.stringify({ clientId }))
-        url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${redirect}&scope=openid%20profile%20email%20w_member_social%20w_organization_social&state=${state}&prompt=login`
+        url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${redirect}&scope=openid%20profile%20email%20w_member_social&state=${state}&prompt=login`
         break
       }
       case 'gohighlevel': {
@@ -587,21 +587,19 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
       )
       const accessToken: string = tokenRes.data.access_token
 
-      // Fetch organization this user administers
-      const orgRes = await axios.get(
-        'https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&projection=(elements*(organization~(id,localizedName)))',
-        { headers: { Authorization: `Bearer ${accessToken}`, 'X-Restli-Protocol-Version': '2.0.0' } }
-      )
-      const orgs: Array<{ 'organization~': { id: number; localizedName: string } }> = orgRes.data.elements || []
-      const org = orgs[0]?.['organization~']
-      if (!org) throw new Error('No LinkedIn Company Page found — you must be an admin of a LinkedIn Company Page')
+      // Fetch person ID via OpenID Connect userinfo
+      const userRes = await axios.get('https://api.linkedin.com/v2/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+      const personId: string = userRes.data.sub
+      const personName: string = userRes.data.name || ''
 
       credentials = {
         accessToken,
         refreshToken: tokenRes.data.refresh_token || '',
         expiresIn: String(tokenRes.data.expires_in || ''),
-        organizationId: String(org.id),
-        organizationName: org.localizedName
+        personId,
+        personName
       }
     } else if (platform === 'hubspot') {
       const tokenRes = await axios.post(
