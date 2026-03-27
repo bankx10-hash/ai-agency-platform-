@@ -1,6 +1,7 @@
 import express from 'express'
 import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
+import twilio from 'twilio'
 import { emailService } from '../services/email.service'
 import { encryptJSON, decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
@@ -361,21 +362,40 @@ router.post('/:clientId/contacts/:contactId/notes', async (req, res) => {
   }
 })
 
-// POST /:clientId/messages (SMS/message via connected messaging service)
+// POST /:clientId/messages (SMS via Twilio)
 router.post('/:clientId/messages', async (req, res) => {
   const { clientId } = req.params
-  const { contactId, type, message } = req.body
+  const { contactId, type, message, to } = req.body
   try {
-    const crmType = await getClientCrmType(clientId)
-    logger.info('N8N message send', { clientId, contactId, type, crmType })
-    // TODO: route to Twilio or CRM messaging based on crmType
-    await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
-      lastMessageSent: { contactId, type, sentAt: new Date().toISOString() }
+    if (!to || !message) {
+      return res.status(400).json({ error: 'Missing required fields: to, message' })
+    }
+
+    // Look up the client's provisioned Twilio phone number
+    const cred = await prisma.clientCredential.findUnique({
+      where: { clientId_service: { clientId, service: 'twilio-phone' } }
     })
-    res.json({ success: true, crmType })
+    if (!cred) {
+      logger.warn('No Twilio phone number found for client — SMS not sent', { clientId })
+      return res.status(422).json({ error: 'No phone number provisioned for this client' })
+    }
+    const { phoneNumber: fromNumber } = decryptJSON(cred.credentials) as { phoneNumber: string }
+
+    const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+    const sms = await twilioClient.messages.create({
+      from: fromNumber,
+      to,
+      body: message
+    })
+    logger.info('SMS sent via Twilio', { clientId, contactId, to, sid: sms.sid })
+
+    await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
+      lastMessageSent: { contactId, type, to, sentAt: new Date().toISOString() }
+    })
+    res.json({ success: true, sid: sms.sid })
   } catch (err) {
-    logger.error('N8N message error', { clientId, err })
-    res.status(500).json({ error: 'Failed to send message' })
+    logger.error('N8N SMS error', { clientId, err })
+    res.status(500).json({ error: 'Failed to send SMS' })
   }
 })
 

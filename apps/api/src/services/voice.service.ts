@@ -1,7 +1,11 @@
 // Retell AI voice service — v1 endpoint names, v2 response_engine format
 import axios from 'axios'
 import twilio from 'twilio'
+import { PrismaClient } from '@prisma/client'
+import { encryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
+
+const prisma = new PrismaClient()
 
 const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
@@ -181,7 +185,7 @@ export class VoiceService {
         }
         if (!addressSid) throw new Error('No Twilio address available for AU number purchase')
 
-        const available = await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1 })
+        const available = await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1, smsEnabled: true })
         if (!available.length) throw new Error('No Australian Twilio numbers available')
 
         const trunkSid = process.env.TWILIO_SIP_TRUNK_SID
@@ -211,6 +215,13 @@ export class VoiceService {
           nickname: `${businessName} - ${clientId}`
         })
         logger.info('AU number imported to Retell and linked to agent', { phoneNumber, clientId })
+
+        // Save phone number so outbound SMS can use it as the `from` number
+        await prisma.clientCredential.upsert({
+          where: { clientId_service: { clientId, service: 'twilio-phone' } },
+          update: { credentials: encryptJSON({ phoneNumber }) },
+          create: { clientId, service: 'twilio-phone', credentials: encryptJSON({ phoneNumber }) }
+        })
       } else {
         // US/CA: Retell auto-provisions via Twilio
         const phoneRes = await retellApi.post('/create-phone-number', {
@@ -222,6 +233,13 @@ export class VoiceService {
         })
         phoneNumber = phoneRes.data.phone_number
         logger.info('Phone number provisioned via Retell', { phoneNumber, clientId })
+
+        // Save phone number so outbound SMS can use it as the `from` number
+        await prisma.clientCredential.upsert({
+          where: { clientId_service: { clientId, service: 'twilio-phone' } },
+          update: { credentials: encryptJSON({ phoneNumber }) },
+          create: { clientId, service: 'twilio-phone', credentials: encryptJSON({ phoneNumber }) }
+        })
       }
     } catch (error) {
       logger.warn('Failed to provision phone number', { clientId, country: clientCountry, error })
