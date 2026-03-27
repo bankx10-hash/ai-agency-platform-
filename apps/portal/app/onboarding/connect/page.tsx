@@ -430,7 +430,7 @@ function ConnectPageInner() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  {connected[crmType] && <ConnectedBadge />}
+                  {connected[crmType] && <ConnectedBadge platform={crmType} />}
                   <button type="button" onClick={() => oauthConnect(crmType)}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
