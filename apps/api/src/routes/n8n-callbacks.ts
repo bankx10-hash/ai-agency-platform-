@@ -531,24 +531,52 @@ router.post('/:clientId/social/generate-content', async (req, res) => {
     const businessName = (config.businessName as string) || 'the business'
     const platformList = platforms.split(',').map(p => p.trim()).filter(Boolean)
 
-    const systemPrompt = contentCalendar
-      ? `You are a social media content strategist. Use this 4-week content calendar as context for what topics and pillars to draw from:\n\n${contentCalendar}`
-      : `You are an expert social media content strategist for ${businessName}.`
+    const businessDescription = (config.business_description as string) || ''
+    const tone = (config.tone as string) || 'authentic, direct, and value-driven'
+    const contentPillars = (config.content_pillars as string[]) || ['education', 'social proof', 'behind the scenes', 'entertainment', 'offer']
 
-    const userPrompt = topic
-      ? `Create social media posts about: "${topic}" for platforms: ${platformList.join(', ')}.`
-      : `Create today's social media posts for ${businessName}. Platforms: ${platformList.join(', ')}.`
+    const PLATFORM_RULES: Record<string, string> = {
+      instagram: `INSTAGRAM: Hook on line 1 (scroll-stopper). 3-5 short punchy paragraphs. storytelling: hook→problem→insight→proof→CTA. 20-25 hashtags at end. Emojis as visual bullets only.`,
+      facebook: `FACEBOOK: Emotional hook or controversy on line 1. 100-200 words. "This is for you if..." framing. End with a direct question to drive comments. One CTA max.`,
+      linkedin: `LINKEDIN: Bold professional insight or contrarian take on line 1. Hook→story→insight→question structure. 1-2 sentence paragraphs. 150-300 words. 3-5 hashtags at end. Never use "Excited to share".`
+    }
+
+    const platformRules = platformList
+      .map(p => PLATFORM_RULES[p] || '')
+      .filter(Boolean)
+      .join('\n\n')
+
+    const systemPrompt = `You are an elite social media content strategist for ${businessName}.
+Your job is to create scroll-stopping content that drives real engagement and gets shared.
+
+BUSINESS: ${businessDescription}
+BRAND TONE: ${tone}
+CONTENT PILLARS TO ROTATE: ${contentPillars.join(', ')}
+
+PLATFORM RULES:
+${platformRules}
+
+VIRALITY PRINCIPLES (apply to every post):
+1. Every post delivers ONE clear specific insight — not a vague overview
+2. Write like a person, not a brand — use "I" or "we", share real moments
+3. The hook is 80% of the work — spend most creative energy on line 1
+4. Specificity beats generality: "$47K in 30 days" beats "made money"
+5. Never end with "DM us" as the only CTA${contentCalendar ? `\n\nCONTENT CALENDAR CONTEXT (draw topics and pillars from this):\n${contentCalendar.substring(0, 3000)}` : ''}`
+
+    const userMessage = topic
+      ? `Create social media posts about: "${topic}"`
+      : `Create today's social media posts for ${businessName}`
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{
         role: 'user',
-        content: `${userPrompt}\n\nReturn a single JSON object with keys for each platform (${platformList.join(', ')}). Each value must be an object with:\n- content: the full post text\n- hashtags: array of hashtag strings\n- image_prompt: detailed prompt for AI image generation\n\nOnly include the platforms listed. Return valid JSON only, no markdown.`
+        content: `${userMessage}.\n\nPlatforms: ${platformList.join(', ')}.\n\nReturn a single JSON object with keys for each platform. Each value must be an object with:\n- content: the full post text ready to copy-paste\n- hashtags: array of hashtag strings (with # prefix)\n- image_prompt: detailed visual prompt for AI image generation that pairs perfectly with this post\n\nOnly include the platforms listed. Return valid JSON only, no markdown code blocks.`
       }]
     })
 
