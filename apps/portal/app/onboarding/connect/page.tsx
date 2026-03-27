@@ -507,7 +507,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['google-calendar'] && <ConnectedBadge />}
+              {connected['google-calendar'] && <ConnectedBadge platform="google-calendar" />}
               <button type="button" onClick={() => oauthConnect('google-calendar')}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
