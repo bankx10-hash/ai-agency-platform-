@@ -75,7 +75,7 @@
       "typeVersion": 2,
       "position": [1250, 200],
       "parameters": {
-        "jsCode": "const text = $input.first().json.content[0].text.trim();\nconst contactId = $('New Lead Webhook').first().json.contactId;\nreturn [{ json: { message: text, contactId } }];"
+        "jsCode": "const text = $input.first().json.content[0].text.trim();\nconst contactId = $('New Lead Webhook').first().json.contactId;\nconst contact = $('Get Contact').first().json.contact || $('Get Contact').first().json;\nconst to = contact.phone || '';\nreturn [{ json: { message: text, contactId, to } }];"
       }
     },
     {
@@ -286,7 +286,7 @@
       "typeVersion": 2,
       "position": [3000, 400],
       "parameters": {
-        "jsCode": "const data = $('Build Confirmation Email').first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nconst name = data.name || 'there';\nconst startTime = data.startTime || '';\nlet timeStr = 'today';\nif (startTime) {\n  try {\n    timeStr = new Date(startTime).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });\n  } catch {}\n}\nreturn [{ json: { contactId: data.contactId, type: 'SMS', message: 'Hi ' + name + ', just a reminder about your call with ' + businessName + ' tomorrow at ' + timeStr + '. See you then!' } }];"
+        "jsCode": "const data = $('Build Confirmation Email').first().json;\nconst contactForEmail = $('Get Contact for Email').first().json.contact || $('Get Contact for Email').first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nconst name = data.name || 'there';\nconst to = contactForEmail.phone || '';\nconst startTime = data.startTime || '';\nlet timeStr = 'today';\nif (startTime) {\n  try {\n    timeStr = new Date(startTime).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });\n  } catch {}\n}\nreturn [{ json: { contactId: data.contactId, type: 'SMS', to, message: 'Hi ' + name + ', just a reminder about your call with ' + businessName + ' tomorrow at ' + timeStr + '. See you then!' } }];"
       }
     },
     {

@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto'
 import twilio from 'twilio'
 import { emailService } from '../services/email.service'
 import { encryptJSON, decryptJSON } from '../utils/encrypt'
+import { appendPostRows } from '../services/sheets.service'
 import { logger } from '../utils/logger'
 import axios from 'axios'
 
@@ -511,25 +512,80 @@ router.post('/:clientId/alerts', async (req, res) => {
   }
 })
 
+// POST /:clientId/social/generate-images
+// Generates one image per platform using the image_prompt Claude included in the content.
+// Returns 500 if any image fails — N8N will stop the workflow rather than posting without an image.
+router.post('/:clientId/social/generate-images', async (req, res) => {
+  const { clientId } = req.params
+  const { content } = req.body as { content: Record<string, { content: string; image_prompt?: string }> }
+
+  try {
+    const images: Record<string, string> = {}
+
+    for (const [platform, platformContent] of Object.entries(content)) {
+      const prompt = platformContent.image_prompt
+      if (!prompt) {
+        logger.error('No image_prompt for platform — aborting', { clientId, platform })
+        return res.status(500).json({ error: `No image_prompt for platform: ${platform}` })
+      }
+
+      // Fal AI — flux/dev model, aspect ratio based on platform
+      const aspectRatio = platform === 'instagram' ? '1:1' : '16:9'
+      const response = await axios.post(
+        'https://fal.run/fal-ai/flux/dev',
+        {
+          prompt: prompt.substring(0, 1000),
+          image_size: aspectRatio === '1:1' ? 'square_hd' : 'landscape_16_9',
+          num_images: 1,
+          enable_safety_checker: true
+        },
+        {
+          headers: {
+            Authorization: `Key ${process.env.FAL_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+      images[platform] = response.data.images[0].url
+      logger.info('Image generated for social post via Fal AI', { clientId, platform })
+    }
+
+    res.json({ images })
+  } catch (err) {
+    logger.error('Social image generation failed — aborting workflow', { clientId, err })
+    res.status(500).json({ error: 'Image generation failed' })
+  }
+})
+
 // POST /:clientId/social/post-all
 router.post('/:clientId/social/post-all', async (req, res) => {
   const { clientId } = req.params
-  const { content, generatedAt } = req.body as { content: Record<string, string>; generatedAt: string }
+  const { content, images, metadata, generatedAt } = req.body as {
+    content: Record<string, string>
+    images?: Record<string, string>
+    metadata?: Record<string, { hashtags?: string[]; image_prompt?: string }>
+    generatedAt: string
+  }
 
-  async function postToPlatform(platform: string, text: string, credentials: Record<string, string>): Promise<{ success: boolean; error?: string }> {
+  async function postToPlatform(
+    platform: string,
+    text: string,
+    credentials: Record<string, string>,
+    imageUrl: string
+  ): Promise<{ success: boolean; postId?: string; error?: string }> {
     try {
       if (platform === 'facebook') {
         const response = await fetch(
-          `https://graph.facebook.com/v19.0/${credentials.pageId}/feed`,
+          `https://graph.facebook.com/v19.0/${credentials.pageId}/photos`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, access_token: credentials.accessToken })
+            body: JSON.stringify({ url: imageUrl, caption: text, access_token: credentials.accessToken })
           }
         )
         const data = await response.json() as Record<string, unknown>
         if (!response.ok) return { success: false, error: JSON.stringify(data) }
-        return { success: true }
+        return { success: true, postId: data.id as string }
       }
 
       if (platform === 'instagram') {
@@ -539,7 +595,7 @@ router.post('/:clientId/social/post-all', async (req, res) => {
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caption: text, media_type: 'IMAGE', image_url: credentials.defaultImageUrl || '', access_token: credentials.accessToken })
+            body: JSON.stringify({ caption: text, media_type: 'IMAGE', image_url: imageUrl, access_token: credentials.accessToken })
           }
         )
         const createData = await createRes.json() as Record<string, unknown>
@@ -555,45 +611,65 @@ router.post('/:clientId/social/post-all', async (req, res) => {
         )
         const publishData = await publishRes.json() as Record<string, unknown>
         if (!publishRes.ok) return { success: false, error: JSON.stringify(publishData) }
-        return { success: true }
+        return { success: true, postId: publishData.id as string }
       }
 
       if (platform === 'linkedin') {
-        const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+        const author = credentials.organizationId
+          ? `urn:li:organization:${credentials.organizationId}`
+          : `urn:li:person:${credentials.personId}`
+        const liHeaders = {
+          'Authorization': `Bearer ${credentials.accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0'
+        }
+
+        // Step 1: register image upload
+        const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
-            'Content-Type': 'application/json',
-            'X-Restli-Protocol-Version': '2.0.0'
-          },
+          headers: liHeaders,
           body: JSON.stringify({
-            author: `urn:li:organization:${credentials.organizationId}`,
+            registerUploadRequest: {
+              recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+              owner: author,
+              serviceRelationships: [{ relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' }]
+            }
+          })
+        })
+        const registerData = await registerRes.json() as Record<string, unknown>
+        if (!registerRes.ok) return { success: false, error: `LinkedIn register upload failed: ${JSON.stringify(registerData)}` }
+
+        const uploadUrl = (registerData.value as Record<string, unknown>)?.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl as string
+        const assetUrn = (registerData.value as Record<string, unknown>)?.asset as string
+        if (!uploadUrl || !assetUrn) return { success: false, error: 'LinkedIn did not return upload URL' }
+
+        // Step 2: download image and upload binary to LinkedIn
+        const imgResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+        await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/png' },
+          body: imgResponse.data
+        })
+
+        // Step 3: create post with asset
+        const postRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+          method: 'POST',
+          headers: liHeaders,
+          body: JSON.stringify({
+            author,
             lifecycleState: 'PUBLISHED',
             specificContent: {
               'com.linkedin.ugc.ShareContent': {
                 shareCommentary: { text },
-                shareMediaCategory: 'NONE'
+                shareMediaCategory: 'IMAGE',
+                media: [{ status: 'READY', media: assetUrn }]
               }
             },
             visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }
           })
         })
-        const data = await response.json() as Record<string, unknown>
-        if (!response.ok) return { success: false, error: JSON.stringify(data) }
-        return { success: true }
-      }
-
-      if (platform === 'twitter') {
-        const response = await fetch('https://api.twitter.com/2/tweets', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${credentials.bearerToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ text })
-        })
-        const data = await response.json() as Record<string, unknown>
-        if (!response.ok) return { success: false, error: JSON.stringify(data) }
+        const postData = await postRes.json() as Record<string, unknown>
+        if (!postRes.ok) return { success: false, error: JSON.stringify(postData) }
         return { success: true }
       }
 
@@ -608,7 +684,7 @@ router.post('/:clientId/social/post-all', async (req, res) => {
       return res.status(400).json({ error: 'content object required' })
     }
 
-    const results: Record<string, { success: boolean; error?: string }> = {}
+    const results: Record<string, { success: boolean; postId?: string; error?: string }> = {}
 
     for (const [platform, text] of Object.entries(content)) {
       const cred = await prisma.clientCredential.findFirst({
@@ -622,13 +698,36 @@ router.post('/:clientId/social/post-all', async (req, res) => {
       }
 
       const credentials = decryptJSON<Record<string, string>>(cred.credentials)
-      results[platform] = await postToPlatform(platform, text, credentials)
+      const imageUrl = images?.[platform]
+      if (!imageUrl) {
+        results[platform] = { success: false, error: 'No image generated for this platform' }
+        logger.error('Missing image for platform — skipping post', { clientId, platform })
+        continue
+      }
+      results[platform] = await postToPlatform(platform, text, credentials, imageUrl)
       logger.info('Social post result', { clientId, platform, success: results[platform].success })
     }
 
     await updateAgentMetrics(clientId, 'SOCIAL_MEDIA', {
       lastPost: { platforms: Object.keys(content), results, generatedAt, postedAt: new Date().toISOString() }
     })
+
+    // Log all posts to Google Sheet (non-blocking)
+    const timestamp = new Date().toISOString()
+    const sheetRows = Object.entries(results).map(([platform, result]) => ({
+      timestamp,
+      platform,
+      postText: content[platform] || '',
+      hashtags: (metadata?.[platform]?.hashtags || []).join(' '),
+      imageUrl: images?.[platform] || '',
+      imagePrompt: metadata?.[platform]?.image_prompt || '',
+      status: (result.success ? 'Complete' : 'Failed') as 'Complete' | 'Failed',
+      postId: result.postId,
+      error: result.error
+    }))
+    appendPostRows(clientId, sheetRows).catch(err =>
+      logger.warn('Sheet logging failed (non-fatal)', { clientId, err })
+    )
 
     res.json({ success: true, results })
   } catch (err) {

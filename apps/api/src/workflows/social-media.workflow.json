@@ -15,25 +15,48 @@
       }
     },
     {
+      "id": "content-brief-webhook",
+      "name": "Content Brief Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 500],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-brief-{{CLIENT_ID}}",
+        "responseMode": "onReceived"
+      },
+      "webhookId": "social-brief-{{CLIENT_ID}}"
+    },
+    {
       "id": "claude-generate-content",
       "name": "Claude - Generate Post Content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [500, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":2048,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Create today's social media posts for {{BUSINESS_NAME}}. Return a single JSON object with keys for each platform the business uses: facebook, instagram, linkedin, twitter. Each value should be the post text, tailored for that platform's tone and format. Only include platforms relevant to the business.\"}]}"
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "claude-sonnet-4-20250514" },
+            { "name": "max_tokens", "value": 4096 },
+            { "name": "system", "value": "{{AGENT_PROMPT}}" },
+            { "name": "messages", "value": "=[{\"role\":\"user\",\"content\":\"Create today's social media posts for {{BUSINESS_NAME}}. Platforms: {{PLATFORMS}}. Return a single JSON object with keys for each platform (facebook, instagram, linkedin). Each value should be an object with: content (the post text), hashtags (array), image_prompt (detailed prompt for AI image generation). Only include platforms listed above.\"}]" }
+          ]
+        }
       }
     },
     {
@@ -43,7 +66,32 @@
       "typeVersion": 2,
       "position": [750, 300],
       "parameters": {
-        "jsCode": "const text = $input.first().json.content[0].text;\nlet content;\ntry { content = JSON.parse(text); } catch { content = { error: 'Failed to parse content' }; }\nreturn [{ json: { content, generatedAt: new Date().toISOString() } }];"
+        "jsCode": "const raw = $input.first().json.content[0].text;\nlet content;\ntry {\n  const clean = raw.replace(/^```json\\s*/, '').replace(/```\\s*$/, '');\n  content = JSON.parse(clean);\n} catch {\n  content = {};\n}\nreturn [{ json: { content, generatedAt: new Date().toISOString() } }];"
+      }
+    },
+    {
+      "id": "generate-images",
+      "name": "Generate Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 300],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/generate-images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ content: $('Parse Platform Content').first().json.content }) }}"
       }
     },
     {
@@ -51,20 +99,21 @@
       "name": "Post to All Connected Platforms",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1000, 300],
+      "position": [1250, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/post-all",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/post-all",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"content\":$json.content,\"generatedAt\":$json.generatedAt}"
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ content: Object.fromEntries(Object.entries($('Parse Platform Content').first().json.content).map(([k,v]) => [k, v.content + (v.hashtags && v.hashtags.length ? '\\n\\n' + v.hashtags.map(h => h.startsWith('#') ? h : '#' + h).join(' ') : '')])), images: $json.images || {}, metadata: Object.fromEntries(Object.entries($('Parse Platform Content').first().json.content).map(([k,v]) => [k, { hashtags: v.hashtags || [], image_prompt: v.image_prompt || '' }])), generatedAt: $('Parse Platform Content').first().json.generatedAt }) }}"
       }
     },
     {
@@ -72,50 +121,42 @@
       "name": "Log Post Activity",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1250, 300],
+      "position": [1500, 300],
       "parameters": {
         "method": "POST",
-        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/activity",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/activity",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"type\":\"social_post\",\"platforms\":Object.keys($('Parse Platform Content').first().json.content),\"results\":$json.results,\"postedAt\":new Date().toISOString()}"
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ type: 'social_post', platforms: Object.keys($('Parse Platform Content').first().json.content), results: $json.results, postedAt: new Date().toISOString() }) }}"
       }
-    },
-    {
-      "id": "content-brief-webhook",
-      "name": "Content Brief Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "position": [250, 500],
-      "parameters": {
-        "path": "social-brief-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      },
-      "webhookId": "social-brief-{{CLIENT_ID}}"
     }
   ],
   "connections": {
     "Post Schedule": {
       "main": [[{ "node": "Claude - Generate Post Content", "type": "main", "index": 0 }]]
     },
+    "Content Brief Webhook": {
+      "main": [[{ "node": "Claude - Generate Post Content", "type": "main", "index": 0 }]]
+    },
     "Claude - Generate Post Content": {
       "main": [[{ "node": "Parse Platform Content", "type": "main", "index": 0 }]]
     },
     "Parse Platform Content": {
+      "main": [[{ "node": "Generate Images", "type": "main", "index": 0 }]]
+    },
+    "Generate Images": {
       "main": [[{ "node": "Post to All Connected Platforms", "type": "main", "index": 0 }]]
     },
     "Post to All Connected Platforms": {
       "main": [[{ "node": "Log Post Activity", "type": "main", "index": 0 }]]
-    },
-    "Content Brief Webhook": {
-      "main": [[{ "node": "Claude - Generate Post Content", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

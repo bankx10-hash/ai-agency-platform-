@@ -148,9 +148,8 @@ export class OnboardingService {
         business_description: `${businessName} provides excellent products and services`,
         tone: 'professional',
         posting_frequency: 'daily',
-        platforms: ['linkedin', 'facebook'],
-        content_pillars: ['tips', 'case_studies', 'promotions'],
-        buffer_token: ''
+        platforms: ['facebook', 'instagram', 'linkedin'],
+        content_pillars: ['tips', 'case_studies', 'promotions']
       },
       [AgentType.ADVERTISING]: {
         ...baseConfig,
