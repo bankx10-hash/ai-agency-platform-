@@ -111,11 +111,13 @@ Return a JSON object with:
   }
 
   async generateContentCalendar(config: SocialMediaAgentConfig): Promise<string> {
+    const platforms = config.platforms?.length ? config.platforms : ['facebook', 'instagram', 'linkedin']
+    const contentPillars = config.content_pillars?.length ? config.content_pillars : ['education', 'social proof', 'behind the scenes', 'entertainment', 'offer']
     return this.callClaude(
       `Create a 4-week social media content calendar for: ${config.business_description}
 Tone: ${config.tone}
-Platforms: ${config.platforms.join(', ')}
-Content pillars: ${config.content_pillars.join(', ')}
+Platforms: ${platforms.join(', ')}
+Content pillars: ${contentPillars.join(', ')}
 Posting frequency: ${config.posting_frequency}
 
 For each post include: platform, content_pillar, topic, hook_idea, best_time.
