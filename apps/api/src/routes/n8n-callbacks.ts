@@ -373,7 +373,7 @@ router.post('/:clientId/messages', async (req, res) => {
 
     // Look up the client's provisioned Twilio phone number
     const cred = await prisma.clientCredential.findUnique({
-      where: { clientId_service: { clientId, service: 'twilio-phone' } }
+      where: { id: `twilio-phone-${clientId}` }
     })
     if (!cred) {
       logger.warn('No Twilio phone number found for client — SMS not sent', { clientId })

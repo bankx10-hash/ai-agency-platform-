@@ -218,9 +218,9 @@ export class VoiceService {
 
         // Save phone number so outbound SMS can use it as the `from` number
         await prisma.clientCredential.upsert({
-          where: { clientId_service: { clientId, service: 'twilio-phone' } },
+          where: { id: `twilio-phone-${clientId}` },
           update: { credentials: encryptJSON({ phoneNumber }) },
-          create: { clientId, service: 'twilio-phone', credentials: encryptJSON({ phoneNumber }) }
+          create: { id: `twilio-phone-${clientId}`, clientId, service: 'twilio-phone', credentials: encryptJSON({ phoneNumber }) }
         })
       } else {
         // US/CA: Retell auto-provisions via Twilio
@@ -236,9 +236,9 @@ export class VoiceService {
 
         // Save phone number so outbound SMS can use it as the `from` number
         await prisma.clientCredential.upsert({
-          where: { clientId_service: { clientId, service: 'twilio-phone' } },
+          where: { id: `twilio-phone-${clientId}` },
           update: { credentials: encryptJSON({ phoneNumber }) },
-          create: { clientId, service: 'twilio-phone', credentials: encryptJSON({ phoneNumber }) }
+          create: { id: `twilio-phone-${clientId}`, clientId, service: 'twilio-phone', credentials: encryptJSON({ phoneNumber }) }
         })
       }
     } catch (error) {
