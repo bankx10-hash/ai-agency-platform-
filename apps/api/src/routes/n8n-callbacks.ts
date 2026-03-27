@@ -512,6 +512,62 @@ router.post('/:clientId/alerts', async (req, res) => {
   }
 })
 
+// POST /:clientId/social/generate-content
+// Calls Claude to generate today's social media posts using the stored content calendar.
+// Returns { facebook: {content, hashtags, image_prompt}, instagram: {...}, linkedin: {...} }
+router.post('/:clientId/social/generate-content', async (req, res) => {
+  const { clientId } = req.params
+  const { platforms = 'facebook,instagram,linkedin', topic } = req.body as { platforms?: string; topic?: string }
+
+  try {
+    // Load stored agent config (content calendar is in agentPrompt / config)
+    const agent = await prisma.agentDeployment.findFirst({
+      where: { clientId, agentType: 'SOCIAL_MEDIA' as never }
+    })
+    if (!agent) return res.status(404).json({ error: 'Social media agent not deployed' })
+
+    const config = agent.config as Record<string, unknown>
+    const contentCalendar = (config.generatedContentCalendar as string) || ''
+    const businessName = (config.businessName as string) || 'the business'
+    const platformList = platforms.split(',').map(p => p.trim()).filter(Boolean)
+
+    const systemPrompt = contentCalendar
+      ? `You are a social media content strategist. Use this 4-week content calendar as context for what topics and pillars to draw from:\n\n${contentCalendar}`
+      : `You are an expert social media content strategist for ${businessName}.`
+
+    const userPrompt = topic
+      ? `Create social media posts about: "${topic}" for platforms: ${platformList.join(', ')}.`
+      : `Create today's social media posts for ${businessName}. Platforms: ${platformList.join(', ')}.`
+
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-4-5',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: `${userPrompt}\n\nReturn a single JSON object with keys for each platform (${platformList.join(', ')}). Each value must be an object with:\n- content: the full post text\n- hashtags: array of hashtag strings\n- image_prompt: detailed prompt for AI image generation\n\nOnly include the platforms listed. Return valid JSON only, no markdown.`
+      }]
+    })
+
+    const raw = (message.content[0] as { text: string }).text
+    let content: Record<string, unknown>
+    try {
+      content = JSON.parse(raw.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim())
+    } catch {
+      return res.status(500).json({ error: 'Claude returned invalid JSON', raw })
+    }
+
+    logger.info('Social media content generated via API', { clientId, platforms: platformList })
+    res.json({ content, generatedAt: new Date().toISOString() })
+  } catch (err) {
+    logger.error('Social content generation failed', { clientId, err })
+    res.status(500).json({ error: 'Content generation failed' })
+  }
+})
+
 // POST /:clientId/social/generate-images
 // Generates one image per platform using the image_prompt Claude included in the content.
 // Returns 500 if any image fails — N8N will stop the workflow rather than posting without an image.
