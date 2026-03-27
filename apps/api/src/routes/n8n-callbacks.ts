@@ -639,7 +639,8 @@ router.post('/:clientId/social/post-all', async (req, res) => {
         const registerData = await registerRes.json() as Record<string, unknown>
         if (!registerRes.ok) return { success: false, error: `LinkedIn register upload failed: ${JSON.stringify(registerData)}` }
 
-        const uploadUrl = (registerData.value as Record<string, unknown>)?.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl as string
+        const uploadMechanism = ((registerData.value as Record<string, unknown>)?.uploadMechanism as Record<string, unknown>) || {}
+        const uploadUrl = (uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'] as Record<string, unknown>)?.uploadUrl as string
         const assetUrn = (registerData.value as Record<string, unknown>)?.asset as string
         if (!uploadUrl || !assetUrn) return { success: false, error: 'LinkedIn did not return upload URL' }
 
