@@ -359,9 +359,8 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
       case 'instagram': {
         const metaClientId = process.env.META_APP_ID
         if (!metaClientId) { res.status(500).json({ error: 'META_APP_ID not configured' }); return }
-        const scope = platform === 'instagram'
-          ? 'instagram_basic,instagram_content_publish,pages_read_engagement,pages_manage_posts'
-          : 'pages_manage_posts,pages_read_engagement,pages_show_list'
+        // Same scope for both facebook and instagram buttons — one OAuth connects both
+        const scope = 'pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish'
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/meta/callback`)
         const state = encodeURIComponent(JSON.stringify({ clientId, platform }))
         url = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${metaClientId}&redirect_uri=${redirect}&scope=${scope}&state=${state}&response_type=code`
@@ -388,7 +387,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         if (!linkedinClientId) { res.status(500).json({ error: 'LINKEDIN_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/linkedin/callback`)
         const state = encodeURIComponent(JSON.stringify({ clientId }))
-        url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${redirect}&scope=openid%20profile%20email%20w_member_social&state=${state}`
+        url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${redirect}&scope=openid%20profile%20email%20w_member_social%20w_organization_social&state=${state}&prompt=login`
         break
       }
       case 'gohighlevel': {
@@ -416,7 +415,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const state = encodeURIComponent(JSON.stringify({ clientId }))
         url = oauth2Client.generateAuthUrl({
           access_type: 'offline',
-          scope: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/userinfo.email'],
+          scope: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file'],
           prompt: 'consent',
           state
         })
@@ -531,18 +530,49 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
     } else if (platform === 'meta') {
       const metaAppId = process.env.META_APP_ID
       const metaAppSecret = process.env.META_APP_SECRET
+
+      // Exchange code for short-lived user token
       const tokenRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
-        params: {
-          client_id: metaAppId,
-          client_secret: metaAppSecret,
-          code,
-          redirect_uri: `${apiBase}/onboarding/oauth/meta/callback`
-        }
+        params: { client_id: metaAppId, client_secret: metaAppSecret, code, redirect_uri: `${apiBase}/onboarding/oauth/meta/callback` }
       })
-      credentials = {
-        accessToken: tokenRes.data.access_token,
-        platform: statePlatform
+
+      // Exchange for long-lived user token (60 days)
+      const longTokenRes = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+        params: { grant_type: 'fb_exchange_token', client_id: metaAppId, client_secret: metaAppSecret, fb_exchange_token: tokenRes.data.access_token }
+      })
+      const userToken: string = longTokenRes.data.access_token
+
+      // Fetch pages managed by this user (with page access token + Instagram account)
+      const pagesRes = await axios.get('https://graph.facebook.com/v18.0/me/accounts', {
+        params: { access_token: userToken, fields: 'id,name,access_token,instagram_business_account' }
+      })
+      const pages: Array<{ id: string; name: string; access_token: string; instagram_business_account?: { id: string } }> = pagesRes.data.data || []
+      if (!pages.length) throw new Error('No Facebook pages found — you must be an admin of at least one Facebook Page')
+      const page = pages[0]
+
+      // Store Facebook credentials
+      await prisma.clientCredential.upsert({
+        where: { id: `facebook-${clientId}` },
+        update: { credentials: encryptJSON({ pageId: page.id, pageName: page.name, accessToken: page.access_token, connectedAt: new Date().toISOString() }), service: 'facebook' },
+        create: { id: `facebook-${clientId}`, clientId, service: 'facebook', credentials: encryptJSON({ pageId: page.id, pageName: page.name, accessToken: page.access_token, connectedAt: new Date().toISOString() }) }
+      })
+      logger.info('Facebook page connected', { clientId, pageId: page.id })
+
+      // Store Instagram credentials if linked
+      if (page.instagram_business_account?.id) {
+        await prisma.clientCredential.upsert({
+          where: { id: `instagram-${clientId}` },
+          update: { credentials: encryptJSON({ igUserId: page.instagram_business_account.id, accessToken: page.access_token, connectedAt: new Date().toISOString() }), service: 'instagram' },
+          create: { id: `instagram-${clientId}`, clientId, service: 'instagram', credentials: encryptJSON({ igUserId: page.instagram_business_account.id, accessToken: page.access_token, connectedAt: new Date().toISOString() }) }
+        })
+        logger.info('Instagram Business account connected', { clientId, igUserId: page.instagram_business_account.id })
+        res.redirect(`${portalBase}/onboarding/connect?connected=facebook&connected=instagram`)
+      } else {
+        logger.warn('No Instagram Business account linked to this Facebook page', { clientId })
+        res.redirect(`${portalBase}/onboarding/connect?connected=facebook`)
       }
+      return
+
     } else if (platform === 'linkedin') {
       const tokenRes = await axios.post(
         'https://www.linkedin.com/oauth/v2/accessToken',
@@ -555,10 +585,23 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
         }),
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       )
+      const accessToken: string = tokenRes.data.access_token
+
+      // Fetch organization this user administers
+      const orgRes = await axios.get(
+        'https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&projection=(elements*(organization~(id,localizedName)))',
+        { headers: { Authorization: `Bearer ${accessToken}`, 'X-Restli-Protocol-Version': '2.0.0' } }
+      )
+      const orgs: Array<{ 'organization~': { id: number; localizedName: string } }> = orgRes.data.elements || []
+      const org = orgs[0]?.['organization~']
+      if (!org) throw new Error('No LinkedIn Company Page found — you must be an admin of a LinkedIn Company Page')
+
       credentials = {
-        accessToken: tokenRes.data.access_token,
+        accessToken,
         refreshToken: tokenRes.data.refresh_token || '',
-        expiresIn: String(tokenRes.data.expires_in || '')
+        expiresIn: String(tokenRes.data.expires_in || ''),
+        organizationId: String(org.id),
+        organizationName: org.localizedName
       }
     } else if (platform === 'hubspot') {
       const tokenRes = await axios.post(
@@ -611,6 +654,31 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
   } catch (error) {
     logger.error('OAuth callback error', { error, platform, clientId })
     res.redirect(`${portalBase}/onboarding/connect?error=callback_failed`)
+  }
+})
+
+// DELETE /onboarding/disconnect/:platform — removes stored credentials for a platform
+router.delete('/disconnect/:platform', async (req: Request, res: Response): Promise<void> => {
+  const { platform } = req.params
+  const { clientId } = req.query as { clientId?: string }
+
+  if (!clientId) { res.status(400).json({ error: 'clientId required' }); return }
+
+  try {
+    // Meta connects both facebook + instagram — disconnect both
+    const platforms = platform === 'facebook' || platform === 'instagram'
+      ? ['facebook', 'instagram']
+      : [platform]
+
+    for (const p of platforms) {
+      await prisma.clientCredential.deleteMany({ where: { clientId, service: p } })
+    }
+
+    logger.info('Platform disconnected', { clientId, platform })
+    res.json({ success: true, disconnected: platforms })
+  } catch (error) {
+    logger.error('Disconnect error', { error, platform, clientId })
+    res.status(500).json({ error: 'Failed to disconnect' })
   }
 })
 

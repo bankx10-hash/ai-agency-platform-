@@ -73,6 +73,25 @@ function ConnectPageInner() {
   function getClientId() { return localStorage.getItem('clientId') || '' }
   function mark(key: string) { setConnected(prev => ({ ...prev, [key]: true })) }
 
+  async function disconnectPlatform(platform: string) {
+    try {
+      const clientId = getClientId()
+      const token = getToken()
+      await axios.delete(`${API_URL}/onboarding/disconnect/${platform}`, {
+        params: { clientId },
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      // Remove from connected state (meta disconnects both facebook + instagram)
+      if (platform === 'facebook' || platform === 'instagram') {
+        setConnected(prev => ({ ...prev, facebook: false, instagram: false }))
+      } else {
+        setConnected(prev => ({ ...prev, [platform]: false }))
+      }
+    } catch {
+      setError(`Failed to disconnect ${platform}. Please try again.`)
+    }
+  }
+
   async function oauthConnect(platform: string) {
     try {
       const token = getToken()
@@ -134,13 +153,22 @@ function ConnectPageInner() {
     }
   }
 
-  const ConnectedBadge = () => (
-    <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
-      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-      </svg>
-      Connected
-    </span>
+  const ConnectedBadge = ({ platform }: { platform: string }) => (
+    <div className="flex items-center gap-2">
+      <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+        </svg>
+        Connected
+      </span>
+      <button
+        type="button"
+        onClick={() => disconnectPlatform(platform)}
+        className="text-xs text-gray-400 hover:text-red-500 underline transition"
+      >
+        Disconnect
+      </button>
+    </div>
   )
 
   const crmLabels: Record<string, string> = {
@@ -222,7 +250,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['gmail'] && <ConnectedBadge />}
+              {connected['gmail'] && <ConnectedBadge platform="gmail" />}
               <button type="button" onClick={() => oauthConnect('gmail')}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
@@ -254,7 +282,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['facebook'] && <ConnectedBadge />}
+              {connected['facebook'] && <ConnectedBadge platform="facebook" />}
               <button type="button" onClick={() => oauthConnect('facebook')}
                 className="flex items-center gap-2 px-4 py-2 bg-[#1877F2] text-white text-sm font-medium rounded-lg hover:bg-[#166FE5] transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -286,7 +314,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['instagram'] && <ConnectedBadge />}
+              {connected['instagram'] && <ConnectedBadge platform="instagram" />}
               <button type="button" onClick={() => oauthConnect('instagram')}
                 className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-lg hover:opacity-90 transition"
                 style={{ background: 'linear-gradient(45deg, #F58529, #DD2A7B, #8134AF)' }}>
@@ -312,7 +340,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['tiktok'] && <ConnectedBadge />}
+              {connected['tiktok'] && <ConnectedBadge platform="tiktok" />}
               <button type="button" onClick={() => oauthConnect('tiktok')}
                 className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -337,7 +365,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['twitter'] && <ConnectedBadge />}
+              {connected['twitter'] && <ConnectedBadge platform="twitter" />}
               <button type="button" onClick={() => oauthConnect('twitter')}
                 className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -362,7 +390,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['linkedin'] && <ConnectedBadge />}
+              {connected['linkedin'] && <ConnectedBadge platform="linkedin" />}
               <button type="button" onClick={() => oauthConnect('linkedin')}
                 className="flex items-center gap-2 px-4 py-2 bg-[#0A66C2] text-white text-sm font-medium rounded-lg hover:bg-[#004182] transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -454,7 +482,7 @@ function ConnectPageInner() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {connected['calendly'] && <ConnectedBadge />}
+              {connected['calendly'] && <ConnectedBadge platform="calendly" />}
               <button type="button" onClick={() => oauthConnect('calendly')}
                 className="flex items-center gap-2 px-4 py-2 bg-[#006BFF] text-white text-sm font-medium rounded-lg hover:bg-[#0055cc] transition">
                 Connect Calendly
