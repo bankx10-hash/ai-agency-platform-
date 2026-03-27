@@ -11,6 +11,16 @@ import axios from 'axios'
 const router = express.Router()
 const prisma = new PrismaClient()
 
+// Parse JSON bodies regardless of Content-Type (N8N sometimes sends empty content-type)
+router.use(express.json({ type: '*/*' }))
+router.use(express.text({ type: '*/*' }))
+router.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  if (typeof req.body === 'string') {
+    try { req.body = JSON.parse(req.body) } catch { /* leave as string */ }
+  }
+  next()
+})
+
 function n8nAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const secret = req.headers['x-api-secret']
   if (!process.env.N8N_API_SECRET || secret !== process.env.N8N_API_SECRET) {
