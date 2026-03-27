@@ -2,9 +2,10 @@ import { BaseAgent } from './base.agent'
 import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { n8nService } from '../services/n8n.service'
 import { socialService } from '../services/social.service'
+import { createSocialMediaSheet } from '../services/sheets.service'
 import { logger } from '../utils/logger'
 
-export type SupportedPlatform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin' | 'twitter'
+export type SupportedPlatform = 'instagram' | 'facebook' | 'linkedin'
 
 export interface SocialMediaAgentConfig {
   business_description: string
@@ -15,17 +16,15 @@ export interface SocialMediaAgentConfig {
   businessName: string
   locationId: string
 
-  // Buffer — schedules LinkedIn, Facebook, Instagram, Twitter/X
-  buffer_token: string
-
   // Meta Graph API — direct Facebook page + Instagram Business posting
   meta_page_id?: string
   meta_access_token?: string
   instagram_user_id?: string         // Instagram Business account ID (from Meta)
 
-  // TikTok Content Posting API
-  tiktok_access_token?: string
-  tiktok_open_id?: string            // TikTok user open_id from OAuth
+  // LinkedIn direct posting
+  linkedin_access_token?: string
+  linkedin_person_id?: string
+  linkedin_organization_id?: string  // future: requires Marketing Developer Platform
 }
 
 // Virality frameworks per platform
@@ -177,8 +176,6 @@ Each week is an array of post objects. Plan ${config.posting_frequency} per day.
       ? `${postText}\n\n${hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}`
       : postText
 
-    const postAt = scheduleAt || new Date()
-
     // 2. Route to the correct posting method
     switch (platform) {
       case 'instagram':
@@ -205,33 +202,17 @@ Each week is an array of post objects. Plan ${config.posting_frequency} per day.
         }
         break
 
-      case 'tiktok':
-        if (config.tiktok_access_token && config.tiktok_open_id) {
-          const ttResult = await socialService.postToTikTok({
-            openId: config.tiktok_open_id,
-            accessToken: config.tiktok_access_token,
-            title: postText.substring(0, 150),
-            videoScript: parsed.content
+      case 'linkedin':
+        if (config.linkedin_access_token) {
+          const liResult = await socialService.postToLinkedIn({
+            accessToken: config.linkedin_access_token,
+            personId: config.linkedin_person_id,
+            organizationId: config.linkedin_organization_id,
+            text: fullText
           })
-          return { platform, content: fullText, postId: ttResult.share_id }
+          return { platform, content: fullText, postId: liResult.id }
         }
         break
-    }
-
-    // Fallback: schedule via Buffer (covers LinkedIn, Twitter, Facebook, Instagram)
-    if (config.buffer_token) {
-      const results = await socialService.schedulePost({
-        content: fullText,
-        platforms: [platform],
-        scheduledTime: postAt,
-        bufferToken: config.buffer_token
-      })
-      return {
-        platform,
-        content: fullText,
-        postId: results[0]?.id,
-        scheduled: true
-      }
     }
 
     return { platform, content: fullText }
@@ -257,9 +238,15 @@ Each week is an array of post objects. Plan ${config.posting_frequency} per day.
       logger.warn('N8N workflow deployment failed, agent will run via direct API calls', { clientId, error })
     }
 
+    // Create Google Sheet for post logging (non-blocking — fails silently if no Google creds)
+    const spreadsheetId = await createSocialMediaSheet(clientId)
+    if (spreadsheetId) {
+      logger.info('Social media Google Sheet created', { clientId, spreadsheetId })
+    }
+
     const deployment = await this.createDeploymentRecord(
       clientId,
-      { ...typedConfig, generatedContentCalendar: contentCalendar },
+      { ...typedConfig, generatedContentCalendar: contentCalendar, spreadsheetId },
       workflowResult?.workflowId
     )
 
