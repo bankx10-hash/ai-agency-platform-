@@ -636,8 +636,11 @@ router.post('/:clientId/social/generate-images', async (req, res) => {
 
     res.json({ images })
   } catch (err) {
-    logger.error('Social image generation failed — aborting workflow', { clientId, err })
-    res.status(500).json({ error: 'Image generation failed' })
+    const detail = axios.isAxiosError(err)
+      ? `${err.response?.status} ${JSON.stringify(err.response?.data)}`
+      : String(err)
+    logger.error('Social image generation failed — aborting workflow', { clientId, err: detail })
+    res.status(500).json({ error: 'Image generation failed', detail })
   }
 })
 
