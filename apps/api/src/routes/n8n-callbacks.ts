@@ -11,14 +11,20 @@ import axios from 'axios'
 const router = express.Router()
 const prisma = new PrismaClient()
 
-// Parse JSON bodies regardless of Content-Type (N8N sometimes sends empty content-type)
-router.use(express.json({ type: '*/*' }))
-router.use(express.text({ type: '*/*' }))
+// Parse JSON bodies regardless of Content-Type (N8N sends empty content-type)
 router.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
-  if (typeof req.body === 'string') {
-    try { req.body = JSON.parse(req.body) } catch { /* leave as string */ }
+  if (req.body !== undefined && req.body !== null && Object.keys(req.body).length > 0) {
+    return next() // already parsed by global middleware
   }
-  next()
+  let raw = ''
+  req.on('data', (chunk: Buffer) => { raw += chunk.toString() })
+  req.on('end', () => {
+    if (raw) {
+      try { req.body = JSON.parse(raw) } catch { req.body = raw }
+    }
+    next()
+  })
+  req.on('error', () => next())
 })
 
 function n8nAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -718,57 +724,49 @@ router.post('/:clientId/social/post-all', async (req, res) => {
         const liHeaders = {
           'Authorization': `Bearer ${credentials.accessToken}`,
           'Content-Type': 'application/json',
-          'X-Restli-Protocol-Version': '2.0.0'
+          'LinkedIn-Version': '202401'
         }
 
-        // Step 1: register image upload
-        const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+        // Step 1: initialize image upload (newer REST API — works with w_member_social)
+        const initRes = await fetch('https://api.linkedin.com/rest/images?action=initializeUpload', {
           method: 'POST',
           headers: liHeaders,
-          body: JSON.stringify({
-            registerUploadRequest: {
-              recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
-              owner: author,
-              serviceRelationships: [{ relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' }]
-            }
-          })
+          body: JSON.stringify({ initializeUploadRequest: { owner: author } })
         })
-        const registerData = await registerRes.json() as Record<string, unknown>
-        if (!registerRes.ok) return { success: false, error: `LinkedIn register upload failed: ${JSON.stringify(registerData)}` }
+        const initData = await initRes.json() as Record<string, unknown>
+        if (!initRes.ok) return { success: false, error: `LinkedIn image init failed: ${JSON.stringify(initData)}` }
 
-        const uploadMechanism = ((registerData.value as Record<string, unknown>)?.uploadMechanism as Record<string, unknown>) || {}
-        const uploadUrl = (uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'] as Record<string, unknown>)?.uploadUrl as string
-        const assetUrn = (registerData.value as Record<string, unknown>)?.asset as string
-        if (!uploadUrl || !assetUrn) return { success: false, error: 'LinkedIn did not return upload URL' }
+        const initValue = initData.value as Record<string, unknown>
+        const uploadUrl = initValue?.uploadUrl as string
+        const imageUrn = initValue?.image as string
+        if (!uploadUrl || !imageUrn) return { success: false, error: 'LinkedIn did not return upload URL' }
 
         // Step 2: download image and upload binary to LinkedIn
         const imgResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' })
-        await fetch(uploadUrl, {
+        const uploadRes = await fetch(uploadUrl, {
           method: 'PUT',
-          headers: { 'Content-Type': 'image/png' },
+          headers: { 'Content-Type': 'application/octet-stream' },
           body: imgResponse.data
         })
+        if (!uploadRes.ok) return { success: false, error: `LinkedIn image upload failed: ${uploadRes.status}` }
 
-        // Step 3: create post with asset
-        const postRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+        // Step 3: create post with image (newer /rest/posts API)
+        const postRes = await fetch('https://api.linkedin.com/rest/posts', {
           method: 'POST',
           headers: liHeaders,
           body: JSON.stringify({
             author,
+            commentary: text,
+            visibility: 'PUBLIC',
+            distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
+            content: { media: { altText: 'Post image', id: imageUrn } },
             lifecycleState: 'PUBLISHED',
-            specificContent: {
-              'com.linkedin.ugc.ShareContent': {
-                shareCommentary: { text },
-                shareMediaCategory: 'IMAGE',
-                media: [{ status: 'READY', media: assetUrn }]
-              }
-            },
-            visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }
+            isReshareDisabledByAuthor: false
           })
         })
         const postData = await postRes.json() as Record<string, unknown>
         if (!postRes.ok) return { success: false, error: JSON.stringify(postData) }
-        return { success: true }
+        return { success: true, postId: postData.id as string }
       }
 
       return { success: false, error: `Unsupported platform: ${platform}` }
