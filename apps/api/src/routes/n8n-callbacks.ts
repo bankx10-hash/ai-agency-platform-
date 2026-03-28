@@ -974,19 +974,17 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
     let result: { success: boolean; id?: string; error?: string }
 
     if (type === 'dm') {
-      // Instagram: POST /{ig-user-id}/messages with IGSID recipient
-      // Facebook: POST /me/messages with PSID recipient
-      const messagesUrl = platform === 'instagram'
-        ? `https://graph.facebook.com/v19.0/${credentials.igUserId}/messages`
-        : `https://graph.facebook.com/v19.0/me/messages`
-
-      const response = await fetch(messagesUrl, {
+      // Both Facebook Messenger and Instagram use /me/messages with Bearer auth
+      // Instagram requires the token from Messenger → Instagram → Generate token
+      const response = await fetch('https://graph.facebook.com/v19.0/me/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify({
           recipient: { id: senderId },
-          message: { text: reply },
-          access_token: accessToken
+          message: { text: reply }
         })
       })
       const data = await response.json() as Record<string, unknown>
