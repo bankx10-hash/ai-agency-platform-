@@ -27,26 +27,20 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$('Normalise Event').first().json.type === 'dm' ? '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts' : '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts'}}",
-        "specifyBody": "string",
-        "body": "={\"name\": \"{{$('Normalise Event').first().json.senderName || $('Normalise Event').first().json.senderId}}\", \"email\": \"{{$('Normalise Event').first().json.platform}}_{{$('Normalise Event').first().json.senderId}}@social.nodus\", \"source\": \"{{$('Normalise Event').first().json.platform}}\", \"phone\": \"\"}",
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false
-            }
-          }
-        },
+        "url": "={{('{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts')}}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-secret",
-              "value": "{{N8N_API_SECRET}}"
-            }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={\"name\": \"\" + ($('Normalise Event').first().json.senderName || $('Normalise Event').first().json.senderId) + \"\", \"email\": \"\" + $('Normalise Event').first().json.platform + \"_\" + $('Normalise Event').first().json.senderId + \"@social.nodus\", \"source\": \"\" + $('Normalise Event').first().json.platform + \"\", \"phone\": \"\"}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "options": {}
       },
       "id": "save-contact",
       "name": "Save Contact",
@@ -57,26 +51,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{'{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/analyse-engagement'}}",
-        "specifyBody": "string",
-        "body": "={\"type\": \"{{$('Normalise Event').first().json.type}}\", \"platform\": \"{{$('Normalise Event').first().json.platform}}\", \"senderId\": \"{{$('Normalise Event').first().json.senderId}}\", \"senderName\": \"{{$('Normalise Event').first().json.senderName}}\", \"message\": \"{{$('Normalise Event').first().json.message}}\", \"postId\": \"{{$('Normalise Event').first().json.postId}}\", \"commentId\": \"{{$('Normalise Event').first().json.commentId}}\"}",
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false
-            }
-          }
-        },
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/analyse-engagement",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-secret",
-              "value": "{{N8N_API_SECRET}}"
-            }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  type: $('Normalise Event').first().json.type,\n  platform: $('Normalise Event').first().json.platform,\n  senderId: $('Normalise Event').first().json.senderId,\n  senderName: $('Normalise Event').first().json.senderName,\n  message: $('Normalise Event').first().json.message,\n  postId: $('Normalise Event').first().json.postId,\n  commentId: $('Normalise Event').first().json.commentId\n}}",
+        "options": {}
       },
       "id": "analyse-and-reply",
       "name": "Analyse and Reply",
@@ -105,26 +91,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{'{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/send-reply'}}",
-        "specifyBody": "string",
-        "body": "={\"type\": \"{{$('Normalise Event').first().json.type}}\", \"platform\": \"{{$('Normalise Event').first().json.platform}}\", \"senderId\": \"{{$('Normalise Event').first().json.senderId}}\", \"reply\": \"{{$('Analyse and Reply').first().json.reply}}\", \"postId\": \"{{$('Normalise Event').first().json.postId}}\", \"commentId\": \"{{$('Normalise Event').first().json.commentId}}\"}",
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false
-            }
-          }
-        },
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/send-reply",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-secret",
-              "value": "{{N8N_API_SECRET}}"
-            }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  type: $('Normalise Event').first().json.type,\n  platform: $('Normalise Event').first().json.platform,\n  senderId: $('Normalise Event').first().json.senderId,\n  reply: $('Analyse and Reply').first().json.reply,\n  postId: $('Normalise Event').first().json.postId,\n  commentId: $('Normalise Event').first().json.commentId\n}}",
+        "options": {}
       },
       "id": "send-reply",
       "name": "Send Reply",
@@ -152,26 +130,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{'{{N8N_BASE_URL}}/webhook/appointments-{{CLIENT_ID}}'}}",
-        "specifyBody": "string",
-        "body": "={\"source\": \"social_engagement\", \"platform\": \"{{$('Normalise Event').first().json.platform}}\", \"senderId\": \"{{$('Normalise Event').first().json.senderId}}\", \"senderName\": \"{{$('Normalise Event').first().json.senderName}}\", \"message\": \"{{$('Normalise Event').first().json.message}}\", \"intent\": \"{{$('Analyse and Reply').first().json.intent}}\", \"urgency\": \"{{$('Analyse and Reply').first().json.urgency}}\"}",
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false
-            }
-          }
-        },
+        "url": "{{N8N_BASE_URL}}/webhook/appointments-{{CLIENT_ID}}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-secret",
-              "value": "{{N8N_API_SECRET}}"
-            }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  source: 'social_engagement',\n  platform: $('Normalise Event').first().json.platform,\n  senderId: $('Normalise Event').first().json.senderId,\n  senderName: $('Normalise Event').first().json.senderName,\n  message: $('Normalise Event').first().json.message,\n  intent: $('Analyse and Reply').first().json.intent,\n  urgency: $('Analyse and Reply').first().json.urgency\n}}",
+        "options": {}
       },
       "id": "trigger-appointment-setter",
       "name": "Trigger Appointment Setter",
@@ -182,26 +152,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{'{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.contact?.id + '/notes'}}",
-        "specifyBody": "string",
-        "body": "={\"body\": \"Social engagement via {{$('Normalise Event').first().json.platform}} ({{$('Normalise Event').first().json.type}}). Intent: {{$('Analyse and Reply').first().json.intent}}. Urgency: {{$('Analyse and Reply').first().json.urgency}}. Message: {{$('Normalise Event').first().json.message}}. Reply sent: {{$('Analyse and Reply').first().json.reply}}\"}",
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false
-            }
-          }
-        },
+        "url": "={{('{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/') + $('Save Contact').first().json.contact?.id + '/notes'}}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-secret",
-              "value": "{{N8N_API_SECRET}}"
-            }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  body: 'Social engagement via ' + $('Normalise Event').first().json.platform + ' (' + $('Normalise Event').first().json.type + '). Intent: ' + $('Analyse and Reply').first().json.intent + '. Message: ' + $('Normalise Event').first().json.message + '. Reply: ' + $('Analyse and Reply').first().json.reply\n}}",
+        "options": {}
       },
       "id": "save-note",
       "name": "Save Conversation Note",
