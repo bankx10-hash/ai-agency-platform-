@@ -95,7 +95,7 @@ router.post('/', async (req, res) => {
       })
     }
 
-    // Facebook feed comments
+    // Facebook feed comments + Instagram DMs delivered via page changes
     if (!isInstagram) {
       for (const change of (entry.changes || [])) {
         if (change.field === 'feed') {
@@ -112,6 +112,18 @@ router.post('/', async (req, res) => {
               timestamp: value.created_time
             })
           }
+        }
+
+        // Instagram DMs arrive as object=page with changes[].field=messages
+        if (change.field === 'messages') {
+          const value = change.value as Record<string, unknown>
+          await forwardEngagementEvent(clientId, {
+            type: 'dm',
+            platform: 'instagram',
+            senderId: (value.sender as Record<string, string>)?.id,
+            message: (value.message as Record<string, string>)?.text || '',
+            timestamp: value.timestamp as number
+          })
         }
       }
     }
