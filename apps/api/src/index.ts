@@ -123,6 +123,9 @@ app.use((req, res, next) => {
 
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }))
 
+// Meta webhooks must be registered before rate limiter — Meta's IPs must never be blocked
+app.use('/webhooks/meta', metaWebhooksRouter)
+
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
@@ -137,7 +140,6 @@ app.use('/billing', billingRouter)
 app.use('/clients', clientsRouter)
 app.use('/agents', agentsRouter)
 app.use('/onboarding', onboardingRouter)
-app.use('/webhooks/meta', metaWebhooksRouter)
 app.use('/webhooks', webhooksRouter)
 app.use('/n8n', n8nCallbacksRouter)
 app.use('/admin', adminRouter)

@@ -7,6 +7,9 @@ import axios from 'axios'
 const router = express.Router()
 const prisma = new PrismaClient()
 
+// Parse JSON bodies — this router is mounted before the global json middleware
+router.use(express.json({ limit: '1mb' }))
+
 // ─── Webhook Verification (GET) ──────────────────────────────────────────────
 // Meta sends a GET request when you first set up the webhook in the Developer Console.
 // It passes hub.mode=subscribe, hub.challenge=<token>, hub.verify_token=<your token>.
@@ -29,7 +32,7 @@ router.get('/', (req, res) => {
 // ─── Webhook Event Handler (POST) ────────────────────────────────────────────
 // Meta sends all page events here. We look up which client owns the page/IG account,
 // normalise the event, and forward it to the client's engagement N8N workflow.
-router.post('/', express.json(), async (req, res) => {
+router.post('/', async (req, res) => {
   // Always ack immediately — Meta retries if we don't respond within 20s
   res.sendStatus(200)
 
