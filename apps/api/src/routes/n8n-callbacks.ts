@@ -971,13 +971,13 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
     let result: { success: boolean; id?: string; error?: string }
 
     if (type === 'dm') {
-      // Send a DM via Messenger / Instagram Messaging API
-      const recipientIdField = platform === 'instagram' ? 'instagram_user_id' : 'id'
-      const apiBase = platform === 'instagram'
-        ? `https://graph.facebook.com/v19.0/me/messages`
+      // Instagram: POST /{ig-user-id}/messages with IGSID recipient
+      // Facebook: POST /me/messages with PSID recipient
+      const messagesUrl = platform === 'instagram'
+        ? `https://graph.facebook.com/v19.0/${credentials.igUserId}/messages`
         : `https://graph.facebook.com/v19.0/me/messages`
 
-      const response = await fetch(apiBase, {
+      const response = await fetch(messagesUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
