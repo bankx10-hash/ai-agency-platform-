@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Normalise the incoming event from Meta webhook forwarder\nconst body = $json.body || $json;\nconst type = body.type || 'dm';\nconst platform = body.platform || 'facebook';\nconst senderId = body.senderId || '';\nconst senderName = body.senderName || '';\nconst message = body.message || '';\nconst postId = body.postId || '';\nconst commentId = body.commentId || '';\nconst clientId = body.clientId || '{{CLIENT_ID}}';\n\n// Skip empty messages (likes, reactions with no text)\nif (!message.trim()) {\n  return [];\n}\n\nreturn [{ json: { type, platform, senderId, senderName, message, postId, commentId, clientId } }];"
+        "jsCode": "const body = $json.body || $json;\nconst type = body.type || 'dm';\nconst platform = body.platform || 'facebook';\nconst senderId = String(body.senderId || '');\nconst senderName = String(body.senderName || '');\nconst message = String(body.message || '');\nconst postId = String(body.postId || '');\nconst commentId = String(body.commentId || '');\nconst clientId = body.clientId || '{{CLIENT_ID}}';\nif (!message.trim()) return [];\nreturn [{ json: { type, platform, senderId, senderName, message, postId, commentId, clientId } }];"
       },
       "id": "normalise-event",
       "name": "Normalise Event",
@@ -31,13 +31,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{\n  name: $('Normalise Event').first().json.senderName || $('Normalise Event').first().json.senderId,\n  email: $('Normalise Event').first().json.platform + '_' + $('Normalise Event').first().json.senderId + '@social.nodus',\n  source: $('Normalise Event').first().json.platform,\n  phone: ''\n}}",
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ name: $('Normalise Event').first().json.senderName || $('Normalise Event').first().json.senderId, email: $('Normalise Event').first().json.platform + '_' + $('Normalise Event').first().json.senderId + '@social.nodus', source: $('Normalise Event').first().json.platform, phone: '' }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
         "options": {}
       },
       "id": "save-contact",
@@ -53,13 +54,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{\n  type: $('Normalise Event').first().json.type,\n  platform: $('Normalise Event').first().json.platform,\n  senderId: $('Normalise Event').first().json.senderId,\n  senderName: $('Normalise Event').first().json.senderName,\n  message: $('Normalise Event').first().json.message,\n  postId: $('Normalise Event').first().json.postId,\n  commentId: $('Normalise Event').first().json.commentId\n}}",
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ type: $('Normalise Event').first().json.type, platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, senderName: $('Normalise Event').first().json.senderName, message: $('Normalise Event').first().json.message, postId: $('Normalise Event').first().json.postId, commentId: $('Normalise Event').first().json.commentId }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
         "options": {}
       },
       "id": "analyse-and-reply",
@@ -93,13 +95,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{\n  type: $('Normalise Event').first().json.type,\n  platform: $('Normalise Event').first().json.platform,\n  senderId: $('Normalise Event').first().json.senderId,\n  reply: $('Analyse and Reply').first().json.reply,\n  postId: $('Normalise Event').first().json.postId,\n  commentId: $('Normalise Event').first().json.commentId\n}}",
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ type: $('Normalise Event').first().json.type, platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, reply: $('Analyse and Reply').first().json.reply, postId: $('Normalise Event').first().json.postId, commentId: $('Normalise Event').first().json.commentId }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
         "options": {}
       },
       "id": "send-reply",
@@ -132,13 +135,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{\n  source: 'social_engagement',\n  platform: $('Normalise Event').first().json.platform,\n  senderId: $('Normalise Event').first().json.senderId,\n  senderName: $('Normalise Event').first().json.senderName,\n  message: $('Normalise Event').first().json.message,\n  intent: $('Analyse and Reply').first().json.intent,\n  urgency: $('Analyse and Reply').first().json.urgency\n}}",
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ source: 'social_engagement', platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, senderName: $('Normalise Event').first().json.senderName, message: $('Normalise Event').first().json.message, intent: $('Analyse and Reply').first().json.intent, urgency: $('Analyse and Reply').first().json.urgency }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
         "options": {}
       },
       "id": "trigger-appointment-setter",
@@ -150,17 +154,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{('{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/') + $('Save Contact').first().json.contact?.id + '/notes'}}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.contact?.id + '/notes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{\n  body: 'Social engagement via ' + $('Normalise Event').first().json.platform + ' (' + $('Normalise Event').first().json.type + '). Intent: ' + $('Analyse and Reply').first().json.intent + '. Message: ' + $('Normalise Event').first().json.message + '. Reply: ' + $('Analyse and Reply').first().json.reply\n}}",
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ body: 'Social engagement via ' + $('Normalise Event').first().json.platform + ' (' + $('Normalise Event').first().json.type + '). Intent: ' + $('Analyse and Reply').first().json.intent + '. Message: ' + $('Normalise Event').first().json.message + '. Reply: ' + $('Analyse and Reply').first().json.reply }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
         "options": {}
       },
       "id": "save-note",
