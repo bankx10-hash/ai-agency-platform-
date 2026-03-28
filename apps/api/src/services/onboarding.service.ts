@@ -41,7 +41,17 @@ export class OnboardingService {
         ? { bookingLink: rootBookingLink }
         : undefined
 
-    await this.deployAgentsByPlan(clientId, client.plan as Plan, locationId, client, (client as Record<string, unknown>).country as string | undefined, mergedVoiceConfig)
+    const clientRecord = client as Record<string, unknown>
+    await this.deployAgentsByPlan(
+      clientId,
+      client.plan as Plan,
+      locationId,
+      client,
+      clientRecord.country as string | undefined,
+      mergedVoiceConfig,
+      clientRecord.businessDescription as string | undefined,
+      clientRecord.icpDescription as string | undefined
+    )
 
     await this.updateOnboardingStep(clientId, 3, { agentsDeployed: true })
 
@@ -62,7 +72,9 @@ export class OnboardingService {
       email: string
     },
     country?: string,
-    voiceConfig?: Record<string, unknown>
+    voiceConfig?: Record<string, unknown>,
+    businessDescription?: string,
+    icpDescription?: string
   ): Promise<void> {
     const planConfig = PLANS[plan]
     const agentTypes = [...planConfig.agents] as AgentType[]
@@ -85,7 +97,7 @@ export class OnboardingService {
         }
 
         const agent = new AgentClass()
-        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName, country, voiceConfig)
+        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName, country, voiceConfig, businessDescription, icpDescription)
 
         await agent.deploy(clientId, defaultConfig)
 
@@ -114,7 +126,9 @@ export class OnboardingService {
     locationId: string,
     businessName: string,
     country?: string,
-    voiceConfig?: Record<string, unknown>
+    voiceConfig?: Record<string, unknown>,
+    businessDescription?: string,
+    icpDescription?: string
   ): Record<string, unknown> {
     const baseConfig = {
       locationId,
@@ -125,7 +139,7 @@ export class OnboardingService {
     const configs: Record<AgentType, Record<string, unknown>> = {
       [AgentType.LEAD_GENERATION]: {
         ...baseConfig,
-        icp_description: 'Business owners looking to grow their business',
+        icp_description: icpDescription || 'Business owners looking to grow their business',
         lead_sources: ['website', 'facebook'],
         scoring_prompt: 'Score this lead 0-100 based on how well they match our ICP',
         pipeline_id: '',
@@ -145,7 +159,7 @@ export class OnboardingService {
       },
       [AgentType.SOCIAL_MEDIA]: {
         ...baseConfig,
-        business_description: `${businessName} provides excellent products and services`,
+        business_description: businessDescription || `${businessName} provides excellent products and services`,
         tone: 'professional',
         posting_frequency: 'daily',
         platforms: ['facebook', 'instagram', 'linkedin'],

@@ -41,6 +41,12 @@ async function runStartupMigrations() {
   } catch { /* already exists, skip */ }
 
   try {
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "businessDescription" TEXT`
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "icpDescription" TEXT`
+    logger.info('Startup migration: businessDescription and icpDescription columns ensured')
+  } catch { /* already exists, skip */ }
+
+  try {
     await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "Contact" (
         "id"         TEXT        NOT NULL,

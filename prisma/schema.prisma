@@ -59,8 +59,10 @@ model Client {
   stripeSubId      String?
   plan             Plan             @default(STARTER)
   status           ClientStatus     @default(PENDING)
-  crmType          String?
-  country          String?          @default("AU")
+  crmType             String?
+  country             String?          @default("AU")
+  businessDescription String?
+  icpDescription      String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   agents           AgentDeployment[]

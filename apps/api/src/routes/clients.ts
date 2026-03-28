@@ -11,7 +11,9 @@ const updateClientSchema = z.object({
   businessName: z.string().min(1).optional(),
   phone: z.string().optional(),
   country: z.string().optional(),
-  crmType: z.string().nullable().optional().transform(v => (!v || v.toLowerCase() === 'none') ? null : v)
+  crmType: z.string().nullable().optional().transform(v => (!v || v.toLowerCase() === 'none') ? null : v),
+  businessDescription: z.string().optional(),
+  icpDescription: z.string().optional()
 })
 
 router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
