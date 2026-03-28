@@ -154,7 +154,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.contact?.id + '/notes' }}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.id + '/notes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
