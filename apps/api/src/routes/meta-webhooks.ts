@@ -39,45 +39,54 @@ router.post('/', async (req, res) => {
   logger.info('Meta webhook POST received', { object: req.body?.object, entryCount: req.body?.entry?.length })
 
   const body = req.body as MetaWebhookBody
-  if (!body || body.object !== 'page') {
+  if (!body || (body.object !== 'page' && body.object !== 'instagram')) {
     logger.warn('Meta webhook ignored — unexpected object type', { object: body?.object })
     return
   }
 
+  const isInstagram = body.object === 'instagram'
+
   for (const entry of (body.entry || [])) {
-    const pageId = entry.id
-
-    // Find the client that owns this Facebook page
-    const cred = await prisma.clientCredential.findFirst({
-      where: { service: 'facebook' }
-    })
-
-    // We may have multiple clients — find the one whose pageId matches
-    const allFbCreds = await prisma.clientCredential.findMany({
-      where: { service: 'facebook' }
-    })
+    const accountId = entry.id
 
     let clientId: string | undefined
-    for (const c of allFbCreds) {
-      try {
-        const data = decryptJSON<{ pageId: string }>(c.credentials)
-        if (data.pageId === pageId) {
-          clientId = c.clientId
-          break
-        }
-      } catch { /* skip corrupt credentials */ }
+
+    if (isInstagram) {
+      // Instagram: entry.id is the Instagram Business Account ID (igUserId)
+      const allIgCreds = await prisma.clientCredential.findMany({ where: { service: 'instagram' } })
+      for (const c of allIgCreds) {
+        try {
+          const data = decryptJSON<{ igUserId: string }>(c.credentials)
+          if (data.igUserId === accountId) {
+            clientId = c.clientId
+            break
+          }
+        } catch { /* skip corrupt credentials */ }
+      }
+    } else {
+      // Facebook: entry.id is the Facebook Page ID
+      const allFbCreds = await prisma.clientCredential.findMany({ where: { service: 'facebook' } })
+      for (const c of allFbCreds) {
+        try {
+          const data = decryptJSON<{ pageId: string }>(c.credentials)
+          if (data.pageId === accountId) {
+            clientId = c.clientId
+            break
+          }
+        } catch { /* skip corrupt credentials */ }
+      }
     }
 
     if (!clientId) {
-      logger.warn('Meta webhook: no client found for page', { pageId })
+      logger.warn('Meta webhook: no client found for account', { accountId, isInstagram })
       continue
     }
 
-    // Process each messaging or feed event
+    // DMs — same messaging[] structure for both Facebook (Messenger) and Instagram
     for (const event of (entry.messaging || [])) {
       await forwardEngagementEvent(clientId, {
         type: 'dm',
-        platform: 'facebook',
+        platform: isInstagram ? 'instagram' : 'facebook',
         senderId: event.sender?.id,
         recipientId: event.recipient?.id,
         message: event.message?.text || '',
@@ -86,34 +95,42 @@ router.post('/', async (req, res) => {
       })
     }
 
-    // Feed events (comments, likes on posts)
-    for (const change of (entry.changes || [])) {
-      if (change.field === 'feed') {
-        const value = change.value as FeedChangeValue
-        if (value.item === 'comment' && value.verb === 'add') {
-          await forwardEngagementEvent(clientId, {
-            type: 'comment',
-            platform: 'facebook',
-            senderId: value.from?.id,
-            senderName: value.from?.name,
-            message: value.message || '',
-            postId: value.post_id,
-            commentId: value.comment_id,
-            timestamp: value.created_time
-          })
+    // Facebook feed comments
+    if (!isInstagram) {
+      for (const change of (entry.changes || [])) {
+        if (change.field === 'feed') {
+          const value = change.value as FeedChangeValue
+          if (value.item === 'comment' && value.verb === 'add') {
+            await forwardEngagementEvent(clientId, {
+              type: 'comment',
+              platform: 'facebook',
+              senderId: value.from?.id,
+              senderName: value.from?.name,
+              message: value.message || '',
+              postId: value.post_id,
+              commentId: value.comment_id,
+              timestamp: value.created_time
+            })
+          }
         }
       }
+    }
 
-      // Instagram comment/DM events come through the page's changes
-      if (change.field === 'messages') {
-        const value = change.value as Record<string, unknown>
-        await forwardEngagementEvent(clientId, {
-          type: 'dm',
-          platform: 'instagram',
-          senderId: (value.sender as Record<string, string>)?.id,
-          message: (value.message as Record<string, string>)?.text || '',
-          timestamp: value.timestamp as number
-        })
+    // Instagram comments
+    if (isInstagram) {
+      for (const change of (entry.changes || [])) {
+        if (change.field === 'comments') {
+          const value = change.value as IgCommentValue
+          await forwardEngagementEvent(clientId, {
+            type: 'comment',
+            platform: 'instagram',
+            senderId: value.from?.id,
+            senderName: value.from?.username,
+            message: value.text || '',
+            postId: value.media?.id,
+            commentId: value.id,
+          })
+        }
       }
     }
   }
@@ -170,6 +187,13 @@ interface FeedChangeValue {
   post_id?: string
   comment_id?: string
   created_time?: number
+}
+
+interface IgCommentValue {
+  from?: { id: string; username?: string }
+  media?: { id: string; media_product_type?: string }
+  id?: string
+  text?: string
 }
 
 interface EngagementEvent {

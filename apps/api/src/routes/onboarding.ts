@@ -567,7 +567,7 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
         })
         logger.info('Instagram Business account connected', { clientId, igUserId: page.instagram_business_account.id })
 
-        // Auto-subscribe the page to Meta webhooks for DMs, comments, and feed events
+        // Auto-subscribe the Facebook page to Meta webhooks
         try {
           await axios.post(
             `https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`,
@@ -577,6 +577,18 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
           logger.info('Meta page subscribed to webhooks', { clientId, pageId: page.id })
         } catch (subErr) {
           logger.warn('Failed to subscribe page to webhooks (non-fatal)', { clientId, pageId: page.id, subErr })
+        }
+
+        // Also subscribe the Instagram Business Account to webhooks for DMs and comments
+        try {
+          await axios.post(
+            `https://graph.facebook.com/v19.0/${page.instagram_business_account.id}/subscribed_apps`,
+            { subscribed_fields: 'messages,comments,mentions', access_token: page.access_token },
+            { headers: { 'Content-Type': 'application/json' } }
+          )
+          logger.info('Instagram account subscribed to webhooks', { clientId, igUserId: page.instagram_business_account.id })
+        } catch (subErr) {
+          logger.warn('Failed to subscribe Instagram account to webhooks (non-fatal)', { clientId, igUserId: page.instagram_business_account.id, subErr })
         }
 
         res.redirect(`${portalBase}/onboarding/connect?connected=facebook&connected=instagram`)
