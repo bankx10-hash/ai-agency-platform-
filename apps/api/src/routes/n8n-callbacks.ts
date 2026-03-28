@@ -703,13 +703,28 @@ router.post('/:clientId/social/post-all', async (req, res) => {
         )
         const createData = await createRes.json() as Record<string, unknown>
         if (!createRes.ok || !createData.id) return { success: false, error: JSON.stringify(createData) }
-        // Step 2: publish
+
+        // Step 2: poll until media container is FINISHED (avoids "not ready" error)
+        const containerId = createData.id as string
+        let ready = false
+        for (let attempt = 0; attempt < 10; attempt++) {
+          await new Promise(r => setTimeout(r, 3000))
+          const statusRes = await fetch(
+            `https://graph.facebook.com/v19.0/${containerId}?fields=status_code&access_token=${credentials.accessToken}`
+          )
+          const statusData = await statusRes.json() as Record<string, unknown>
+          if (statusData.status_code === 'FINISHED') { ready = true; break }
+          if (statusData.status_code === 'ERROR') return { success: false, error: `Instagram media processing failed: ${JSON.stringify(statusData)}` }
+        }
+        if (!ready) return { success: false, error: 'Instagram media container timed out (30s)' }
+
+        // Step 3: publish
         const publishRes = await fetch(
           `https://graph.facebook.com/v19.0/${credentials.igUserId}/media_publish`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ creation_id: createData.id, access_token: credentials.accessToken })
+            body: JSON.stringify({ creation_id: containerId, access_token: credentials.accessToken })
           }
         )
         const publishData = await publishRes.json() as Record<string, unknown>
@@ -724,7 +739,7 @@ router.post('/:clientId/social/post-all', async (req, res) => {
         const liHeaders = {
           'Authorization': `Bearer ${credentials.accessToken}`,
           'Content-Type': 'application/json',
-          'LinkedIn-Version': '202501'
+          'LinkedIn-Version': '202504'
         }
 
         // Step 1: initialize image upload (newer REST API — works with w_member_social)
