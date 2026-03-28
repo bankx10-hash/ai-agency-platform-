@@ -36,8 +36,13 @@ router.post('/', async (req, res) => {
   // Always ack immediately — Meta retries if we don't respond within 20s
   res.sendStatus(200)
 
+  logger.info('Meta webhook POST received', { object: req.body?.object, entryCount: req.body?.entry?.length })
+
   const body = req.body as MetaWebhookBody
-  if (!body || body.object !== 'page') return
+  if (!body || body.object !== 'page') {
+    logger.warn('Meta webhook ignored — unexpected object type', { object: body?.object })
+    return
+  }
 
   for (const entry of (body.entry || [])) {
     const pageId = entry.id
