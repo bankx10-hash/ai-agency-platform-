@@ -974,23 +974,19 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
     let result: { success: boolean; id?: string; error?: string }
 
     if (type === 'dm') {
-      // Both Facebook Messenger and Instagram use /me/messages with Bearer auth
-      // Instagram requires the token from Messenger → Instagram → Generate token
-      const response = await fetch('https://graph.facebook.com/v19.0/me/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
+      // Both Facebook Messenger and Instagram use /me/messages with access_token in body
+      const dmRes = await axios.post(
+        'https://graph.facebook.com/v19.0/me/messages',
+        {
           recipient: { id: senderId },
-          message: { text: reply }
-        })
-      })
-      const data = await response.json() as Record<string, unknown>
-      result = response.ok
-        ? { success: true, id: data.message_id as string }
-        : { success: false, error: JSON.stringify(data) }
+          message: { text: reply },
+          access_token: accessToken.trim()
+        },
+        { validateStatus: () => true }
+      )
+      result = dmRes.status < 300
+        ? { success: true, id: dmRes.data?.message_id }
+        : { success: false, error: JSON.stringify(dmRes.data) }
 
     } else if (type === 'comment') {
       // Reply to a comment on a Facebook post
