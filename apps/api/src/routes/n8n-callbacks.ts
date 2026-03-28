@@ -966,7 +966,10 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
       return res.status(404).json({ error: `No ${service} credentials found for client` })
     }
     const credentials = decryptJSON<Record<string, string>>(cred.credentials)
-    const accessToken = credentials.accessToken
+    // Instagram messaging requires the Messenger-generated page access token (has messaging capability)
+    const accessToken = platform === 'instagram' && process.env.META_PAGE_ACCESS_TOKEN
+      ? process.env.META_PAGE_ACCESS_TOKEN
+      : credentials.accessToken
 
     let result: { success: boolean; id?: string; error?: string }
 
