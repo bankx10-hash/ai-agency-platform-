@@ -779,9 +779,13 @@ router.post('/:clientId/social/post-all', async (req, res) => {
             isReshareDisabledByAuthor: false
           })
         })
-        const postData = await postRes.json() as Record<string, unknown>
-        if (!postRes.ok) return { success: false, error: JSON.stringify(postData) }
-        return { success: true, postId: postData.id as string }
+        // 201 success has empty body — read ID from header, only parse body on error
+        if (!postRes.ok) {
+          const errText = await postRes.text()
+          return { success: false, error: errText }
+        }
+        const postId = postRes.headers.get('x-linkedin-id') || postRes.headers.get('x-restli-id') || ''
+        return { success: true, postId }
       }
 
       return { success: false, error: `Unsupported platform: ${platform}` }
