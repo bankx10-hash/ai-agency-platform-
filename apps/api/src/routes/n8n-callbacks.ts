@@ -724,7 +724,7 @@ router.post('/:clientId/social/post-all', async (req, res) => {
         const liHeaders = {
           'Authorization': `Bearer ${credentials.accessToken}`,
           'Content-Type': 'application/json',
-          'LinkedIn-Version': '202401'
+          'LinkedIn-Version': '202501'
         }
 
         // Step 1: initialize image upload (newer REST API — works with w_member_social)
