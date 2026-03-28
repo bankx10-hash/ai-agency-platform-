@@ -1015,7 +1015,7 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
       return res.status(400).json({ error: `Unsupported reply type: ${type}` })
     }
 
-    logger.info('Social reply sent', { clientId, platform, type, success: result.success })
+    logger.info('Social reply sent', { clientId, platform, type, success: result.success, error: result.error })
     res.json(result)
   } catch (err) {
     logger.error('Send reply failed', { clientId, err })
