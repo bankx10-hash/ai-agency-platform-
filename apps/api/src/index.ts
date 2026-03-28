@@ -11,6 +11,7 @@ import webhooksRouter from './routes/webhooks'
 import n8nCallbacksRouter from './routes/n8n-callbacks'
 import adminRouter from './routes/admin'
 import calendarRouter from './routes/calendar'
+import metaWebhooksRouter from './routes/meta-webhooks'
 import { logger } from './utils/logger'
 
 async function runStartupMigrations() {
@@ -44,6 +45,11 @@ async function runStartupMigrations() {
     await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "businessDescription" TEXT`
     await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "icpDescription" TEXT`
     logger.info('Startup migration: businessDescription and icpDescription columns ensured')
+  } catch { /* already exists, skip */ }
+
+  try {
+    await prisma.$executeRaw`ALTER TYPE "AgentType" ADD VALUE IF NOT EXISTS 'SOCIAL_ENGAGEMENT'`
+    logger.info('Startup migration: SOCIAL_ENGAGEMENT enum value ensured')
   } catch { /* already exists, skip */ }
 
   try {
@@ -131,6 +137,7 @@ app.use('/billing', billingRouter)
 app.use('/clients', clientsRouter)
 app.use('/agents', agentsRouter)
 app.use('/onboarding', onboardingRouter)
+app.use('/webhooks/meta', metaWebhooksRouter)
 app.use('/webhooks', webhooksRouter)
 app.use('/n8n', n8nCallbacksRouter)
 app.use('/admin', adminRouter)

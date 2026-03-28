@@ -3,6 +3,7 @@ import { BaseAgent } from './base.agent'
 import { LeadGenerationAgent } from './lead-generation.agent'
 import { LinkedInAgent } from './linkedin.agent'
 import { SocialMediaAgent } from './social-media.agent'
+import { SocialEngagementAgent } from './social-engagement.agent'
 import { AdvertisingAgent } from './advertising.agent'
 import { AppointmentSetterAgent } from './appointment-setter.agent'
 import { VoiceInboundAgent } from './voice-inbound.agent'
@@ -15,6 +16,7 @@ export {
   LeadGenerationAgent,
   LinkedInAgent,
   SocialMediaAgent,
+  SocialEngagementAgent,
   AdvertisingAgent,
   AppointmentSetterAgent,
   VoiceInboundAgent,
@@ -29,6 +31,7 @@ export const AGENT_REGISTRY: Record<AgentType, AgentConstructor> = {
   [AgentType.LEAD_GENERATION]: LeadGenerationAgent,
   [AgentType.LINKEDIN_OUTREACH]: LinkedInAgent,
   [AgentType.SOCIAL_MEDIA]: SocialMediaAgent,
+  [AgentType.SOCIAL_ENGAGEMENT]: SocialEngagementAgent,
   [AgentType.ADVERTISING]: AdvertisingAgent,
   [AgentType.APPOINTMENT_SETTER]: AppointmentSetterAgent,
   [AgentType.VOICE_INBOUND]: VoiceInboundAgent,

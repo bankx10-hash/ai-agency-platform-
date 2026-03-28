@@ -851,6 +851,178 @@ router.post('/:clientId/social/post-all', async (req, res) => {
   }
 })
 
+// POST /:clientId/social/analyse-engagement
+// Called by N8N engagement workflow. Claude classifies the intent and drafts a reply.
+router.post('/:clientId/social/analyse-engagement', async (req, res) => {
+  const { clientId } = req.params
+  const { type, platform, senderId, senderName, message, postId, commentId } = req.body as {
+    type: string
+    platform: string
+    senderId: string
+    senderName?: string
+    message: string
+    postId?: string
+    commentId?: string
+  }
+
+  try {
+    const agentDep = await prisma.agentDeployment.findFirst({
+      where: { clientId, agentType: 'SOCIAL_ENGAGEMENT' as never }
+    })
+    const config = (agentDep?.config || {}) as Record<string, unknown>
+    const businessName = (config.businessName as string) || 'our business'
+    const businessDescription = (config.business_description as string) || ''
+    const bookingLink = (config.booking_link as string) || ''
+    const objectionHandlers = (config.objection_handlers as Record<string, string>) || {}
+
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+    const systemPrompt = `You are a smart social media engagement assistant for ${businessName}.
+${businessDescription ? `Business: ${businessDescription}` : ''}
+Your job is to classify incoming messages/comments and draft natural, helpful replies that build relationships.
+
+Booking link (only share if explicitly helpful): ${bookingLink || 'not set'}
+
+Objection handlers:
+${Object.entries(objectionHandlers).map(([k, v]) => `- "${k}": ${v}`).join('\n') || 'Use natural empathetic responses'}
+
+Classification rules:
+- "interested": asking about services, prices, how it works, or expressing interest
+- "question": general question about the business or content
+- "complaint": negative experience or frustration
+- "booking_ready": explicitly wanting to book, meet, or get started NOW
+- "spam": irrelevant, promotional, or clearly automated
+- "positive": compliment, like, or positive engagement with no clear intent
+
+Reply rules:
+- Keep replies SHORT (1-3 sentences) — social media, not email
+- Sound like a real person, not a robot
+- If "interested" or "booking_ready" and booking link is set, weave it in naturally
+- Never paste the booking link as raw text — use natural language like "you can grab a time here: [link]"
+- Match the energy of the platform (casual on Instagram/Facebook)
+- For comments: reply publicly, be friendly and brief
+- For DMs: slightly more personal and detailed is fine`
+
+    const userMessage = `${senderName ? `From: ${senderName}` : `Sender ID: ${senderId}`}
+Platform: ${platform} (${type})
+Message: "${message}"
+
+Classify this message and draft an appropriate reply.
+Return JSON only:
+{
+  "intent": "interested|question|complaint|booking_ready|spam|positive",
+  "urgency": "low|medium|high",
+  "shouldBook": true|false,
+  "reply": "<the reply text to send>",
+  "reason": "<one sentence explaining your classification>"
+}`
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    })
+
+    const raw = (response.content[0] as { text: string }).text
+    let analysis: Record<string, unknown>
+    try {
+      analysis = JSON.parse(raw.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim())
+    } catch {
+      return res.status(500).json({ error: 'Claude returned invalid JSON', raw })
+    }
+
+    logger.info('Engagement analysed', { clientId, platform, type, intent: analysis.intent })
+    res.json({ ...analysis, clientId, platform, type, senderId, postId, commentId })
+  } catch (err) {
+    logger.error('Engagement analysis failed', { clientId, err })
+    res.status(500).json({ error: 'Analysis failed' })
+  }
+})
+
+// POST /:clientId/social/send-reply
+// Called by N8N after analysis. Routes the reply to the correct Meta Graph API endpoint.
+router.post('/:clientId/social/send-reply', async (req, res) => {
+  const { clientId } = req.params
+  const { type, platform, senderId, reply, postId, commentId } = req.body as {
+    type: string
+    platform: string
+    senderId: string
+    reply: string
+    postId?: string
+    commentId?: string
+  }
+
+  if (!reply?.trim()) {
+    return res.status(400).json({ error: 'reply text is required' })
+  }
+
+  try {
+    // Get the page access token for this client
+    const service = platform === 'instagram' ? 'instagram' : 'facebook'
+    const cred = await prisma.clientCredential.findFirst({ where: { clientId, service } })
+    if (!cred) {
+      return res.status(404).json({ error: `No ${service} credentials found for client` })
+    }
+    const credentials = decryptJSON<Record<string, string>>(cred.credentials)
+    const accessToken = credentials.accessToken
+
+    let result: { success: boolean; id?: string; error?: string }
+
+    if (type === 'dm') {
+      // Send a DM via Messenger / Instagram Messaging API
+      const recipientIdField = platform === 'instagram' ? 'instagram_user_id' : 'id'
+      const apiBase = platform === 'instagram'
+        ? `https://graph.facebook.com/v19.0/me/messages`
+        : `https://graph.facebook.com/v19.0/me/messages`
+
+      const response = await fetch(apiBase, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: senderId },
+          message: { text: reply },
+          access_token: accessToken
+        })
+      })
+      const data = await response.json() as Record<string, unknown>
+      result = response.ok
+        ? { success: true, id: data.message_id as string }
+        : { success: false, error: JSON.stringify(data) }
+
+    } else if (type === 'comment') {
+      // Reply to a comment on a Facebook post
+      const targetId = commentId || postId
+      if (!targetId) {
+        return res.status(400).json({ error: 'commentId or postId required for comment replies' })
+      }
+
+      const response = await fetch(
+        `https://graph.facebook.com/v19.0/${targetId}/comments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: reply, access_token: accessToken })
+        }
+      )
+      const data = await response.json() as Record<string, unknown>
+      result = response.ok
+        ? { success: true, id: data.id as string }
+        : { success: false, error: JSON.stringify(data) }
+
+    } else {
+      return res.status(400).json({ error: `Unsupported reply type: ${type}` })
+    }
+
+    logger.info('Social reply sent', { clientId, platform, type, success: result.success })
+    res.json(result)
+  } catch (err) {
+    logger.error('Send reply failed', { clientId, err })
+    res.status(500).json({ error: 'Failed to send reply' })
+  }
+})
+
 // POST /:clientId/activity
 router.post('/:clientId/activity', async (req, res) => {
   const { clientId } = req.params

@@ -230,6 +230,19 @@ export class OnboardingService {
         },
         commission_tracking: false
       },
+      [AgentType.SOCIAL_ENGAGEMENT]: {
+        ...baseConfig,
+        business_description: businessDescription || `${businessName} provides excellent products and services`,
+        booking_link: (voiceConfig?.bookingLink as string) || '',
+        objection_handlers: {
+          'not interested': 'Totally understand! No worries at all. If you ever want to learn more, we\'re always here.',
+          'too expensive': 'That\'s fair feedback! We do have flexible options — happy to chat if you\'d like to explore what works for your budget.',
+          'not ready': 'No pressure at all! When the time\'s right, we\'d love to connect.'
+        },
+        platforms: ['facebook', 'instagram'],
+        handoff_to_appointment_setter: true,
+        handoff_to_closer: false
+      },
       [AgentType.CLIENT_SERVICES]: {
         ...baseConfig,
         welcome_sequence: [

@@ -360,7 +360,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const metaClientId = process.env.META_APP_ID
         if (!metaClientId) { res.status(500).json({ error: 'META_APP_ID not configured' }); return }
         // Same scope for both facebook and instagram buttons — one OAuth connects both
-        const scope = 'pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish'
+        const scope = 'pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish,pages_messaging,instagram_manage_messages,instagram_manage_comments,pages_manage_engagement'
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/meta/callback`)
         const state = encodeURIComponent(JSON.stringify({ clientId, platform }))
         url = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${metaClientId}&redirect_uri=${redirect}&scope=${scope}&state=${state}&response_type=code`
@@ -566,9 +566,35 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
           create: { id: `instagram-${clientId}`, clientId, service: 'instagram', credentials: encryptJSON({ igUserId: page.instagram_business_account.id, accessToken: page.access_token, connectedAt: new Date().toISOString() }) }
         })
         logger.info('Instagram Business account connected', { clientId, igUserId: page.instagram_business_account.id })
+
+        // Auto-subscribe the page to Meta webhooks for DMs, comments, and feed events
+        try {
+          await axios.post(
+            `https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`,
+            { subscribed_fields: 'messages,feed,mention,comment', access_token: page.access_token },
+            { headers: { 'Content-Type': 'application/json' } }
+          )
+          logger.info('Meta page subscribed to webhooks', { clientId, pageId: page.id })
+        } catch (subErr) {
+          logger.warn('Failed to subscribe page to webhooks (non-fatal)', { clientId, pageId: page.id, subErr })
+        }
+
         res.redirect(`${portalBase}/onboarding/connect?connected=facebook&connected=instagram`)
       } else {
         logger.warn('No Instagram Business account linked to this Facebook page', { clientId })
+
+        // Still subscribe page to webhooks even without Instagram
+        try {
+          await axios.post(
+            `https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`,
+            { subscribed_fields: 'messages,feed,mention,comment', access_token: page.access_token },
+            { headers: { 'Content-Type': 'application/json' } }
+          )
+          logger.info('Meta page subscribed to webhooks', { clientId, pageId: page.id })
+        } catch (subErr) {
+          logger.warn('Failed to subscribe page to webhooks (non-fatal)', { clientId, pageId: page.id, subErr })
+        }
+
         res.redirect(`${portalBase}/onboarding/connect?connected=facebook`)
       }
       return
