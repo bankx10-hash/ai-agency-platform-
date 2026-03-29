@@ -109,6 +109,9 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 py-12 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <img src="/nodus-logo.jpeg" alt="Nodus AI Systems" className="h-12 w-auto object-contain" />
+          </div>
           <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
             <span>Step 1 of 3</span>
           </div>
