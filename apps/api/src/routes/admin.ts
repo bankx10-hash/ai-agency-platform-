@@ -456,8 +456,9 @@ router.delete('/client/:clientId', async (req: Request, res: Response): Promise<
     const n8nDeleted = await n8nService.deleteAllClientWorkflows(clientId).catch(() => 0)
 
     // Delete all DB records in dependency order
-    await prisma.contactNote.deleteMany({ where: { contact: { clientId } } })
-    await prisma.contact.deleteMany({ where: { clientId } })
+    // Contact/ContactNote are raw-SQL tables (not in schema.prisma)
+    await prisma.$executeRaw`DELETE FROM "ContactNote" WHERE "contactId" IN (SELECT id FROM "Contact" WHERE "clientId" = ${clientId})`
+    await prisma.$executeRaw`DELETE FROM "Contact" WHERE "clientId" = ${clientId}`
     await prisma.agentDeployment.deleteMany({ where: { clientId } })
     await prisma.clientCredential.deleteMany({ where: { clientId } })
     await prisma.onboarding.deleteMany({ where: { clientId } })
