@@ -258,6 +258,26 @@ function ConnectionsPageInner() {
               </button>
             }
           />
+          <ConnectRow
+            platform="salesforce"
+            label="Salesforce"
+            description="Sync leads, contacts, and opportunities with Salesforce CRM"
+            connectButton={
+              <button onClick={() => oauthConnect('salesforce')} className="text-sm font-medium px-4 py-2 bg-[#00A1E0] text-white rounded-lg hover:bg-[#0090C8] transition">
+                Connect Salesforce
+              </button>
+            }
+          />
+          <ConnectRow
+            platform="zoho"
+            label="Zoho CRM"
+            description="Sync contacts and leads with Zoho CRM"
+            connectButton={
+              <button onClick={() => oauthConnect('zoho')} className="text-sm font-medium px-4 py-2 bg-[#E42527] text-white rounded-lg hover:bg-[#CC2022] transition">
+                Connect Zoho CRM
+              </button>
+            }
+          />
         </div>
       </main>
     </div>

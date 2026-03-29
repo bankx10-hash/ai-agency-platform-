@@ -221,6 +221,9 @@ export default function DashboardPage() {
                 { key: 'calendly', label: 'Calendly', color: '#006BFF', icon: '🗓️' },
                 { key: 'calcom', label: 'Cal.com', color: '#111827', icon: '🗓️' },
                 { key: 'hubspot', label: 'HubSpot', color: '#FF7A59', icon: '🔶' },
+                { key: 'gohighlevel', label: 'GoHighLevel', color: '#1a1a1a', icon: '⚡' },
+                { key: 'salesforce', label: 'Salesforce', color: '#00A1E0', icon: '☁️' },
+                { key: 'zoho', label: 'Zoho CRM', color: '#E42527', icon: '🔴' },
                 { key: 'twilio-phone', label: 'Phone', color: '#F22F46', icon: '📞' },
               ].map(({ key, label, color, icon }) => {
                 const isConnected = !!connections[key]
