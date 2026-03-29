@@ -342,16 +342,17 @@ router.get('/gmail/auth-url', (req: Request, res: Response): void => {
 // Generic OAuth auth-url endpoint for all platforms
 router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
   const { platform } = req.params
-  const { clientId } = req.query as { clientId?: string }
+  const { clientId, returnTo } = req.query as { clientId?: string; returnTo?: string }
   const apiBase = process.env.API_BASE_URL || 'http://localhost:4000'
-  const portalBase = process.env.PORTAL_BASE_URL || 'http://localhost:3000'
 
   try {
     let url: string
+    // returnTo is included in state so the callback knows where to send the user back
+    const baseState = { clientId, ...(returnTo ? { returnTo } : {}) }
 
     switch (platform) {
       case 'gmail': {
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = emailService.getGmailAuthUrl(state)
         break
       }
@@ -362,7 +363,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         // Same scope for both facebook and instagram buttons — one OAuth connects both
         const scope = 'pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish,pages_messaging,instagram_manage_messages,instagram_manage_comments,pages_manage_engagement'
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/meta/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId, platform }))
+        const state = encodeURIComponent(JSON.stringify({ ...baseState, platform }))
         url = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${metaClientId}&redirect_uri=${redirect}&scope=${scope}&state=${state}&response_type=code`
         break
       }
@@ -370,7 +371,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const tiktokKey = process.env.TIKTOK_CLIENT_KEY
         if (!tiktokKey) { res.status(500).json({ error: 'TIKTOK_CLIENT_KEY not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/tiktok/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://www.tiktok.com/v2/auth/authorize?client_key=${tiktokKey}&redirect_uri=${redirect}&scope=user.info.basic,video.upload,video.publish&response_type=code&state=${state}`
         break
       }
@@ -378,7 +379,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const twitterClientId = process.env.TWITTER_CLIENT_ID
         if (!twitterClientId) { res.status(500).json({ error: 'TWITTER_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/twitter/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${twitterClientId}&redirect_uri=${redirect}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`
         break
       }
@@ -386,7 +387,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const linkedinClientId = process.env.LINKEDIN_CLIENT_ID
         if (!linkedinClientId) { res.status(500).json({ error: 'LINKEDIN_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/linkedin/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${redirect}&scope=openid%20profile%20email%20w_member_social&state=${state}&prompt=login`
         break
       }
@@ -394,7 +395,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const ghlClientId = process.env.GHL_OAUTH_CLIENT_ID
         if (!ghlClientId) { res.status(500).json({ error: 'GHL_OAUTH_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/gohighlevel/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&client_id=${ghlClientId}&redirect_uri=${redirect}&scope=contacts.readonly%20contacts.write%20opportunities.readonly%20opportunities.write&state=${state}`
         break
       }
@@ -402,7 +403,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const calendlyClientId = process.env.CALENDLY_CLIENT_ID
         if (!calendlyClientId) { res.status(500).json({ error: 'CALENDLY_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/calendly/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://auth.calendly.com/oauth/authorize?client_id=${calendlyClientId}&redirect_uri=${redirect}&response_type=code&state=${state}`
         break
       }
@@ -412,7 +413,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         if (!gcalClientId || !gcalClientSecret) { res.status(500).json({ error: 'Google credentials not configured' }); return }
         const redirectUri = `${apiBase}/onboarding/oauth/google-calendar/callback`
         const oauth2Client = new google.auth.OAuth2(gcalClientId, gcalClientSecret, redirectUri)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = oauth2Client.generateAuthUrl({
           access_type: 'offline',
           scope: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file'],
@@ -425,7 +426,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const hubspotClientId = process.env.HUBSPOT_CLIENT_ID
         if (!hubspotClientId) { res.status(500).json({ error: 'HUBSPOT_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/hubspot/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://app.hubspot.com/oauth/authorize?client_id=${hubspotClientId}&redirect_uri=${redirect}&scope=crm.objects.contacts.read%20crm.objects.contacts.write%20crm.objects.deals.read%20crm.objects.deals.write&state=${state}`
         break
       }
@@ -433,7 +434,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const sfClientId = process.env.SALESFORCE_CLIENT_ID
         if (!sfClientId) { res.status(500).json({ error: 'SALESFORCE_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/salesforce/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://login.salesforce.com/services/oauth2/authorize?response_type=code&client_id=${sfClientId}&redirect_uri=${redirect}&state=${state}`
         break
       }
@@ -441,7 +442,7 @@ router.get('/oauth/:platform/auth-url', (req: Request, res: Response): void => {
         const zohoClientId = process.env.ZOHO_CLIENT_ID
         if (!zohoClientId) { res.status(500).json({ error: 'ZOHO_CLIENT_ID not configured' }); return }
         const redirect = encodeURIComponent(`${apiBase}/onboarding/oauth/zoho/callback`)
-        const state = encodeURIComponent(JSON.stringify({ clientId }))
+        const state = encodeURIComponent(JSON.stringify(baseState))
         url = `https://accounts.zoho.com/oauth/v2/auth?scope=ZohoCRM.modules.contacts.ALL,ZohoCRM.modules.leads.ALL&client_id=${zohoClientId}&response_type=code&access_type=offline&redirect_uri=${redirect}&state=${state}`
         break
       }
@@ -472,17 +473,22 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
 
   let clientId = ''
   let statePlatform = platform
+  let returnTo = ''
   try {
     const parsed = JSON.parse(decodeURIComponent(state || '{}'))
     clientId = parsed.clientId || ''
     if (parsed.platform) statePlatform = parsed.platform
+    if (parsed.returnTo) returnTo = parsed.returnTo
   } catch {
     res.redirect(`${portalBase}/onboarding/connect?error=invalid_state`)
     return
   }
 
+  // Where to send the user back after OAuth — dashboard/connections or onboarding/connect
+  const redirectBase = returnTo ? `${portalBase}${returnTo}` : `${portalBase}/onboarding/connect`
+
   if (!clientId) {
-    res.redirect(`${portalBase}/onboarding/connect?error=missing_client`)
+    res.redirect(`${redirectBase}?error=missing_client`)
     return
   }
 
@@ -591,7 +597,7 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
           logger.warn('Failed to subscribe Instagram account to webhooks (non-fatal)', { clientId, igUserId: page.instagram_business_account.id, subErr })
         }
 
-        res.redirect(`${portalBase}/onboarding/connect?connected=facebook&connected=instagram`)
+        res.redirect(`${redirectBase}?connected=facebook&connected=instagram`)
       } else {
         logger.warn('No Instagram Business account linked to this Facebook page', { clientId })
 
@@ -607,7 +613,7 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
           logger.warn('Failed to subscribe page to webhooks (non-fatal)', { clientId, pageId: page.id, subErr })
         }
 
-        res.redirect(`${portalBase}/onboarding/connect?connected=facebook`)
+        res.redirect(`${redirectBase}?connected=facebook`)
       }
       return
 
@@ -686,10 +692,10 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
     }
 
     logger.info('OAuth callback completed', { platform: storePlatform, clientId })
-    res.redirect(`${portalBase}/onboarding/connect?connected=${storePlatform}`)
+    res.redirect(`${redirectBase}?connected=${storePlatform}`)
   } catch (error) {
     logger.error('OAuth callback error', { error, platform, clientId })
-    res.redirect(`${portalBase}/onboarding/connect?error=callback_failed`)
+    res.redirect(`${redirectBase}?error=callback_failed`)
   }
 })
 

@@ -142,6 +142,7 @@ export default function DashboardPage() {
             <Link href="/dashboard" className="text-sm font-medium text-indigo-600">Dashboard</Link>
             <Link href="/dashboard/agents" className="text-sm font-medium text-gray-600 hover:text-gray-900">Agents</Link>
             <Link href="/dashboard/analytics" className="text-sm font-medium text-gray-600 hover:text-gray-900">Analytics</Link>
+            <Link href="/dashboard/connections" className="text-sm font-medium text-gray-600 hover:text-gray-900">Connections</Link>
             <Link href="/dashboard/settings" className="text-sm font-medium text-gray-600 hover:text-gray-900">Settings</Link>
           </nav>
 
@@ -242,7 +243,7 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs text-gray-400 mt-4">
               To connect or disconnect accounts, visit{' '}
-              <a href="/dashboard/settings" className="text-indigo-500 hover:underline">Settings</a>.
+              <a href="/dashboard/connections" className="text-indigo-500 hover:underline">Manage Connections</a>.
             </p>
           </div>
         </div>
