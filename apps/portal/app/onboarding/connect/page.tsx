@@ -490,13 +490,12 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Connect your Calendly account</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['calendly'] && <ConnectedBadge platform="calendly" />}
+            <ConnectRow platform="calendly" connectButton={
               <button type="button" onClick={() => oauthConnect('calendly')}
                 className="flex items-center gap-2 px-4 py-2 bg-[#006BFF] text-white text-sm font-medium rounded-lg hover:bg-[#0055cc] transition">
                 Connect Calendly
               </button>
-            </div>
+            } />
           </div>
 
           {/* Google Calendar */}
@@ -515,8 +514,7 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Connect your Google Calendar</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['google-calendar'] && <ConnectedBadge platform="google-calendar" />}
+            <ConnectRow platform="google-calendar" connectButton={
               <button type="button" onClick={() => oauthConnect('google-calendar')}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
@@ -525,7 +523,7 @@ function ConnectPageInner() {
                 </svg>
                 Connect with Google
               </button>
-            </div>
+            } />
           </div>
 
           {/* Cal.com */}
