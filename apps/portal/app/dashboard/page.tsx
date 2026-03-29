@@ -7,6 +7,7 @@ import Link from 'next/link'
 import axios from 'axios'
 import AgentCard from '../../components/AgentCard'
 import MetricsDashboard from '../../components/MetricsDashboard'
+import ThemeToggle from '../../components/ThemeToggle'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
@@ -78,7 +79,6 @@ export default function DashboardPage() {
 
         const clientData = clientRes.data.client
 
-        // Redirect PENDING clients to the connect screen
         if (clientData.status === 'PENDING') {
           router.push(`/onboarding/connect?clientId=${clientId}`)
           return
@@ -114,10 +114,10 @@ export default function DashboardPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
         </div>
       </div>
     )
@@ -126,23 +126,24 @@ export default function DashboardPage() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/nodus-logo.jpeg" alt="Nodus AI Systems" className="h-9 w-auto object-contain" />
           </div>
 
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/dashboard" className="text-sm font-medium text-indigo-600">Dashboard</Link>
-            <Link href="/dashboard/agents" className="text-sm font-medium text-gray-600 hover:text-gray-900">Agents</Link>
-            <Link href="/dashboard/analytics" className="text-sm font-medium text-gray-600 hover:text-gray-900">Analytics</Link>
-            <Link href="/dashboard/connections" className="text-sm font-medium text-gray-600 hover:text-gray-900">Connections</Link>
-            <Link href="/dashboard/settings" className="text-sm font-medium text-gray-600 hover:text-gray-900">Settings</Link>
+            <Link href="/dashboard" className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Dashboard</Link>
+            <Link href="/dashboard/agents" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Agents</Link>
+            <Link href="/dashboard/analytics" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Analytics</Link>
+            <Link href="/dashboard/connections" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Connections</Link>
+            <Link href="/dashboard/settings" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Settings</Link>
           </nav>
 
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-semibold text-sm">
+            <ThemeToggle />
+            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-semibold text-sm">
               {businessName.charAt(0)}
             </div>
           </div>
@@ -151,11 +152,11 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <p className="text-sm text-gray-500">{today}</p>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400">{today}</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
             Good morning, {businessName} 👋
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 dark:text-gray-300 mt-1">
             Your AI agents are working hard. Here&apos;s what&apos;s happened today.
           </p>
         </div>
@@ -164,39 +165,29 @@ export default function DashboardPage() {
 
         <div className="mt-10">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Your AI Agents</h2>
-            <Link
-              href="/dashboard/agents"
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-            >
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Your AI Agents</h2>
+            <Link href="/dashboard/agents" className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">
               View all →
             </Link>
           </div>
 
           {agents.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-12 text-center">
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No agents deployed yet</h3>
-              <p className="text-gray-500 text-sm mb-6">Your agents are being set up. This usually takes 2-3 minutes.</p>
-              <Link
-                href="/onboarding/complete"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
-              >
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No agents deployed yet</h3>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">Your agents are being set up. This usually takes 2-3 minutes.</p>
+              <Link href="/onboarding/complete" className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
                 Check setup status
               </Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {agents.slice(0, 6).map(agent => (
-                <AgentCard
-                  key={agent.id}
-                  agent={agent}
-                  onStatusChange={() => {}}
-                />
+                <AgentCard key={agent.id} agent={agent} onStatusChange={() => {}} />
               ))}
             </div>
           )}
@@ -204,34 +195,31 @@ export default function DashboardPage() {
 
         {/* Connected Accounts */}
         <div className="mt-10">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Connected Accounts</h2>
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Connected Accounts</h2>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               {[
-                { key: 'facebook', label: 'Facebook', color: '#1877F2', icon: '📘' },
-                { key: 'instagram', label: 'Instagram', color: '#E1306C', icon: '📸' },
-                { key: 'linkedin', label: 'LinkedIn', color: '#0A66C2', icon: '💼' },
-                { key: 'gmail', label: 'Gmail', color: '#EA4335', icon: '✉️' },
-                { key: 'google-calendar', label: 'Google Cal', color: '#4285F4', icon: '📅' },
-                { key: 'calendly', label: 'Calendly', color: '#006BFF', icon: '🗓️' },
-                { key: 'calcom', label: 'Cal.com', color: '#111827', icon: '🗓️' },
-                { key: 'hubspot', label: 'HubSpot', color: '#FF7A59', icon: '🔶' },
-                { key: 'gohighlevel', label: 'GoHighLevel', color: '#1a1a1a', icon: '⚡' },
-                { key: 'salesforce', label: 'Salesforce', color: '#00A1E0', icon: '☁️' },
-                { key: 'zoho', label: 'Zoho CRM', color: '#E42527', icon: '🔴' },
-                { key: 'twilio-phone', label: 'Phone', color: '#F22F46', icon: '📞' },
-              ].map(({ key, label, color, icon }) => {
+                { key: 'facebook', label: 'Facebook', icon: '📘' },
+                { key: 'instagram', label: 'Instagram', icon: '📸' },
+                { key: 'linkedin', label: 'LinkedIn', icon: '💼' },
+                { key: 'gmail', label: 'Gmail', icon: '✉️' },
+                { key: 'google-calendar', label: 'Google Cal', icon: '📅' },
+                { key: 'calendly', label: 'Calendly', icon: '🗓️' },
+                { key: 'calcom', label: 'Cal.com', icon: '🗓️' },
+                { key: 'hubspot', label: 'HubSpot', icon: '🔶' },
+                { key: 'gohighlevel', label: 'GoHighLevel', icon: '⚡' },
+                { key: 'salesforce', label: 'Salesforce', icon: '☁️' },
+                { key: 'zoho', label: 'Zoho CRM', icon: '🔴' },
+                { key: 'twilio-phone', label: 'Phone', icon: '📞' },
+              ].map(({ key, label, icon }) => {
                 const isConnected = !!connections[key]
                 return (
-                  <div key={key} className="flex flex-col items-center gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50">
+                  <div key={key} className="flex flex-col items-center gap-2 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
                     <span className="text-2xl">{icon}</span>
-                    <span className="text-xs font-semibold text-gray-700">{label}</span>
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{label}</span>
                     <div className="flex items-center gap-1">
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: isConnected ? '#38a169' : '#cbd5e0' }}
-                      />
-                      <span className="text-xs" style={{ color: isConnected ? '#38a169' : '#a0aec0' }}>
+                      <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                      <span className={`text-xs ${isConnected ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
                         {isConnected ? 'Connected' : 'Not connected'}
                       </span>
                     </div>
@@ -239,9 +227,9 @@ export default function DashboardPage() {
                 )
               })}
             </div>
-            <p className="text-xs text-gray-400 mt-4">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">
               To connect or disconnect accounts, visit{' '}
-              <a href="/dashboard/connections" className="text-indigo-500 hover:underline">Manage Connections</a>.
+              <a href="/dashboard/connections" className="text-indigo-500 dark:text-indigo-400 hover:underline">Manage Connections</a>.
             </p>
           </div>
         </div>

@@ -53,22 +53,22 @@ export default function SignupPage() {
           <div className="flex justify-center mb-6">
             <img src="/nodus-logo.jpeg" alt="Nodus AI Systems" className="h-16 w-auto object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Create your account</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create your account</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Get your AI workforce up and running in minutes
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl dark:shadow-gray-950 border border-transparent dark:border-gray-800 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-600 dark:text-red-400">
                 {error}
               </div>
             )}
 
             <div>
-              <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Business name
               </label>
               <input
@@ -77,13 +77,13 @@ export default function SignupPage() {
                 required
                 value={form.businessName}
                 onChange={e => updateForm('businessName', e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white bg-white dark:bg-gray-800"
                 placeholder="Acme Corp"
               />
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email address
               </label>
               <input
@@ -92,27 +92,27 @@ export default function SignupPage() {
                 required
                 value={form.email}
                 onChange={e => updateForm('email', e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white bg-white dark:bg-gray-800"
                 placeholder="you@company.com"
               />
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                Phone number <span className="text-gray-400">(optional)</span>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Phone number <span className="text-gray-400 dark:text-gray-500">(optional)</span>
               </label>
               <input
                 id="phone"
                 type="tel"
                 value={form.phone}
                 onChange={e => updateForm('phone', e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white bg-white dark:bg-gray-800"
                 placeholder="+1 555 000 0000"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Password
               </label>
               <input
@@ -122,7 +122,7 @@ export default function SignupPage() {
                 minLength={8}
                 value={form.password}
                 onChange={e => updateForm('password', e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white bg-white dark:bg-gray-800"
                 placeholder="Min. 8 characters"
               />
             </div>
@@ -144,9 +144,9 @@ export default function SignupPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-gray-600">
+          <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link href="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500">
               Sign in
             </Link>
           </p>

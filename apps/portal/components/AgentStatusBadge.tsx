@@ -5,26 +5,26 @@ interface AgentStatusBadgeProps {
 
 const config: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   ACTIVE: {
-    bg: 'bg-green-100',
-    text: 'text-green-700',
+    bg: 'bg-green-100 dark:bg-green-900/30',
+    text: 'text-green-700 dark:text-green-400',
     dot: 'bg-green-500',
     label: 'Active'
   },
   INACTIVE: {
-    bg: 'bg-gray-100',
-    text: 'text-gray-600',
-    dot: 'bg-gray-400',
+    bg: 'bg-gray-100 dark:bg-gray-800',
+    text: 'text-gray-600 dark:text-gray-400',
+    dot: 'bg-gray-400 dark:bg-gray-500',
     label: 'Inactive'
   },
   PAUSED: {
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-700',
+    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+    text: 'text-yellow-700 dark:text-yellow-400',
     dot: 'bg-yellow-500',
     label: 'Paused'
   },
   ERROR: {
-    bg: 'bg-red-100',
-    text: 'text-red-700',
+    bg: 'bg-red-100 dark:bg-red-900/30',
+    text: 'text-red-700 dark:text-red-400',
     dot: 'bg-red-500',
     label: 'Error'
   }
@@ -32,12 +32,11 @@ const config: Record<string, { bg: string; text: string; dot: string; label: str
 
 export default function AgentStatusBadge({ status, size = 'md' }: AgentStatusBadgeProps) {
   const c = config[status] || config.INACTIVE
-  const textSize = size === 'sm' ? 'text-xs' : 'text-xs'
   const padding = size === 'sm' ? 'px-2 py-0.5' : 'px-2.5 py-1'
   const dotSize = size === 'sm' ? 'w-1.5 h-1.5' : 'w-2 h-2'
 
   return (
-    <span className={`inline-flex items-center gap-1.5 ${padding} ${c.bg} ${c.text} rounded-full font-medium ${textSize}`}>
+    <span className={`inline-flex items-center gap-1.5 ${padding} ${c.bg} ${c.text} rounded-full font-medium text-xs`}>
       <span className={`${dotSize} ${c.dot} rounded-full ${status === 'ACTIVE' ? 'animate-pulse' : ''}`} />
       {c.label}
     </span>
