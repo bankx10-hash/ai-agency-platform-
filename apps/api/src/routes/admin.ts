@@ -395,4 +395,15 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
   }
 })
 
+router.post('/purge-all-clients', adminAuth, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE "ContactNote", "Contact", "AgentDeployment", "ClientCredential", "Onboarding", "Client" CASCADE`)
+    logger.info('All client data purged')
+    res.json({ success: true })
+  } catch (error) {
+    logger.error('Purge failed', { error })
+    res.status(500).json({ error: String(error) })
+  }
+})
+
 export default router
