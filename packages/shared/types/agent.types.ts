@@ -148,6 +148,7 @@ export const PLANS = {
     stripePriceId: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter',
     agents: [
       AgentType.LEAD_GENERATION,
+      AgentType.SOCIAL_ENGAGEMENT,
       AgentType.APPOINTMENT_SETTER,
       AgentType.VOICE_INBOUND
     ]
