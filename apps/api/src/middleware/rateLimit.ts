@@ -5,6 +5,7 @@ export const apiRateLimit = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path.startsWith('/admin'),
   message: {
     error: 'Too many requests, please try again later.',
     retryAfter: 15
