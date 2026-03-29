@@ -46,6 +46,7 @@ export default function DashboardPage() {
   })
   const [businessName, setBusinessName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [connections, setConnections] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -59,24 +60,35 @@ export default function DashboardPage() {
     const fetchData = async () => {
       try {
         const clientId = (session.user as { clientId?: string })?.clientId
-        const token = localStorage.getItem('token') || ''
+        const token = localStorage.getItem('token') || (session as { accessToken?: string })?.accessToken || ''
 
         if (!clientId) return
 
-        const [clientRes, agentsRes] = await Promise.all([
+        const [clientRes, agentsRes, connectionsRes] = await Promise.all([
           axios.get(`${API_URL}/clients/${clientId}`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
           axios.get(`${API_URL}/clients/${clientId}/agents`, {
             headers: { Authorization: `Bearer ${token}` }
-          })
+          }),
+          axios.get(`${API_URL}/onboarding/${clientId}/connections`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => ({ data: { connected: {} } }))
         ])
 
         const clientData = clientRes.data.client
+
+        // Redirect PENDING clients to the connect screen
+        if (clientData.status === 'PENDING') {
+          router.push(`/onboarding/connect?clientId=${clientId}`)
+          return
+        }
+
         const agentsData: AgentDeployment[] = agentsRes.data.agents
 
         setBusinessName(clientData.businessName)
         setAgents(agentsData)
+        setConnections((connectionsRes.data as { connected: Record<string, boolean> }).connected || {})
 
         const computedMetrics = agentsData.reduce((acc, agent) => {
           const m = agent.metrics || {}
@@ -192,6 +204,47 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Connected Accounts */}
+        <div className="mt-10">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Connected Accounts</h2>
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              {[
+                { key: 'facebook', label: 'Facebook', color: '#1877F2', icon: '📘' },
+                { key: 'instagram', label: 'Instagram', color: '#E1306C', icon: '📸' },
+                { key: 'linkedin', label: 'LinkedIn', color: '#0A66C2', icon: '💼' },
+                { key: 'gmail', label: 'Gmail', color: '#EA4335', icon: '✉️' },
+                { key: 'google-calendar', label: 'Google Cal', color: '#4285F4', icon: '📅' },
+                { key: 'calendly', label: 'Calendly', color: '#006BFF', icon: '🗓️' },
+                { key: 'calcom', label: 'Cal.com', color: '#111827', icon: '🗓️' },
+                { key: 'hubspot', label: 'HubSpot', color: '#FF7A59', icon: '🔶' },
+                { key: 'twilio-phone', label: 'Phone', color: '#F22F46', icon: '📞' },
+              ].map(({ key, label, color, icon }) => {
+                const isConnected = !!connections[key]
+                return (
+                  <div key={key} className="flex flex-col items-center gap-2 p-3 rounded-xl border border-gray-100 bg-gray-50">
+                    <span className="text-2xl">{icon}</span>
+                    <span className="text-xs font-semibold text-gray-700">{label}</span>
+                    <div className="flex items-center gap-1">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: isConnected ? '#38a169' : '#cbd5e0' }}
+                      />
+                      <span className="text-xs" style={{ color: isConnected ? '#38a169' : '#a0aec0' }}>
+                        {isConnected ? 'Connected' : 'Not connected'}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-4">
+              To connect or disconnect accounts, visit{' '}
+              <a href="/dashboard/settings" className="text-indigo-500 hover:underline">Settings</a>.
+            </p>
+          </div>
         </div>
       </main>
     </div>

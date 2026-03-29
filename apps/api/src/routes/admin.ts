@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 import { onboardingQueue } from '../queue/onboarding.queue'
 import { n8nService } from '../services/n8n.service'
 import { logger } from '../utils/logger'
@@ -76,6 +77,47 @@ router.post('/test-onboarding', async (req: Request, res: Response): Promise<voi
   } catch (error) {
     logger.error('Test onboarding failed', { error })
     res.status(500).json({ error: 'Failed to create test onboarding' })
+  }
+})
+
+/**
+ * POST /admin/create-client
+ * Creates a client with real login credentials, bypassing Stripe.
+ * Use this to create demo/review accounts (e.g. Meta app review).
+ * Client is created with PENDING status — on login they are redirected to /onboarding/connect.
+ */
+router.post('/create-client', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { businessName, email, password, plan = 'GROWTH' } = req.body as Record<string, string>
+    if (!businessName || !email || !password) {
+      res.status(400).json({ error: 'businessName, email and password are required' })
+      return
+    }
+
+    const existing = await prisma.client.findUnique({ where: { email } })
+    if (existing) {
+      res.status(409).json({ error: 'Client with this email already exists', clientId: existing.id })
+      return
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12)
+
+    const client = await prisma.client.create({
+      data: {
+        businessName,
+        email,
+        passwordHash,
+        stripeCustomerId: `manual_${Date.now()}`,
+        plan: plan as never,
+        status: 'PENDING'
+      }
+    })
+
+    logger.info('Admin created client', { clientId: client.id, email, businessName, plan })
+    res.json({ clientId: client.id, businessName, email, plan, status: 'PENDING' })
+  } catch (error) {
+    logger.error('Create client failed', { error })
+    res.status(500).json({ error: 'Failed to create client' })
   }
 })
 
