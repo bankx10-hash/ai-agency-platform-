@@ -91,6 +91,7 @@ export default function AgentsPage() {
             <Link href="/dashboard" className="text-sm font-medium text-gray-600 hover:text-gray-900">Dashboard</Link>
             <Link href="/dashboard/agents" className="text-sm font-medium text-indigo-600">Agents</Link>
             <Link href="/dashboard/analytics" className="text-sm font-medium text-gray-600 hover:text-gray-900">Analytics</Link>
+            <Link href="/dashboard/connections" className="text-sm font-medium text-gray-600 hover:text-gray-900">Connections</Link>
             <Link href="/dashboard/settings" className="text-sm font-medium text-gray-600 hover:text-gray-900">Settings</Link>
           </nav>
         </div>

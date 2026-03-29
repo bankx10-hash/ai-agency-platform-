@@ -14,6 +14,32 @@ const updateConfigSchema = z.object({
   config: z.record(z.unknown())
 })
 
+router.get('/:deploymentId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { deploymentId } = req.params
+    const deployment = await prisma.agentDeployment.findUnique({ where: { id: deploymentId } })
+    if (!deployment) { res.status(404).json({ error: 'Not found' }); return }
+    if (deployment.clientId !== req.clientId) { res.status(403).json({ error: 'Forbidden' }); return }
+    res.json({ agent: deployment })
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.get('/:deploymentId/appointments', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { deploymentId } = req.params
+    const deployment = await prisma.agentDeployment.findUnique({ where: { id: deploymentId } })
+    if (!deployment) { res.status(404).json({ error: 'Not found' }); return }
+    if (deployment.clientId !== req.clientId) { res.status(403).json({ error: 'Forbidden' }); return }
+    const metrics = (deployment.metrics as Record<string, unknown>) || {}
+    const appointments = (metrics.appointments as unknown[]) || []
+    res.json({ appointments })
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 router.post('/:deploymentId/pause', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { deploymentId } = req.params

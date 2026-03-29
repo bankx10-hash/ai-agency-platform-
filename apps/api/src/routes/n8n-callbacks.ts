@@ -462,13 +462,17 @@ router.get('/:clientId/calendar-slots', async (req, res) => {
 // POST /:clientId/appointments
 router.post('/:clientId/appointments', async (req, res) => {
   const { clientId } = req.params
-  const { contactId, calendarId, startTime, title } = req.body
+  const { contactId, calendarId, startTime, title, contactName, contactEmail } = req.body
   try {
     logger.info('N8N appointment booked', { clientId, contactId, startTime })
-    await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
-      lastAppointment: { contactId, calendarId, startTime, title, bookedAt: new Date().toISOString() }
-    })
-    res.json({ success: true, appointmentId: `appt-${Date.now()}`, startTime, contactId })
+    const agent = await prisma.agentDeployment.findFirst({ where: { clientId, agentType: 'APPOINTMENT_SETTER' as never } })
+    const current = (agent?.metrics as Record<string, unknown>) || {}
+    const existing = (current.appointments as unknown[]) || []
+    const newAppt = { id: `appt-${Date.now()}`, contactId, contactName, contactEmail, calendarId, startTime, title, bookedAt: new Date().toISOString() }
+    // Keep last 500 appointments
+    const appointments = [newAppt, ...existing].slice(0, 500)
+    await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', { appointments, lastAppointment: newAppt })
+    res.json({ success: true, appointmentId: newAppt.id, startTime, contactId })
   } catch (err) {
     logger.error('N8N appointment error', { clientId, err })
     res.status(500).json({ error: 'Failed to book appointment' })
