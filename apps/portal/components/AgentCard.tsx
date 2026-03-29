@@ -50,6 +50,13 @@ const agentConfig: Record<string, { label: string; icon: string; metricLabel: st
     metricKey: 'postsPublished',
     color: 'from-pink-500 to-rose-500'
   },
+  SOCIAL_ENGAGEMENT: {
+    label: 'Social Engagement',
+    icon: '💬',
+    metricLabel: 'Replies sent',
+    metricKey: 'repliesSent',
+    color: 'from-fuchsia-500 to-pink-500'
+  },
   ADVERTISING: {
     label: 'Advertising',
     icon: '📊',

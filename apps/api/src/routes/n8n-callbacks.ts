@@ -162,6 +162,45 @@ async function updateAgentMetrics(
   })
 }
 
+// Increments named counters, with automatic daily reset for "today" counters.
+// dailyKeys: counter names that reset to 0 each calendar day (e.g. leadsToday)
+// totalKeys: cumulative counters that never reset (e.g. totalLeads)
+async function incrementAgentMetrics(
+  clientId: string,
+  agentType: string,
+  daily: Record<string, number>,
+  total: Record<string, number> = {},
+  snapshot: Record<string, unknown> = {}
+): Promise<void> {
+  const agent = await prisma.agentDeployment.findFirst({
+    where: { clientId, agentType: agentType as never }
+  })
+  if (!agent) return
+  const today = new Date().toISOString().slice(0, 10)
+  const current = (agent.metrics as Record<string, unknown>) || {}
+  const isNewDay = (current.lastResetDate as string) !== today
+
+  const updated = { ...current }
+  // Reset daily counters on new day
+  if (isNewDay) {
+    for (const key of Object.keys(daily)) updated[key] = 0
+    updated.lastResetDate = today
+  }
+  // Increment daily counters
+  for (const [key, delta] of Object.entries(daily)) {
+    updated[key] = ((updated[key] as number) || 0) + delta
+  }
+  // Increment total counters
+  for (const [key, delta] of Object.entries(total)) {
+    updated[key] = ((current[key] as number) || 0) + delta
+  }
+  Object.assign(updated, snapshot, { lastUpdated: new Date().toISOString() })
+  await prisma.agentDeployment.update({
+    where: { id: agent.id },
+    data: { metrics: updated }
+  })
+}
+
 // GET /:clientId/contacts
 router.get('/:clientId/contacts', async (req, res) => {
   const { clientId } = req.params
@@ -328,10 +367,12 @@ router.patch('/:clientId/contacts/score', async (req, res) => {
       }
     }
 
-    await updateAgentMetrics(clientId, 'LEAD_GENERATION', {
-      lastScoredContact: { contactId, score, stage, tags, summary, nextAction },
-      lastScoredAt: new Date().toISOString()
-    })
+    await incrementAgentMetrics(
+      clientId, 'LEAD_GENERATION',
+      { leadsToday: 1 },
+      { totalLeads: 1 },
+      { lastScoredContact: { contactId, score, stage, tags, summary, nextAction }, lastScoredAt: new Date().toISOString() }
+    )
     res.json({ success: true, contactId, score, stage })
   } catch (err) {
     logger.error('N8N score update error', { clientId, err })
@@ -369,9 +410,12 @@ router.post('/:clientId/contacts/:contactId/notes', async (req, res) => {
       }
     }
 
-    await updateAgentMetrics(clientId, 'VOICE_INBOUND', {
-      lastNote: { contactId, addedAt: new Date().toISOString() }
-    })
+    await incrementAgentMetrics(
+      clientId, 'VOICE_INBOUND',
+      {},
+      { callsAnswered: 1 },
+      { lastNote: { contactId, addedAt: new Date().toISOString() } }
+    )
     res.json({ success: true })
   } catch (err) {
     logger.error('N8N note error', { clientId, err })
@@ -471,7 +515,12 @@ router.post('/:clientId/appointments', async (req, res) => {
     const newAppt = { id: `appt-${Date.now()}`, contactId, contactName, contactEmail, calendarId, startTime, title, bookedAt: new Date().toISOString() }
     // Keep last 500 appointments
     const appointments = [newAppt, ...existing].slice(0, 500)
-    await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', { appointments, lastAppointment: newAppt })
+    await incrementAgentMetrics(
+      clientId, 'APPOINTMENT_SETTER',
+      { appointmentsToday: 1 },
+      { appointmentsBooked: 1, totalLeads: 1 },
+      { appointments, lastAppointment: newAppt }
+    )
     res.json({ success: true, appointmentId: newAppt.id, startTime, contactId })
   } catch (err) {
     logger.error('N8N appointment error', { clientId, err })
@@ -485,9 +534,12 @@ router.post('/:clientId/call-outcomes', async (req, res) => {
   const { contactId, outcome, nextAction } = req.body
   try {
     logger.info('N8N call outcome saved', { clientId, contactId, outcome })
-    await updateAgentMetrics(clientId, 'VOICE_OUTBOUND', {
-      lastCallOutcome: { contactId, outcome, nextAction, recordedAt: new Date().toISOString() }
-    })
+    await incrementAgentMetrics(
+      clientId, 'VOICE_OUTBOUND',
+      {},
+      { callsMade: 1 },
+      { lastCallOutcome: { contactId, outcome, nextAction, recordedAt: new Date().toISOString() } }
+    )
     res.json({ success: true })
   } catch (err) {
     logger.error('N8N call outcome error', { clientId, err })
@@ -501,9 +553,12 @@ router.post('/:clientId/deal-outcomes', async (req, res) => {
   const { contactId, opportunityId, outcome, reason } = req.body
   try {
     logger.info('N8N deal outcome saved', { clientId, outcome, opportunityId })
-    await updateAgentMetrics(clientId, 'VOICE_CLOSER', {
-      lastDealOutcome: { contactId, opportunityId, outcome, reason, recordedAt: new Date().toISOString() }
-    })
+    await incrementAgentMetrics(
+      clientId, 'VOICE_CLOSER',
+      {},
+      { dealsClosed: outcome === 'closed' ? 1 : 0, callsMade: 1 },
+      { lastDealOutcome: { contactId, opportunityId, outcome, reason, recordedAt: new Date().toISOString() } }
+    )
     res.json({ success: true })
   } catch (err) {
     logger.error('N8N deal outcome error', { clientId, err })
@@ -827,9 +882,13 @@ router.post('/:clientId/social/post-all', async (req, res) => {
       logger.info('Social post result', { clientId, platform, success: results[platform].success })
     }
 
-    await updateAgentMetrics(clientId, 'SOCIAL_MEDIA', {
-      lastPost: { platforms: Object.keys(content), results, generatedAt, postedAt: new Date().toISOString() }
-    })
+    const successfulPosts = Object.values(results).filter((r: unknown) => (r as { success: boolean }).success).length
+    await incrementAgentMetrics(
+      clientId, 'SOCIAL_MEDIA',
+      {},
+      { postsPublished: successfulPosts },
+      { lastPost: { platforms: Object.keys(content), results, generatedAt, postedAt: new Date().toISOString() } }
+    )
 
     // Log all posts to Google Sheet (non-blocking)
     const timestamp = new Date().toISOString()
@@ -1017,6 +1076,9 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
     }
 
     logger.info('Social reply sent', { clientId, platform, type, success: result.success, error: result.error })
+    if (result.success) {
+      await incrementAgentMetrics(clientId, 'SOCIAL_ENGAGEMENT', {}, { repliesSent: 1, totalLeads: 1 }).catch(() => {})
+    }
     res.json(result)
   } catch (err) {
     logger.error('Send reply failed', { clientId, err })
