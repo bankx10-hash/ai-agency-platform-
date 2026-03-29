@@ -1,5 +1,5 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import twilio from 'twilio'
 import { emailService } from '../services/email.service'
@@ -197,7 +197,7 @@ async function incrementAgentMetrics(
   Object.assign(updated, snapshot, { lastUpdated: new Date().toISOString() })
   await prisma.agentDeployment.update({
     where: { id: agent.id },
-    data: { metrics: updated }
+    data: { metrics: updated as Prisma.InputJsonValue }
   })
 }
 
