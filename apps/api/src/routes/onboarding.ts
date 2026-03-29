@@ -694,6 +694,28 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
 })
 
 // DELETE /onboarding/disconnect/:platform — removes stored credentials for a platform
+router.get('/:clientId/connections', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { clientId } = req.params
+    if (req.clientId !== clientId) { res.status(403).json({ error: 'Forbidden' }); return }
+
+    const creds = await prisma.clientCredential.findMany({
+      where: { clientId },
+      select: { service: true }
+    })
+
+    const connected: Record<string, boolean> = {}
+    for (const c of creds) {
+      connected[c.service] = true
+    }
+
+    res.json({ connected })
+  } catch (error) {
+    logger.error('Error fetching connections', { error, clientId: req.params.clientId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 router.delete('/disconnect/:platform', async (req: Request, res: Response): Promise<void> => {
   const { platform } = req.params
   const { clientId } = req.query as { clientId?: string }

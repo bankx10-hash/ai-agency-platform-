@@ -59,6 +59,18 @@ function ConnectPageInner() {
   }
 
   useEffect(() => {
+    const clientId = getClientId()
+    const token = getToken()
+    if (clientId && token) {
+      axios.get(`${API_URL}/onboarding/${clientId}/connections`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
+        setConnected(res.data.connected || {})
+      }).catch(() => {})
+    }
+  }, [])
+
+  useEffect(() => {
     const justConnected = searchParams.get('connected')
     const oauthError = searchParams.get('error')
     if (justConnected) {
@@ -153,21 +165,25 @@ function ConnectPageInner() {
     }
   }
 
-  const ConnectedBadge = ({ platform }: { platform: string }) => (
+  const ConnectRow = ({ platform, connectButton }: { platform: string; connectButton: React.ReactNode }) => (
     <div className="flex items-center gap-2">
-      <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
-        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-        </svg>
-        Connected
-      </span>
-      <button
-        type="button"
-        onClick={() => disconnectPlatform(platform)}
-        className="text-xs text-gray-400 hover:text-red-500 underline transition"
-      >
-        Disconnect
-      </button>
+      {connected[platform] ? (
+        <>
+          <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 border border-green-300 px-3 py-1.5 rounded-lg">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+            </svg>
+            Connected
+          </span>
+          <button
+            type="button"
+            onClick={() => disconnectPlatform(platform)}
+            className="flex items-center gap-1 px-3 py-1.5 border border-red-200 text-xs font-medium text-red-600 rounded-lg hover:bg-red-50 transition"
+          >
+            Disconnect
+          </button>
+        </>
+      ) : connectButton}
     </div>
   )
 
@@ -249,8 +265,7 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Send emails on your behalf</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['gmail'] && <ConnectedBadge platform="gmail" />}
+            <ConnectRow platform="gmail" connectButton={
               <button type="button" onClick={() => oauthConnect('gmail')}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
@@ -262,7 +277,7 @@ function ConnectPageInner() {
                 </svg>
                 Connect with Google
               </button>
-            </div>
+            } />
           </div>
 
           {/* ── SECTION: Social Media ── */}
@@ -281,8 +296,7 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Post to your Facebook Page</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['facebook'] && <ConnectedBadge platform="facebook" />}
+            <ConnectRow platform="facebook" connectButton={
               <button type="button" onClick={() => oauthConnect('facebook')}
                 className="flex items-center gap-2 px-4 py-2 bg-[#1877F2] text-white text-sm font-medium rounded-lg hover:bg-[#166FE5] transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -290,7 +304,7 @@ function ConnectPageInner() {
                 </svg>
                 Connect with Facebook
               </button>
-            </div>
+            } />
           </div>
 
           {/* Instagram */}
@@ -313,8 +327,7 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Post to your Instagram Business account</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['instagram'] && <ConnectedBadge platform="instagram" />}
+            <ConnectRow platform="instagram" connectButton={
               <button type="button" onClick={() => oauthConnect('instagram')}
                 className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-lg hover:opacity-90 transition"
                 style={{ background: 'linear-gradient(45deg, #F58529, #DD2A7B, #8134AF)' }}>
@@ -323,7 +336,7 @@ function ConnectPageInner() {
                 </svg>
                 Connect with Instagram
               </button>
-            </div>
+            } />
           </div>
 
           {/* TikTok */}
@@ -339,8 +352,7 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Post videos to your TikTok account</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['tiktok'] && <ConnectedBadge platform="tiktok" />}
+            <ConnectRow platform="tiktok" connectButton={
               <button type="button" onClick={() => oauthConnect('tiktok')}
                 className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -348,7 +360,7 @@ function ConnectPageInner() {
                 </svg>
                 Connect with TikTok
               </button>
-            </div>
+            } />
           </div>
 
           {/* Twitter / X */}
@@ -364,8 +376,7 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Post to your Twitter/X account</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['twitter'] && <ConnectedBadge platform="twitter" />}
+            <ConnectRow platform="twitter" connectButton={
               <button type="button" onClick={() => oauthConnect('twitter')}
                 className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -373,7 +384,7 @@ function ConnectPageInner() {
                 </svg>
                 Connect with Twitter
               </button>
-            </div>
+            } />
           </div>
 
           {/* LinkedIn */}
@@ -389,8 +400,7 @@ function ConnectPageInner() {
                 <p className="text-xs text-gray-500">Outreach and connection automation</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {connected['linkedin'] && <ConnectedBadge platform="linkedin" />}
+            <ConnectRow platform="linkedin" connectButton={
               <button type="button" onClick={() => oauthConnect('linkedin')}
                 className="flex items-center gap-2 px-4 py-2 bg-[#0A66C2] text-white text-sm font-medium rounded-lg hover:bg-[#004182] transition">
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -398,7 +408,7 @@ function ConnectPageInner() {
                 </svg>
                 Connect with LinkedIn
               </button>
-            </div>
+            } />
           </div>
 
           {/* ── SECTION: CRM ── */}
@@ -429,8 +439,7 @@ function ConnectPageInner() {
                     Connect to {crmType === 'gohighlevel' ? 'GoHighLevel' : crmType.charAt(0).toUpperCase() + crmType.slice(1)}
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  {connected[crmType] && <ConnectedBadge platform={crmType} />}
+                <ConnectRow platform={crmType} connectButton={
                   <button type="button" onClick={() => oauthConnect(crmType)}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,7 +447,7 @@ function ConnectPageInner() {
                     </svg>
                     Connect {crmLabels[crmType]}
                   </button>
-                </div>
+                } />
               </div>
             )}
           </div>
