@@ -437,4 +437,65 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
   }
 })
 
+/**
+ * DELETE /admin/client/:clientId
+ * Permanently deletes a client and ALL associated data:
+ * agent deployments, credentials, onboarding, contacts, contact notes, N8N workflows.
+ */
+router.delete('/client/:clientId', async (req: Request, res: Response): Promise<void> => {
+  const { clientId } = req.params
+
+  try {
+    const client = await prisma.client.findUnique({ where: { id: clientId } })
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' })
+      return
+    }
+
+    // Delete N8N workflows first
+    const n8nDeleted = await n8nService.deleteAllClientWorkflows(clientId).catch(() => 0)
+
+    // Delete all DB records in dependency order
+    await prisma.contactNote.deleteMany({ where: { contact: { clientId } } })
+    await prisma.contact.deleteMany({ where: { clientId } })
+    await prisma.agentDeployment.deleteMany({ where: { clientId } })
+    await prisma.clientCredential.deleteMany({ where: { clientId } })
+    await prisma.onboarding.deleteMany({ where: { clientId } })
+    await prisma.client.delete({ where: { id: clientId } })
+
+    logger.info('Admin deleted client', { clientId, businessName: client.businessName, n8nDeleted })
+    res.json({ success: true, clientId, businessName: client.businessName, n8nWorkflowsDeleted: n8nDeleted })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error('Admin delete client failed', { clientId, error: msg })
+    res.status(500).json({ error: msg })
+  }
+})
+
+/**
+ * PATCH /admin/client/:clientId/plan
+ * Updates a client's plan. Useful for fixing test clients or upgrading manually.
+ */
+router.patch('/client/:clientId/plan', async (req: Request, res: Response): Promise<void> => {
+  const { clientId } = req.params
+  const { plan } = req.body as { plan: string }
+
+  if (!plan || !['STARTER', 'GROWTH', 'AGENCY'].includes(plan)) {
+    res.status(400).json({ error: 'plan must be STARTER, GROWTH, or AGENCY' })
+    return
+  }
+
+  try {
+    const client = await prisma.client.update({
+      where: { id: clientId },
+      data: { plan: plan as never }
+    })
+    logger.info('Admin updated client plan', { clientId, plan })
+    res.json({ success: true, clientId, businessName: client.businessName, plan })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    res.status(500).json({ error: msg })
+  }
+})
+
 export default router
