@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { useTheme } from '../theme'
 // ── Icon helpers ──────────────────────────────────────────────────────────────
 function Icon({ d, d2 }: { d: string; d2?: string }) {
   return (
@@ -64,8 +65,9 @@ const NAV: NavItem[] = [
     href: '/dashboard/voice', label: 'Voice',
     icon: <Icon d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />,
     children: [
-      { href: '/dashboard/voice',       label: 'Overview' },
-      { href: '/dashboard/voice/calls', label: 'Call Logs' },
+      { href: '/dashboard/voice',          label: 'Overview' },
+      { href: '/dashboard/voice/inbound',  label: 'Inbound'  },
+      { href: '/dashboard/voice/outbound', label: 'Outbound' },
     ]
   },
   {
@@ -195,6 +197,7 @@ function NavGroup({ item, collapsed, pathname }: {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const { theme, toggle: toggleTheme } = useTheme()
   const [businessName, setBusinessName] = useState('')
   const [collapsed, setCollapsed] = useState(false)
 
@@ -249,22 +252,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="px-3 py-3 flex-shrink-0 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border-sidebar)' }}>
           {/* Theme toggle */}
           <button
-            onClick={() => {
-              const html = document.documentElement
-              const isDark = html.classList.contains('dark')
-              html.classList.toggle('dark')
-              localStorage.setItem('theme', isDark ? 'light' : 'dark')
-            }}
+            onClick={toggleTheme}
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 w-full"
             style={{ color: 'rgba(255,255,255,0.45)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-            title="Toggle dark / light mode"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px] flex-shrink-0">
-              <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+              {theme === 'dark'
+                ? <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                : <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              }
             </svg>
-            {!collapsed && <span className="truncate">Toggle Theme</span>}
+            {!collapsed && <span className="truncate">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
           {/* User */}
           <div className="flex items-center gap-2.5 px-3">
