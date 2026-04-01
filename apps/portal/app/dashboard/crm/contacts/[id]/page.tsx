@@ -410,30 +410,51 @@ export default function ContactDetailPage() {
                     </div>
                   </div>
 
-                  {/* Activity list */}
+                  {/* Activity + Notes list — merged and sorted by date */}
                   <div className="space-y-3">
-                    {contact.activities.length === 0 ? (
+                    {contact.activities.length === 0 && contact.notes.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-8">No activity yet</p>
                     ) : (
-                      contact.activities.map(activity => (
-                        <div key={activity.id} className="flex gap-3">
-                          <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-sm flex-shrink-0">
-                            {ACTIVITY_ICONS[activity.type] || '•'}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">{activity.title}</span>
-                              {activity.agentType && (
-                                <span className="text-xs bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded">AI</span>
-                              )}
+                      [
+                        ...contact.activities.map(a => ({ ...a, _kind: 'activity' as const })),
+                        ...contact.notes.map(n => ({ ...n, _kind: 'note' as const, title: 'Note', type: 'NOTE', agentType: n.authorType === 'ai' ? 'AI' : undefined }))
+                      ]
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map(item => (
+                          item._kind === 'note' ? (
+                            <div key={`note-${item.id}`} className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm">📝</span>
+                                <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide">Note</span>
+                                {item.agentType && (
+                                  <span className="text-xs bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded">AI</span>
+                                )}
+                                <span className="text-xs text-gray-400 ml-auto">
+                                  {new Date(item.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{item.body}</p>
                             </div>
-                            {activity.body && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{activity.body}</p>}
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {new Date(activity.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                        </div>
-                      ))
+                          ) : (
+                            <div key={`act-${item.id}`} className="flex gap-3">
+                              <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-sm flex-shrink-0">
+                                {ACTIVITY_ICONS[item.type] || '•'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</span>
+                                  {item.agentType && (
+                                    <span className="text-xs bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded">AI</span>
+                                  )}
+                                </div>
+                                {item.body && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{item.body}</p>}
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {new Date(item.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        ))
                     )}
                   </div>
                 </div>
