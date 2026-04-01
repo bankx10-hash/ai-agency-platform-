@@ -83,13 +83,35 @@
       }
     },
     {
-      "id": "ae32de78-2ef8-40ad-8bb8-5207d17c77f8",
-      "name": "Parse Profiles",
+      "id": "extract-s3-url-001",
+      "name": "Extract S3 JSON URL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1250, 200],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst resultObject = data.data?.resultObject || data.resultObject || '[]';\nlet profiles = [];\ntry {\n  profiles = typeof resultObject === 'string' ? JSON.parse(resultObject) : resultObject;\n} catch { profiles = []; }\nif (!Array.isArray(profiles) || profiles.length === 0) {\n  return [{ json: { skipped: true, reason: 'No profiles returned from Phantombuster' } }];\n}\nconst valid = profiles.filter(p => !p.error && (p.firstName || p.lastName || p.profileUrl));\nif (valid.length === 0) {\n  return [{ json: { skipped: true, reason: 'All profiles had errors' } }];\n}\nreturn valid.map(p => ({\n  json: {\n    firstName: p.firstName || '',\n    lastName: p.lastName || '',\n    fullName: ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || 'Unknown',\n    headline: p.headline || p.title || '',\n    company: p.company || '',\n    location: p.location || '',\n    profileUrl: p.profileUrl || '',\n    email: p.email || '',\n    connectedAt: p.timestamp || new Date().toISOString()\n  }\n}));"
+        "jsCode": "const raw = $input.first().json;\n// fetch-output returns the console log as a string field\nconst log = raw.output || raw.log || JSON.stringify(raw);\nconst match = String(log).match(/JSON saved at (https:\\/\\/[^\\s\\\\n]+\\.json)/);\nif (!match) {\n  return [{ json: { skipped: true, reason: 'No S3 JSON URL found in Phantombuster output' } }];\n}\nreturn [{ json: { jsonUrl: match[1] } }];"
+      }
+    },
+    {
+      "id": "fetch-s3-json-001",
+      "name": "Fetch Profile JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1500, 200],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.jsonUrl }}"
+      }
+    },
+    {
+      "id": "ae32de78-2ef8-40ad-8bb8-5207d17c77f8",
+      "name": "Parse Profiles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 200],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n// S3 returns the JSON array directly or as a string\nlet profiles = [];\nif (Array.isArray(data)) {\n  profiles = data;\n} else if (typeof data === 'string') {\n  try { profiles = JSON.parse(data); } catch { profiles = []; }\n} else if (Array.isArray(data.result)) {\n  profiles = data.result;\n}\nif (!Array.isArray(profiles) || profiles.length === 0) {\n  return [{ json: { skipped: true, reason: 'No profiles returned from Phantombuster' } }];\n}\nconst valid = profiles.filter(p => !p.error && (p.firstName || p.lastName || p.profileUrl || p.profileUrl));\nif (valid.length === 0) {\n  return [{ json: { skipped: true, reason: 'All profiles had errors' } }];\n}\nreturn valid.map(p => ({\n  json: {\n    firstName: p.firstName || '',\n    lastName: p.lastName || '',\n    fullName: ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || 'Unknown',\n    headline: p.headline || p.title || p.occupation || '',\n    company: p.company || p.companyName || '',\n    location: p.location || '',\n    profileUrl: p.profileUrl || p.linkedInProfileUrl || '',\n    email: p.email || '',\n    connectedAt: p.timestamp || new Date().toISOString()\n  }\n}));"
       }
     },
     {
@@ -97,7 +119,7 @@
       "name": "IF - Has Profiles?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1500, 200],
+      "position": [2000, 200],
       "parameters": {
         "conditions": {
           "options": {
@@ -125,7 +147,7 @@
       "name": "Build Claude Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1750, 200],
+      "position": [2250, 200],
       "parameters": {
         "jsCode": "const profile = $input.first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nreturn [{\n  json: {\n    model: 'claude-haiku-4-5-20251001',\n    max_tokens: 300,\n    system: 'You are a LinkedIn outreach specialist for ' + businessName + '. Write a short warm follow-up message for a new LinkedIn connection. Under 200 characters. Human, not salesy. Return ONLY the message text, no quotes.',\n    messages: [{ role: 'user', content: 'Write a personalised follow-up for this new connection.\\n\\nProfile: ' + JSON.stringify({ firstName: profile.firstName, headline: profile.headline, company: profile.company, location: profile.location }) }],\n    profile: profile\n  }\n}];"
       }
@@ -135,7 +157,7 @@
       "name": "Claude - Personalise Follow-up",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2000, 200],
+      "position": [2500, 200],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 5000,
@@ -161,7 +183,7 @@
       "name": "Parse Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2250, 200],
+      "position": [2750, 200],
       "parameters": {
         "jsCode": "const message = $input.first().json.content?.[0]?.text?.trim() || '';\nconst profile = $('Build Claude Request').first().json.profile || {};\nreturn [{ json: { message, profile } }];"
       }
@@ -171,7 +193,7 @@
       "name": "Save Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2500, 200],
+      "position": [3000, 200],
       "continueOnFail": true,
       "parameters": {
         "method": "POST",
@@ -194,7 +216,7 @@
       "name": "Save Note",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2750, 200],
+      "position": [3250, 200],
       "continueOnFail": true,
       "parameters": {
         "method": "POST",
@@ -586,6 +608,12 @@
       "main": [[{ "node": "Fetch Phantom Output", "type": "main", "index": 0 }]]
     },
     "Fetch Phantom Output": {
+      "main": [[{ "node": "Extract S3 JSON URL", "type": "main", "index": 0 }]]
+    },
+    "Extract S3 JSON URL": {
+      "main": [[{ "node": "Fetch Profile JSON", "type": "main", "index": 0 }]]
+    },
+    "Fetch Profile JSON": {
       "main": [[{ "node": "Parse Profiles", "type": "main", "index": 0 }]]
     },
     "Parse Profiles": {
