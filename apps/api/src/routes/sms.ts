@@ -19,7 +19,7 @@ const twilioClient = twilio(
 // Get the client's provisioned Twilio number from credentials
 async function getClientPhoneNumber(clientId: string): Promise<string | null> {
   const cred = await prisma.clientCredential.findFirst({
-    where: { clientId, service: `twilio-phone-${clientId}` }
+    where: { clientId, service: 'twilio-phone' }
   })
   if (!cred) return null
   try {
