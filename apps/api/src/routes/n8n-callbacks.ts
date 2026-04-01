@@ -286,10 +286,33 @@ router.get('/:clientId/contacts/:contactId', async (req, res) => {
   }
 })
 
+// GET /:clientId/contacts/by-linkedin — look up contact by LinkedIn profile URL
+router.get('/:clientId/contacts/by-linkedin', async (req, res) => {
+  const { clientId } = req.params
+  const { url } = req.query
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'url query param required' })
+  }
+  try {
+    const rows = await prisma.$queryRaw<Array<{ id: string; name: string | null; email: string | null }>>`
+      SELECT "id", "name", "email" FROM "Contact"
+      WHERE "clientId" = ${clientId} AND "linkedinUrl" = ${url}
+      LIMIT 1
+    `
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Contact not found' })
+    }
+    return res.json({ id: rows[0].id, name: rows[0].name, email: rows[0].email })
+  } catch (err) {
+    logger.error('N8N by-linkedin lookup error', { clientId, url, err })
+    return res.status(500).json({ error: 'Lookup failed' })
+  }
+})
+
 // POST /:clientId/contacts
 router.post('/:clientId/contacts', async (req, res) => {
   const { clientId } = req.params
-  const { name, email, phone, source, tags = [], intent } = req.body
+  const { name, email, phone, source, tags = [], intent, linkedinUrl } = req.body
   try {
     const crmType = await getClientCrmType(clientId)
     logger.info('N8N contact save', { clientId, crmType, name })
@@ -311,6 +334,13 @@ router.post('/:clientId/contacts', async (req, res) => {
     const id = rows[0]?.id || newId
     const isNew = rows[0]?.is_new !== false
     logger.info('Contact upserted to DB', { clientId, id, isNew })
+
+    // Save/update linkedinUrl if provided
+    if (linkedinUrl) {
+      await prisma.$executeRaw`
+        UPDATE "Contact" SET "linkedinUrl" = ${linkedinUrl} WHERE "id" = ${id}
+      `.catch(() => {})
+    }
 
     // Log CRM activity for new contacts
     if (isNew) {

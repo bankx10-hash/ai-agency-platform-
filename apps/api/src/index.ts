@@ -119,6 +119,12 @@ async function runStartupMigrations() {
   } catch { /* already exist, skip */ }
 
   try {
+    await prisma.$executeRaw`ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "linkedinUrl" TEXT`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "Contact_linkedinUrl_idx" ON "Contact"("linkedinUrl") WHERE "linkedinUrl" IS NOT NULL`
+    logger.info('Startup migration: linkedinUrl column added to Contact table')
+  } catch { /* already exist, skip */ }
+
+  try {
     await prisma.$executeRaw`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PipelineStage') THEN
