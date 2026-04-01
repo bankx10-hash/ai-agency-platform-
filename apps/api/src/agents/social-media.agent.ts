@@ -114,7 +114,7 @@ Return a JSON object with:
   "content": "<the full post text, ready to copy-paste>",
   "caption": "<short caption if platform separates caption from script, else null>",
   "hashtags": ["<tag1>", "<tag2>", ...],
-  "image_prompt": "<detailed prompt for an AI image generator that would pair perfectly with this post>",
+  "image_prompt": "<detailed prompt for an AI image generator that would pair perfectly with this post. CRITICAL: the prompt must end with 'no text, no words, no letters, no typography, no captions, no labels' — AI image generators produce garbled misspelled text so never include text in the image>",
   "best_posting_time": "<optimal day and time for this platform>",
   "predicted_engagement": "low|medium|high|viral"
 }`
