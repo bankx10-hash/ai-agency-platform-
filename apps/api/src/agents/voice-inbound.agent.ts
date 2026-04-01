@@ -81,7 +81,7 @@ Respond naturally as if in a real phone conversation.`
        1. Greet with: "${typedConfig.greeting_script}"
        2. Ask why they are calling (one sentence)
        3. Collect their name, phone number, and email address — ask for each one at a time, do not skip any of these three fields
-       4. Ask the qualification questions ONE AT A TIME — do not ask more than one at once: ${typedConfig.qualification_questions.join(', ')}
+       4. Ask the qualification questions ONE AT A TIME — do not ask more than one at once: ${(typedConfig.qualification_questions || []).join(', ')}
        5. ${bookingInstruction}
        6. End the call with a clear next step
 
@@ -164,7 +164,7 @@ Respond naturally as if in a real phone conversation.`
         clientId,
         businessName: typedConfig.businessName,
         transferNumber: typedConfig.escalation_number,
-        callWebhook: `${process.env.N8N_BASE_URL}/webhook/voice-inbound-${clientId}`,
+        callWebhook: `${process.env.API_URL || 'https://api.nodusaisystems.com'}/calls/webhook`,
         country: typedConfig.country || 'AU',
         tools: calendarTools.length > 0 ? calendarTools : undefined,
         address: typedConfig.address

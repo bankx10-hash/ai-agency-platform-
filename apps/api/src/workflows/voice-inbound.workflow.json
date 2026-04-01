@@ -13,8 +13,7 @@
         "path": "voice-inbound-{{CLIENT_ID}}",
         "responseMode": "onReceived",
         "responseData": "allEntries"
-      },
-      "webhookId": "voice-inbound-{{CLIENT_ID}}"
+      }
     },
     {
       "id": "build-claude-request",
@@ -209,8 +208,7 @@
         "httpMethod": "POST",
         "path": "voice-calendar-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
-      "webhookId": "voice-calendar-{{CLIENT_ID}}"
+      }
     }
   ],
   "connections": {

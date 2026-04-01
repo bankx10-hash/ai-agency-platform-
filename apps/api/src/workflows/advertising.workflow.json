@@ -102,7 +102,6 @@
         "path": "ads-alert-{{CLIENT_ID}}",
         "responseMode": "onReceived"
       },
-      "webhookId": "ads-alert-{{CLIENT_ID}}"
     },
     {
       "id": "send-alert",

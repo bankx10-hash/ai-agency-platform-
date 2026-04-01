@@ -93,6 +93,7 @@ export interface CreateOutboundAgentParams {
   firstSentence: string
   clientId: string
   businessName: string
+  callWebhook?: string
 }
 
 export interface VoiceAgentResult {
@@ -156,54 +157,92 @@ export class VoiceService {
         // For AU: buy from Twilio directly, then import into Retell.
         const twilioClient = getTwilioClient()
 
-        // Create a Twilio address for this client (required for AU number purchase)
+        // AU number purchase requires both bundleSid (regulatory) and addressSid (physical).
+        // The addressSid must already be inside the approved bundle — we look it up rather
+        // than creating a fresh one that would be rejected as "not contained in bundle".
+        const bundleSid = process.env.TWILIO_BUNDLE_SID
         let addressSid: string | undefined
-        logger.info('AU address params', { address, clientId })
-        if (address?.street && address?.city) {
-          try {
-            const created = await twilioClient.addresses.create({
-              customerName: businessName,
-              street: address.street,
-              city: address.city,
-              region: address.state || '',
-              postalCode: address.postcode || '',
-              isoCountry: 'AU'
-            })
-            addressSid = created.sid
-            logger.info('Twilio address created for AU client', { addressSid, clientId })
-          } catch (addrError) {
-            // Address may already exist — search for one matching this client
-            logger.warn('Address creation failed, searching for existing address', { clientId, addrError })
-            const existing = await twilioClient.addresses.list({ customerName: businessName, limit: 1 })
-            if (existing.length) {
-              addressSid = existing[0].sid
-              logger.info('Using existing Twilio address', { addressSid, clientId })
-            }
+
+        if (bundleSid) {
+          // The addressSid must be the address already enrolled in the approved bundle.
+          // Set TWILIO_BUNDLE_ADDRESS_SID in Railway to the AD... SID from:
+          // Twilio Console → Phone Numbers → Regulatory Compliance → your bundle → Addresses
+          addressSid = process.env.TWILIO_BUNDLE_ADDRESS_SID
+          if (addressSid) {
+            logger.info('Using bundle address for AU number purchase', { addressSid, bundleSid, clientId })
+          } else {
+            logger.warn('TWILIO_BUNDLE_ADDRESS_SID not set — number purchase will fail', { clientId })
           }
         } else {
-          logger.warn('Address missing or incomplete — skipping address creation', { address, clientId })
+          // No bundle — create a per-client address (legacy / non-regulated flow)
+          logger.info('AU address params (no bundle)', { address, clientId })
+          if (address?.street && address?.city) {
+            try {
+              const created = await twilioClient.addresses.create({
+                customerName: businessName,
+                street: address.street,
+                city: address.city,
+                region: address.state || '',
+                postalCode: address.postcode || '',
+                isoCountry: 'AU'
+              })
+              addressSid = created.sid
+              logger.info('Twilio address created for AU client', { addressSid, clientId })
+            } catch (addrError) {
+              logger.warn('Address creation failed, searching for existing address', { clientId, addrError })
+              const existing = await twilioClient.addresses.list({ customerName: businessName, limit: 1 })
+              if (existing.length) {
+                addressSid = existing[0].sid
+                logger.info('Using existing Twilio address', { addressSid, clientId })
+              }
+            }
+          } else {
+            logger.warn('Address missing or incomplete — skipping address creation', { address, clientId })
+          }
         }
+
         if (!addressSid) throw new Error('No Twilio address available for AU number purchase')
 
-        const available = await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1, smsEnabled: true })
+        // Prefer AU mobile numbers — they support both voice and SMS (needed for appointment SMS)
+        // Fall back to local voice-only numbers if no mobile available
+        logger.info('Searching for available AU mobile numbers with voice + SMS', { clientId })
+        const mobileNumbers = await twilioClient.availablePhoneNumbers('AU').mobile.list({ limit: 1, voiceEnabled: true, smsEnabled: true })
+        const localNumbers = mobileNumbers.length
+          ? []
+          : await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1, voiceEnabled: true })
+        const available: { phoneNumber: string }[] = mobileNumbers.length ? mobileNumbers : localNumbers
+        if (mobileNumbers.length) {
+          logger.info('Found AU mobile number with SMS capability', { clientId, number: mobileNumbers[0].phoneNumber })
+        } else {
+          logger.warn('No AU mobile numbers with SMS found — falling back to local voice-only', { clientId })
+          logger.info('AU local number search result', { clientId, found: localNumbers.length, number: localNumbers[0]?.phoneNumber })
+        }
         if (!available.length) throw new Error('No Australian Twilio numbers available')
 
         const trunkSid = process.env.TWILIO_SIP_TRUNK_SID
+        logger.info('SIP trunk SID check', { clientId, trunkSid: trunkSid ? `${trunkSid.substring(0, 6)}...` : 'MISSING' })
         if (!trunkSid) throw new Error('TWILIO_SIP_TRUNK_SID env var not set')
 
+        const smsWebhookUrl = `${process.env.API_URL || 'https://api.nodusaisystems.com'}/sms/webhook`
+        logger.info('Purchasing AU number', { clientId, phoneNumber: available[0].phoneNumber })
         const purchased = await twilioClient.incomingPhoneNumbers.create({
           phoneNumber: available[0].phoneNumber,
           friendlyName: `${businessName} - ${clientId}`,
           trunkSid,
-          ...(addressSid && { addressSid })
+          smsUrl: smsWebhookUrl,
+          smsMethod: 'POST',
+          addressSid,
+          ...(bundleSid && { bundleSid })
         })
         phoneNumber = purchased.phoneNumber
         logger.info('AU Twilio number purchased and configured with SIP trunk', { phoneNumber, trunkSid, clientId })
 
         // Import into Retell and link to agent.
         // termination_uri = Twilio SIP trunk domain name
+        logger.info('Fetching SIP trunk domain', { clientId, trunkSid })
         const trunk = await twilioClient.trunking.v1.trunks(trunkSid).fetch()
         const terminationUri = trunk.domainName
+        logger.info('SIP trunk domain', { clientId, terminationUri: terminationUri || 'EMPTY' })
         if (!terminationUri) throw new Error('Twilio SIP trunk has no domain name configured')
 
         logger.info('Using SIP trunk termination URI', { terminationUri, clientId })
@@ -249,7 +288,7 @@ export class VoiceService {
   }
 
   async createOutboundAgent(params: CreateOutboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName } = params
+    const { prompt, voice, firstSentence, clientId, businessName, callWebhook } = params
 
     // Step 1: create the LLM
     const llmId = await this.createRetellLlm(prompt, firstSentence)
@@ -260,7 +299,8 @@ export class VoiceService {
       response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: sanitizeVoiceId(voice),
       agent_name: `${businessName} Outbound - ${clientId}`,
-      boosted_keywords: [businessName]
+      boosted_keywords: [businessName],
+      ...(callWebhook && { webhook_url: callWebhook })
     })
 
     const agentId: string = agentRes.data.agent_id

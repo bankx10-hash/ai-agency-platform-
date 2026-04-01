@@ -76,6 +76,7 @@ export class N8NService {
       '{{PHANTOMBUSTER_AUTOCONNECT_ID}}': esc(process.env.PHANTOMBUSTER_AUTOCONNECT_ID || ''),
       '{{PHANTOMBUSTER_MESSAGESENDER_ID}}': esc(process.env.PHANTOMBUSTER_MESSAGESENDER_ID || ''),
       '{{PHANTOMBUSTER_LEADOUTREACH_ID}}': esc(process.env.PHANTOMBUSTER_LEADOUTREACH_ID || ''),
+      '{{OWNER_EMAIL}}': esc(config.ownerEmail || ''),
       '{{CONNECTION_TEMPLATE}}': esc(config.connectionTemplate || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!'),
       '{{PLATFORMS}}': esc(config.platforms || 'facebook,instagram,linkedin')
     }
@@ -694,9 +695,14 @@ export class N8NService {
     const duplicate = existing.find(w => w.name === workflowName)
     if (duplicate) {
       logger.info('Removing existing workflow before redeploy', { workflowId: duplicate.id, workflowName })
+      // Deactivate first so N8N deregisters webhooks before we delete
+      await this.client.post(`/workflows/${duplicate.id}/deactivate`).catch(() => {})
+      await new Promise(resolve => setTimeout(resolve, 1500))
       await this.deleteWorkflow(duplicate.id).catch((err) =>
         logger.warn('Could not delete existing workflow', { workflowId: duplicate.id, err })
       )
+      // Wait for N8N to fully release the webhook paths
+      await new Promise(resolve => setTimeout(resolve, 1500))
     }
 
     // Only send fields N8N accepts on POST /workflows — extra properties cause a 400
@@ -816,6 +822,26 @@ export class N8NService {
     for (const wf of workflows) {
       await this.deleteWorkflow(wf.id).catch((err) =>
         logger.warn('Failed to delete N8N workflow during cleanup', { workflowId: wf.id, err })
+      )
+      deleted++
+    }
+    return deleted
+  }
+
+  /**
+   * Deletes all N8N workflows for a client that match a given agent type keyword.
+   * Used during agent redeploy to sweep any orphaned workflows not tracked in the DB.
+   * The keyword match is loose (includes) to handle name variations across deployments.
+   */
+  async deleteAllClientWorkflowsByType(clientId: string, agentType: string): Promise<number> {
+    const workflows = await this.listClientWorkflows(clientId)
+    // Convert agent type to a partial name fragment, e.g. LEAD_GENERATOR → "lead"
+    const keyword = agentType.toLowerCase().replace(/_/g, ' ').split(' ')[0]
+    const matching = workflows.filter(w => w.name.toLowerCase().includes(keyword))
+    let deleted = 0
+    for (const wf of matching) {
+      await this.deleteWorkflow(wf.id).catch((err) =>
+        logger.warn('Failed to delete N8N workflow by type during cleanup', { workflowId: wf.id, agentType, err })
       )
       deleted++
     }

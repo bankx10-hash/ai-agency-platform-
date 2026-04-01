@@ -101,4 +101,44 @@ router.get('/:id/agents', authMiddleware, async (req: AuthRequest, res: Response
   }
 })
 
+// GET /:id/analytics — returns last 30 days of activity aggregated across all agents
+router.get('/:id/analytics', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+    if (req.clientId !== id) { res.status(403).json({ error: 'Forbidden' }); return }
+
+    const agents = await prisma.agentDeployment.findMany({ where: { clientId: id } })
+
+    // Aggregate dailyHistory across all agents by date
+    const byDate: Record<string, { leads: number; calls: number; appointments: number; emails: number; posts: number }> = {}
+
+    for (const agent of agents) {
+      const metrics = (agent.metrics as Record<string, unknown>) || {}
+      const history = (metrics.dailyHistory as Array<Record<string, unknown>>) || []
+
+      for (const day of history) {
+        const date = day.date as string
+        if (!date) continue
+        if (!byDate[date]) byDate[date] = { leads: 0, calls: 0, appointments: 0, emails: 0, posts: 0 }
+        byDate[date].leads += (day.leadsToday as number) || (day.totalLeads as number) || 0
+        byDate[date].calls += (day.callsAnswered as number) || (day.callsMade as number) || 0
+        byDate[date].appointments += (day.appointmentsToday as number) || (day.appointmentsBooked as number) || 0
+        byDate[date].emails += (day.emailsSent as number) || 0
+        byDate[date].posts += (day.postsPublished as number) || 0
+      }
+    }
+
+    // Sort by date ascending, last 30 days
+    const sorted = Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-30)
+      .map(([date, vals]) => ({ date, ...vals }))
+
+    res.json({ history: sorted })
+  } catch (error) {
+    logger.error('Error fetching client analytics', { error, clientId: req.params.id })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 export default router

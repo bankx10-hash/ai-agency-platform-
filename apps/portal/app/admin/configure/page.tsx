@@ -77,7 +77,11 @@ const AGENT_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; ty
     { key: 'greeting_script', label: 'Greeting Script', type: 'textarea', placeholder: 'Thank you for calling...' },
     { key: 'faq_knowledge_base', label: 'FAQ / Knowledge Base', type: 'textarea', placeholder: 'Common questions and answers...' },
     { key: 'escalation_number', label: 'Escalation Phone Number', type: 'text', placeholder: '+61400000000' },
-    { key: 'booking_link', label: 'Booking Link', type: 'url', placeholder: 'https://calendly.com/...' }
+    { key: 'booking_link', label: 'Booking Link', type: 'url', placeholder: 'https://calendly.com/...' },
+    { key: 'address_street', label: 'Street Address (for AU number provisioning)', type: 'text', placeholder: '123 Example St' },
+    { key: 'address_city', label: 'City', type: 'text', placeholder: 'Perth' },
+    { key: 'address_state', label: 'State', type: 'text', placeholder: 'WA' },
+    { key: 'address_postcode', label: 'Postcode', type: 'text', placeholder: '6000' }
   ],
   VOICE_OUTBOUND: [
     { key: 'call_script', label: 'Call Script', type: 'textarea', placeholder: 'Hi, this is...' },
@@ -185,6 +189,19 @@ export default function AdminConfigurePage() {
       if (agentType === 'ADVERTISING' && config.daily_budget_limit) parsedConfig.daily_budget_limit = parseFloat(config.daily_budget_limit)
       if (agentType === 'VOICE_OUTBOUND' && config.max_daily_calls) parsedConfig.max_daily_calls = parseInt(config.max_daily_calls)
       if (config.high_score_threshold) parsedConfig.high_score_threshold = parseInt(config.high_score_threshold)
+      // Nest flat address fields into address object for voice inbound provisioning
+      if (agentType === 'VOICE_INBOUND' && config.address_street && config.address_city) {
+        parsedConfig.address = {
+          street: config.address_street,
+          city: config.address_city,
+          state: config.address_state || '',
+          postcode: config.address_postcode || ''
+        }
+        delete parsedConfig.address_street
+        delete parsedConfig.address_city
+        delete parsedConfig.address_state
+        delete parsedConfig.address_postcode
+      }
 
       const res = await fetch(`${API_URL}/admin/deploy-agent/${clientId.trim()}`, {
         method: 'POST',

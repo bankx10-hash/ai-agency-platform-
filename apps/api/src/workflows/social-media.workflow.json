@@ -10,7 +10,7 @@
       "position": [250, 300],
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }]
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }]
         }
       }
     },
@@ -24,8 +24,7 @@
         "httpMethod": "POST",
         "path": "social-brief-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
-      "webhookId": "social-brief-{{CLIENT_ID}}"
+      }
     },
     {
       "id": "claude-generate-content",

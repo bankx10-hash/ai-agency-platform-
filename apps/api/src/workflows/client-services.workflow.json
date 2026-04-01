@@ -12,7 +12,6 @@
         "path": "client-services-{{CLIENT_ID}}",
         "responseMode": "onReceived"
       },
-      "webhookId": "client-services-{{CLIENT_ID}}"
     },
     {
       "id": "schedule-checkins",
@@ -145,7 +144,6 @@
         "path": "client-support-{{CLIENT_ID}}",
         "responseMode": "onReceived"
       },
-      "webhookId": "client-support-{{CLIENT_ID}}"
     },
     {
       "id": "claude-handle-support",

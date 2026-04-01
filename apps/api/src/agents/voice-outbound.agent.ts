@@ -91,7 +91,8 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
         voice: '11labs-Adrian',
         firstSentence: `Hi, is this a good time to chat for just 2 minutes? I'm calling from ${typedConfig.businessName}.`,
         clientId,
-        businessName: typedConfig.businessName
+        businessName: typedConfig.businessName,
+        callWebhook: `${process.env.API_URL || 'https://api.nodusaisystems.com'}/calls/webhook`
       })
 
       retellAgentId = voiceResult.agentId

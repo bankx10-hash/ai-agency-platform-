@@ -6,6 +6,7 @@ import { n8nService } from '../services/n8n.service'
 import { logger } from '../utils/logger'
 import { AGENT_REGISTRY } from '../agents'
 import { AgentType } from '../../../../packages/shared/types/agent.types'
+import { sendDailyDigest } from '../services/digest'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -192,6 +193,22 @@ router.post('/rerun/:clientId', async (req: Request, res: Response): Promise<voi
   } catch (error) {
     logger.error('Rerun onboarding failed', { clientId, error })
     res.status(500).json({ error: 'Failed to rerun onboarding' })
+  }
+})
+
+/**
+ * GET /admin/clients
+ * Lists all clients (id, businessName, email, plan, status) for the admin panel client picker.
+ */
+router.get('/clients', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const clients = await prisma.client.findMany({
+      select: { id: true, businessName: true, email: true, plan: true, status: true, createdAt: true },
+      orderBy: { createdAt: 'desc' }
+    })
+    res.json({ clients })
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch clients' })
   }
 })
 
@@ -415,7 +432,30 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
       return
     }
 
-    // Remove existing deployment record so deploy() can create a fresh one
+    // Find existing deployments BEFORE deleting so we can clean up N8N
+    const existingDeployments = await prisma.agentDeployment.findMany({
+      where: { clientId, agentType: agentType as never },
+      select: { n8nWorkflowId: true }
+    })
+
+    // Delete the N8N workflow(s) by ID — reliable, no name-matching ambiguity
+    for (const dep of existingDeployments) {
+      if (dep.n8nWorkflowId) {
+        await n8nService.deleteWorkflow(dep.n8nWorkflowId).catch(err =>
+          logger.warn('Could not delete existing N8N workflow on agent redeploy', {
+            clientId, agentType, workflowId: dep.n8nWorkflowId, err
+          })
+        )
+      }
+    }
+
+    // Also sweep by name in case a workflow exists without a matching DB record
+    // (e.g. a previously failed deployment that partially created an N8N workflow)
+    await n8nService.deleteAllClientWorkflowsByType(clientId, agentType).catch(err =>
+      logger.warn('N8N name-sweep cleanup failed (non-fatal)', { clientId, agentType, err })
+    )
+
+    // Remove DB record so deploy() can create a fresh one
     await prisma.agentDeployment.deleteMany({ where: { clientId, agentType: agentType as never } })
 
     const agent = new AgentClass()
@@ -495,6 +535,21 @@ router.patch('/client/:clientId/plan', async (req: Request, res: Response): Prom
     res.json({ success: true, clientId, businessName: client.businessName, plan })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
+    res.status(500).json({ error: msg })
+  }
+})
+
+/**
+ * POST /admin/test-digest
+ * Manually triggers the daily digest for all active clients.
+ */
+router.post('/test-digest', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    await sendDailyDigest()
+    res.json({ success: true, message: 'Digest triggered — check server logs and your inbox' })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error('Manual digest trigger failed', { error: msg })
     res.status(500).json({ error: msg })
   }
 })

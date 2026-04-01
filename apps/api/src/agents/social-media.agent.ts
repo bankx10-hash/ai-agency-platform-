@@ -4,6 +4,9 @@ import { n8nService } from '../services/n8n.service'
 import { socialService } from '../services/social.service'
 import { createSocialMediaSheet } from '../services/sheets.service'
 import { logger } from '../utils/logger'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 export type SupportedPlatform = 'instagram' | 'facebook' | 'linkedin'
 
@@ -32,36 +35,42 @@ const PLATFORM_PROMPTS: Record<SupportedPlatform, string> = {
   instagram: `
 PLATFORM: Instagram
 FORMAT RULES:
-- Line 1 must be a scroll-stopping hook (question, bold claim, or controversy) — this is the only line visible before "more"
+- Line 1 MUST be a gut-punch hook — make them stop mid-scroll. Use fear, shocking numbers, or a bold claim they've never heard. This is the only line visible before "more" — it must create unbearable curiosity.
 - Body: 3-5 short punchy paragraphs (2-3 lines each) with line breaks between each
-- Use storytelling structure: hook → problem → insight → proof → CTA
-- End with a direct single-sentence CTA ("Save this post", "Tag someone who needs this", "Comment YES if you agree")
+- Use storytelling structure: hook → painful problem they're ignoring → the brutal truth → proof/results → urgent CTA
+- Build FEAR: make them feel the cost of inaction. Every day without this = lost leads, lost revenue, competitors winning.
+- End with a URGENT single-sentence CTA that creates scarcity ("We only take 3 new clients per month — DM 'AI' NOW before spots fill", "Comment 'READY' and we'll reach out TODAY")
 - Hashtags: 20-25 relevant hashtags on a new line at the end (mix broad, niche, and branded)
 - Use emojis sparingly as visual bullet points, not decoration
-VIRALITY LEVERS: Save-worthy lists, relatable pain points, "share with someone who..." CTAs`,
+VIRALITY LEVERS: Fear of falling behind, shocking competitor stats, "your competitors are already doing this", scarcity/urgency CTAs, "save this before you forget" hooks
+URGENCY TRIGGERS: Limited spots, time-sensitive offers, "while you're reading this your competitor is...", real cost-of-delay numbers`,
 
   facebook: `
 PLATFORM: Facebook
 FORMAT RULES:
-- Line 1: emotional hook or controversial statement (drives comments)
+- Line 1: Fear-based or controversy-starting statement that makes business owners stop and panic slightly ("Your competitors are automating while you're still doing this manually.")
 - Keep to 100-200 words — Facebook rewards engagement over length
-- Use "This is for you if..." framing to create identity resonance
-- Ask a direct question at the end to drive comments (algorithm rewards comments heavily)
-- One CTA maximum — never multiple asks
+- Use "This is for you if..." framing to create identity resonance with business owners feeling left behind
+- Make them feel the URGENCY: every week without AI agents is a week of lost leads handed to competitors
+- Ask a direct question at the end that forces self-reflection ("How many leads did you lose this week because no one followed up fast enough?")
+- One CTA maximum — never multiple asks — make it urgent and specific
 - Avoid links in the post body (add to first comment instead)
-VIRALITY LEVERS: Debate-starting questions, relatable life moments, "agree or disagree?" prompts`,
+VIRALITY LEVERS: Business owner pain points, fear of irrelevance, "agree or disagree?", shocking AI adoption stats
+URGENCY TRIGGERS: "Only X spots left this month", "businesses that act now vs those that wait 6 months", cost-of-delay framing`,
 
   linkedin: `
 PLATFORM: LinkedIn
 FORMAT RULES:
-- Line 1 hook: bold professional insight, surprising stat, or contrarian take (no "I'm excited to announce")
-- Use a proven structure: Hook → Personal story or observation → Actionable insight → Invite discussion
-- Short paragraphs: 1-2 sentences max, with blank lines between each (mobile reading)
+- Line 1 hook: A shocking stat, a brutal truth, or a contrarian take that makes business owners question everything they're doing. NO "I'm excited to announce."
+- Use structure: Shocking hook → the painful reality → what winners are doing differently → what losers are doing → urgent takeaway
+- Short paragraphs: 1-2 sentences max, blank lines between each (mobile reading)
 - 150-300 words
-- End with an open question that professionals will want to answer
+- Create FOMO: name what businesses with AI are achieving vs those without. Make the gap feel terrifying and widening every day.
+- End with an open question that forces painful self-reflection, then a direct CTA with scarcity
 - 3-5 hashtags maximum — place at very end
-- Never use "Excited to share" or corporate filler phrases
-VIRALITY LEVERS: Contrarian career takes, salary transparency, "unpopular opinion:", behind-the-scenes business numbers`
+- Never use "Excited to share" or corporate filler
+VIRALITY LEVERS: ROI numbers, "businesses that adopted AI in 2024 vs those that didn't", behind-the-scenes automation results, "unpopular opinion:" takes
+URGENCY TRIGGERS: "The window to get ahead is closing", "early movers capture 80% of the market", specific revenue/time savings from AI automation`
 }
 
 export class SocialMediaAgent extends BaseAgent {
@@ -74,27 +83,28 @@ export class SocialMediaAgent extends BaseAgent {
 
     const platformGuide = PLATFORM_PROMPTS[platform] || PLATFORM_PROMPTS.instagram
 
-    return `You are an elite social media content strategist for ${config.businessName || 'a business'}.
-Your job is to create content that stops the scroll, drives engagement, and gets shared.
+    return `You are an elite social media content strategist and direct-response copywriter for ${config.businessName || 'a business'}.
+Your ONLY job is to create content that stops the scroll, triggers genuine fear of missing out, and compels business owners to reach out TODAY — because every day they wait is another day their competitors are pulling ahead.
 
 BUSINESS CONTEXT:
 ${config.business_description || ''}
 
-BRAND TONE: ${config.tone || 'authentic, direct, and value-driven'}
+BRAND TONE: ${config.tone || 'urgent, direct, and results-focused'}
 
 CONTENT PILLAR: ${pillar}
-(Rotate pillars to avoid being salesy: education → social proof → behind-the-scenes → entertainment → offer)
+(Rotate pillars to avoid being repetitive: education → fear/competitor threat → social proof/results → behind-the-scenes → urgent offer)
 
 TOPIC FOR THIS POST: ${topic}
 
 ${platformGuide}
 
-VIRALITY PRINCIPLES (apply to every post):
-1. Every post must deliver ONE clear, specific insight — not a vague overview
-2. Write like a person, not a brand — use "I" or "we", share real moments
-3. The hook is 80% of the work — spend most creative energy on line 1
-4. Specificity beats generality: "$47K in 30 days" beats "made money"
-5. Never end with "DM us" as the only CTA — it's weak and overused
+MANDATORY PRINCIPLES — every post must nail ALL of these:
+1. FEAR OF INACTION: Make the reader feel in their gut what they're losing every single day without this. Lost leads, lost revenue, competitors stealing their customers right now.
+2. COMPETITOR THREAT: Make them paranoid. "While you're reading this, your competitor just automated their entire follow-up sequence." They need to feel urgency NOW.
+3. SPECIFICITY: Use concrete numbers that feel real. "23 leads followed up in under 2 minutes" beats "fast follow-up". Numbers build credibility and fear simultaneously.
+4. SCARCITY & URGENCY: Every post must have a reason to act TODAY — limited spots, closing window of competitive advantage, early-mover advantage disappearing fast.
+5. DIRECT CTA WITH CONSEQUENCE: Not "DM us". Instead: "DM 'AI' now — we only take 3 new clients per month and 2 spots are already gone this month."
+6. Write like a person who genuinely cares, not a brand. Use "I" or "we". Be direct. Be urgent. Sound human.
 
 OUTPUT FORMAT:
 Return a JSON object with:
@@ -216,10 +226,18 @@ Each week is an array of post objects. Plan ${config.posting_frequency} per day.
       logger.warn('N8N workflow deployment failed, agent will run via direct API calls', { clientId, error })
     }
 
-    // Create Google Sheet for post logging (non-blocking — fails silently if no Google creds)
-    const spreadsheetId = await createSocialMediaSheet(clientId)
-    if (spreadsheetId) {
-      logger.info('Social media Google Sheet created', { clientId, spreadsheetId })
+    // Create Google Sheet for post logging only if one doesn't already exist
+    const existingSheetCred = await prisma.clientCredential.findUnique({
+      where: { id: `google-sheets-social-${clientId}` }
+    })
+    let spreadsheetId: string | null = null
+    if (!existingSheetCred) {
+      spreadsheetId = await createSocialMediaSheet(clientId)
+      if (spreadsheetId) {
+        logger.info('Social media Google Sheet created', { clientId, spreadsheetId })
+      }
+    } else {
+      logger.info('Google Sheet already exists — skipping creation', { clientId })
     }
 
     const deployment = await this.createDeploymentRecord(

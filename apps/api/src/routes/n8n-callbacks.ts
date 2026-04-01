@@ -181,9 +181,18 @@ async function incrementAgentMetrics(
   const isNewDay = (current.lastResetDate as string) !== today
 
   const updated = { ...current }
-  // Reset daily counters on new day
-  if (isNewDay) {
+  // Reset daily counters on new day — but first snapshot yesterday's values into history
+  if (isNewDay && current.lastResetDate) {
+    const history = (current.dailyHistory as Array<Record<string, unknown>>) || []
+    const yesterdaySnapshot: Record<string, unknown> = { date: current.lastResetDate }
+    for (const key of Object.keys(daily)) yesterdaySnapshot[key] = (current[key] as number) || 0
+    for (const key of Object.keys(total)) yesterdaySnapshot[key] = (current[key] as number) || 0
+    history.unshift(yesterdaySnapshot)
+    // Keep last 90 days only
+    updated.dailyHistory = history.slice(0, 90)
     for (const key of Object.keys(daily)) updated[key] = 0
+    updated.lastResetDate = today
+  } else if (!current.lastResetDate) {
     updated.lastResetDate = today
   }
   // Increment daily counters
@@ -288,19 +297,41 @@ router.post('/:clientId/contacts', async (req, res) => {
     // Upsert to internal DB — deduplicates by email within the same client
     const newId = randomUUID()
     const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : [])
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-      INSERT INTO "Contact" ("id", "clientId", "name", "email", "phone", "source", "tags", "stage", "updatedAt")
+    const rows = await prisma.$queryRaw<Array<{ id: string; is_new: boolean }>>`
+      INSERT INTO "Contact" ("id", "clientId", "name", "email", "phone", "source", "tags", "stage", "pipelineStage", "updatedAt")
       VALUES (${newId}, ${clientId}, ${name || null}, ${email || null}, ${phone || null},
-              ${source || null}, ${tagsJson}::jsonb, 'new', NOW())
+              ${source || null}, ${tagsJson}::jsonb, 'new', 'NEW_LEAD', NOW())
       ON CONFLICT ("clientId", "email") WHERE "email" IS NOT NULL
       DO UPDATE SET
         "name"      = COALESCE(EXCLUDED."name", "Contact"."name"),
         "phone"     = COALESCE(EXCLUDED."phone", "Contact"."phone"),
         "updatedAt" = NOW()
-      RETURNING "id"
+      RETURNING "id", (xmax = 0) AS is_new
     `
     const id = rows[0]?.id || newId
-    logger.info('Contact upserted to DB', { clientId, id })
+    const isNew = rows[0]?.is_new !== false
+    logger.info('Contact upserted to DB', { clientId, id, isNew })
+
+    // Log CRM activity for new contacts
+    if (isNew) {
+      await prisma.contactActivity.create({
+        data: {
+          id: randomUUID(), contactId: id, clientId,
+          type: 'NOTE' as never,
+          title: `New lead captured${source ? ` from ${source}` : ''}`,
+          metadata: { source, intent } as never,
+          agentType: 'LEAD_GENERATION'
+        }
+      }).catch(() => {})
+
+      // Notify client of new lead
+      const notifTitle = `New lead: ${name || email || 'Unknown'}`
+      const notifBody = source ? `Captured from ${source}` : 'Lead captured by AI agent'
+      await prisma.$executeRaw`
+        INSERT INTO "Notification" ("id", "clientId", "type", "title", "body", "link", "createdAt")
+        VALUES (${randomUUID()}, ${clientId}, 'NEW_LEAD', ${notifTitle}, ${notifBody}, ${`/dashboard/crm/contacts/${id}`}, NOW())
+      `.catch(() => {})
+    }
 
     // Sync to HubSpot if connected
     let crmId: string | undefined
@@ -373,6 +404,12 @@ router.patch('/:clientId/contacts/score', async (req, res) => {
       { totalLeads: 1 },
       { lastScoredContact: { contactId, score, stage, tags, summary, nextAction }, lastScoredAt: new Date().toISOString() }
     )
+    // CRM activity: log score update
+    if (contactId) {
+      await prisma.contactActivity.create({
+        data: { id: randomUUID(), contactId, clientId, type: 'SCORE_CHANGE' as never, title: `Lead score updated to ${score}`, body: summary || undefined, metadata: { score, stage, nextAction } as never, agentType: 'LEAD_GENERATION' }
+      }).catch(() => {})
+    }
     res.json({ success: true, contactId, score, stage })
   } catch (err) {
     logger.error('N8N score update error', { clientId, err })
@@ -472,6 +509,12 @@ router.post('/:clientId/messages/email', async (req, res) => {
     await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
       lastEmailSent: { contactId, to, subject, sentAt: new Date().toISOString() }
     })
+    // CRM activity: log email
+    if (contactId) {
+      await prisma.contactActivity.create({
+        data: { id: randomUUID(), contactId, clientId, type: 'EMAIL' as never, title: subject || 'Email sent', body: `To: ${to}`, metadata: { to, subject } as never, agentType: 'APPOINTMENT_SETTER' }
+      }).catch(() => {})
+    }
     res.json({ success: true })
   } catch (err) {
     logger.error('N8N email error', { clientId, err })
@@ -521,6 +564,13 @@ router.post('/:clientId/appointments', async (req, res) => {
       { appointmentsBooked: 1, totalLeads: 1 },
       { appointments, lastAppointment: newAppt }
     )
+    // CRM activity: log appointment
+    if (contactId) {
+      await prisma.contactActivity.create({
+        data: { id: randomUUID(), contactId, clientId, type: 'APPOINTMENT' as never, title: `Appointment booked: ${title || 'Meeting'}`, body: startTime, metadata: { calendarId, startTime, title } as never, agentType: 'APPOINTMENT_SETTER' }
+      }).catch(() => {})
+      await prisma.contact.updateMany({ where: { id: contactId, clientId }, data: { lastContactedAt: new Date(), pipelineStage: 'QUALIFIED' as never } }).catch(() => {})
+    }
     res.json({ success: true, appointmentId: newAppt.id, startTime, contactId })
   } catch (err) {
     logger.error('N8N appointment error', { clientId, err })
@@ -540,6 +590,13 @@ router.post('/:clientId/call-outcomes', async (req, res) => {
       { callsMade: 1 },
       { lastCallOutcome: { contactId, outcome, nextAction, recordedAt: new Date().toISOString() } }
     )
+    // CRM activity: log call
+    if (contactId) {
+      await prisma.contactActivity.create({
+        data: { id: randomUUID(), contactId, clientId, type: 'CALL' as never, title: `Call outcome: ${outcome}`, body: nextAction || undefined, metadata: { outcome, nextAction } as never, agentType: 'VOICE_OUTBOUND' }
+      }).catch(() => {})
+      await prisma.contact.updateMany({ where: { id: contactId, clientId }, data: { lastContactedAt: new Date() } }).catch(() => {})
+    }
     res.json({ success: true })
   } catch (err) {
     logger.error('N8N call outcome error', { clientId, err })
@@ -559,6 +616,16 @@ router.post('/:clientId/deal-outcomes', async (req, res) => {
       { dealsClosed: outcome === 'closed' ? 1 : 0, callsMade: 1 },
       { lastDealOutcome: { contactId, opportunityId, outcome, reason, recordedAt: new Date().toISOString() } }
     )
+    // CRM activity + pipeline stage update
+    if (contactId) {
+      const newStage = outcome === 'closed' ? 'CLOSED_WON' : outcome === 'lost' ? 'CLOSED_LOST' : undefined
+      await prisma.contactActivity.create({
+        data: { id: randomUUID(), contactId, clientId, type: 'CALL' as never, title: `Deal ${outcome}: ${reason || ''}`, metadata: { outcome, reason, opportunityId } as never, agentType: 'VOICE_CLOSER' }
+      }).catch(() => {})
+      if (newStage) {
+        await prisma.contact.updateMany({ where: { id: contactId, clientId }, data: { pipelineStage: newStage as never, lastContactedAt: new Date() } }).catch(() => {})
+      }
+    }
     res.json({ success: true })
   } catch (err) {
     logger.error('N8N deal outcome error', { clientId, err })
@@ -611,9 +678,9 @@ router.post('/:clientId/social/generate-content', async (req, res) => {
     const contentPillars = (config.content_pillars as string[]) || ['education', 'social proof', 'behind the scenes', 'entertainment', 'offer']
 
     const PLATFORM_RULES: Record<string, string> = {
-      instagram: `INSTAGRAM: Hook on line 1 (scroll-stopper). 3-5 short punchy paragraphs. storytelling: hook→problem→insight→proof→CTA. 20-25 hashtags at end. Emojis as visual bullets only.`,
-      facebook: `FACEBOOK: Emotional hook or controversy on line 1. 100-200 words. "This is for you if..." framing. End with a direct question to drive comments. One CTA max.`,
-      linkedin: `LINKEDIN: Bold professional insight or contrarian take on line 1. Hook→story→insight→question structure. 1-2 sentence paragraphs. 150-300 words. 3-5 hashtags at end. Never use "Excited to share".`
+      instagram: `INSTAGRAM: Line 1 = gut-punch fear hook (shocking stat, brutal truth, or bold claim) — only line visible before "more", must create unbearable curiosity. 3-5 short punchy paragraphs. Structure: hook→painful problem→brutal truth→proof→URGENT CTA with scarcity ("We only take 3 clients/month — DM 'AI' NOW"). 20-25 hashtags at end. Emojis as visual bullets only.`,
+      facebook: `FACEBOOK: Line 1 = fear/panic trigger for business owners ("Your competitors are automating while you're still doing this manually."). 100-200 words. "This is for you if..." identity framing. Make them feel the cost of every week they wait. End with fear-based self-reflection question + urgent scarcity CTA. One CTA max.`,
+      linkedin: `LINKEDIN: Line 1 = shocking stat or brutal contrarian take that makes business owners question everything. Structure: shocking hook→painful reality→what winners do→what losers do→urgent takeaway. 1-2 sentence paragraphs. 150-300 words. Create FOMO with specific ROI/revenue numbers. End with painful self-reflection question + direct CTA with scarcity. 3-5 hashtags at end. Never use "Excited to share".`
     }
 
     const platformRules = platformList
@@ -621,8 +688,8 @@ router.post('/:clientId/social/generate-content', async (req, res) => {
       .filter(Boolean)
       .join('\n\n')
 
-    const systemPrompt = `You are an elite social media content strategist for ${businessName}.
-Your job is to create scroll-stopping content that drives real engagement and gets shared.
+    const systemPrompt = `You are an elite social media content strategist and direct-response copywriter for ${businessName}.
+Your ONLY job is to create content that stops the scroll, triggers fear of missing out, and makes business owners feel they MUST reach out TODAY or risk falling irreparably behind their competitors.
 
 BUSINESS: ${businessDescription}
 BRAND TONE: ${tone}
@@ -631,12 +698,14 @@ CONTENT PILLARS TO ROTATE: ${contentPillars.join(', ')}
 PLATFORM RULES:
 ${platformRules}
 
-VIRALITY PRINCIPLES (apply to every post):
-1. Every post delivers ONE clear specific insight — not a vague overview
-2. Write like a person, not a brand — use "I" or "we", share real moments
-3. The hook is 80% of the work — spend most creative energy on line 1
-4. Specificity beats generality: "$47K in 30 days" beats "made money"
-5. Never end with "DM us" as the only CTA${contentCalendar ? `\n\nCONTENT CALENDAR CONTEXT (draw topics and pillars from this):\n${contentCalendar.substring(0, 3000)}` : ''}`
+MANDATORY PRINCIPLES — every single post must have ALL of these:
+1. FEAR OF INACTION: Make the reader viscerally feel what they're losing every day they don't have this service. Lost leads, lost revenue, competitors winning their customers.
+2. COMPETITOR THREAT: Position their competitors as already moving. "While you're reading this, your competitor is automating their follow-ups." Create paranoia.
+3. SPECIFICITY OVER VAGUENESS: Use real-sounding numbers. "47 leads followed up in 3 minutes" beats "fast follow-up". "$12K in recovered revenue" beats "more sales".
+4. SCARCITY & URGENCY: Every post must include a reason to act NOW. Limited client spots, closing window of competitive advantage, price going up, early mover advantage disappearing.
+5. SCROLL-STOPPING HOOK: The first line is 80% of the work. If it doesn't trigger fear, curiosity, or shock — rewrite it.
+6. DIRECT CTA WITH CONSEQUENCE: Never just "DM us". Instead: "DM 'AI' now — we take 3 new clients per month and spots are filling." Make inaction feel costly.
+7. Write like a human who genuinely cares that this person is losing — not a brand. Use "I" or "we", be direct, be urgent.${contentCalendar ? `\n\nCONTENT CALENDAR CONTEXT (draw topics and pillars from this):\n${contentCalendar.substring(0, 3000)}` : ''}`
 
     const userMessage = topic
       ? `Create social media posts about: "${topic}"`
@@ -651,7 +720,7 @@ VIRALITY PRINCIPLES (apply to every post):
       system: systemPrompt,
       messages: [{
         role: 'user',
-        content: `${userMessage}.\n\nPlatforms: ${platformList.join(', ')}.\n\nReturn a single JSON object with keys for each platform. Each value must be an object with:\n- content: the full post text ready to copy-paste\n- hashtags: array of hashtag strings (with # prefix)\n- image_prompt: detailed visual prompt for AI image generation that pairs perfectly with this post\n\nOnly include the platforms listed. Return valid JSON only, no markdown code blocks.`
+        content: `${userMessage}.\n\nPlatforms: ${platformList.join(', ')}.\n\nReturn a single JSON object with keys for each platform. Each value must be an object with:\n- content: the full post text ready to copy-paste\n- hashtags: array of hashtag strings (with # prefix)\n- image_prompt: A prompt for AI image generation that pairs with this post. STYLE RULES: professional business photography OR bold graphic design — NOT cinematic, NOT dramatic film lighting, NOT artistic/abstract. Use: real business scenarios, confident professionals, clean modern workspaces, bold text-on-gradient backgrounds, or flat-design infographic styles. The image must look native and credible on the platform, not like a movie poster.\n\nOnly include the platforms listed. Return valid JSON only, no markdown code blocks.`
       }]
     })
 
@@ -690,10 +759,13 @@ router.post('/:clientId/social/generate-images', async (req, res) => {
 
       // Fal AI — flux/dev model, aspect ratio based on platform
       const aspectRatio = platform === 'instagram' ? '1:1' : '16:9'
+      // Append style reinforcement to prevent cinematic/dramatic defaults from Flux
+      const styleGuide = ', professional business photography style, clean modern design, sharp lighting, NOT cinematic, NOT film grain, NOT dramatic'
+      const styledPrompt = (prompt.substring(0, 900) + styleGuide).substring(0, 1000)
       const response = await axios.post(
         'https://fal.run/fal-ai/flux/dev',
         {
-          prompt: prompt.substring(0, 1000),
+          prompt: styledPrompt,
           image_size: aspectRatio === '1:1' ? 'square_hd' : 'landscape_16_9',
           num_images: 1,
           enable_safety_checker: true

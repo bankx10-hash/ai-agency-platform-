@@ -14,7 +14,6 @@
         "responseMode": "onReceived",
         "responseData": "allEntries"
       },
-      "webhookId": "appointments-{{CLIENT_ID}}"
     },
     {
       "id": "get-contact-details",
@@ -111,7 +110,6 @@
         "responseMode": "onReceived",
         "responseData": "allEntries"
       },
-      "webhookId": "appt-reply-{{CLIENT_ID}}"
     },
     {
       "id": "build-classify-request",

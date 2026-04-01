@@ -11,6 +11,8 @@ export interface LinkedInAgentConfig {
   linkedin_cookie: string
   locationId: string
   businessName: string
+  owner_email?: string
+  booking_link?: string
 }
 
 export class LinkedInAgent extends BaseAgent {
@@ -31,6 +33,8 @@ export class LinkedInAgent extends BaseAgent {
         clientId,
         locationId: typedConfig.locationId || '',
         businessName: typedConfig.businessName,
+        bookingLink: typedConfig.booking_link || '',
+        ownerEmail: typedConfig.owner_email || '',
         connectionTemplate: typedConfig.connection_message_template || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!',
         apiKey: process.env.PHANTOMBUSTER_LEADOUTREACH_ID || ''
       })

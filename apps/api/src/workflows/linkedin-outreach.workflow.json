@@ -1,5 +1,5 @@
 {
-  "name": "[cmn38f9m20000z1w2l7habr2d | wood] LinkedIn Outreach Agent",
+  "name": "LinkedIn Outreach Agent",
   "nodes": [
     {
       "id": "edc62f93-b6c0-41b7-bfca-68b576aa3aae",
@@ -38,7 +38,7 @@
           "parameters": [
             {
               "name": "X-Phantombuster-Key",
-              "value": "eKXfWkzhXiqGSakK06zuGWSsaM6pnplP1lAoXvAmn34"
+              "value": "{{PHANTOMBUSTER_API_KEY}}"
             }
           ]
         },
@@ -48,7 +48,7 @@
           "parameters": [
             {
               "name": "id",
-              "value": "4932857484390114"
+              "value": "{{PHANTOMBUSTER_LEADOUTREACH_ID}}"
             }
           ]
         }
@@ -80,13 +80,13 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.phantombuster.com/api/v2/agents/fetch-output?id=4932857484390114' }}",
+        "url": "={{ 'https://api.phantombuster.com/api/v2/agents/fetch-output?id={{PHANTOMBUSTER_LEADOUTREACH_ID}}' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-Phantombuster-Key",
-              "value": "eKXfWkzhXiqGSakK06zuGWSsaM6pnplP1lAoXvAmn34"
+              "value": "{{PHANTOMBUSTER_API_KEY}}"
             }
           ]
         }
@@ -115,7 +115,7 @@
         200
       ],
       "parameters": {
-        "jsCode": "const profile = $input.first().json;\nif (profile.skipped) return [{ json: profile }];\nconst businessName = \"wood\";\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 300,\n    system: 'You are a LinkedIn outreach specialist for ' + businessName + '. Write a short warm follow-up message for a new LinkedIn connection. Under 200 characters. Human, not salesy. Return ONLY the message \u00c3\u0192\u00c6\u2019\u00c3\u201a\u00c2\u00a2\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u00a1\u00c3\u201a\u00c2\u00ac\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\udc9d no quotes.',\n    messages: [{ role: 'user', content: 'Write a personalised follow-up for this new connection.\\n\\nProfile: ' + JSON.stringify({ firstName: profile.firstName, headline: profile.headline, company: profile.company, location: profile.location }) }],\n    profile: profile\n  }\n}];"
+        "jsCode": "const profile = $input.first().json;\nif (profile.skipped) return [{ json: profile }];\nconst businessName = \"{{BUSINESS_NAME}}\";\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 300,\n    system: 'You are a LinkedIn outreach specialist for ' + businessName + '. Write a short warm follow-up message for a new LinkedIn connection. Under 200 characters. Human, not salesy. Return ONLY the message \u00c3\u0192\u00c6\u2019\u00c3\u201a\u00c2\u00a2\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u00a1\u00c3\u201a\u00c2\u00ac\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\udc9d no quotes.',\n    messages: [{ role: 'user', content: 'Write a personalised follow-up for this new connection.\\n\\nProfile: ' + JSON.stringify({ firstName: profile.firstName, headline: profile.headline, company: profile.company, location: profile.location }) }],\n    profile: profile\n  }\n}];"
       }
     },
     {
@@ -180,13 +180,13 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "https://api.nodusaisystems.com/n8n/cmn38f9m20000z1w2l7habr2d/contacts",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-api-secret",
-              "value": "122e926f76600c4556de465f0961d89c448ec8df477da45f0bb36093ffdf8e56"
+              "value": "{{N8N_API_SECRET}}"
             },
             {
               "name": "Content-Type",
@@ -211,13 +211,13 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.nodusaisystems.com/n8n/cmn38f9m20000z1w2l7habr2d/contacts/' + $('Save Contact').first().json.id + '/notes' }}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.id + '/notes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-api-secret",
-              "value": "122e926f76600c4556de465f0961d89c448ec8df477da45f0bb36093ffdf8e56"
+              "value": "{{N8N_API_SECRET}}"
             },
             {
               "name": "Content-Type",
@@ -242,11 +242,10 @@
       ],
       "parameters": {
         "httpMethod": "POST",
-        "path": "linkedin-reply-cmn38f9m20000z1w2l7habr2d",
+        "path": "linkedin-reply-{{CLIENT_ID}}",
         "responseMode": "onReceived",
         "responseData": "allEntries"
-      },
-      "webhookId": "linkedin-reply-cmn38f9m20000z1w2l7habr2d"
+      }
     },
     {
       "id": "4563c5d9-54a7-4d2e-9827-878b0a9158db",
@@ -323,13 +322,13 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.nodusaisystems.com/n8n/cmn38f9m20000z1w2l7habr2d/contacts/' + $json.contactId + '/notes' }}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.contactId + '/notes' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-api-secret",
-              "value": "122e926f76600c4556de465f0961d89c448ec8df477da45f0bb36093ffdf8e56"
+              "value": "{{N8N_API_SECRET}}"
             },
             {
               "name": "Content-Type",
@@ -385,13 +384,13 @@
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.nodusaisystems.com/n8n/cmn38f9m20000z1w2l7habr2d/contacts/' + $('Parse Classification').first().json.contactId }}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Parse Classification').first().json.contactId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-api-secret",
-              "value": "122e926f76600c4556de465f0961d89c448ec8df477da45f0bb36093ffdf8e56"
+              "value": "{{N8N_API_SECRET}}"
             }
           ]
         }
@@ -407,7 +406,7 @@
         500
       ],
       "parameters": {
-        "jsCode": "const classification = $('Parse Classification').first().json;\nconst contactData = $input.first().json;\nconst contact = contactData.contact || contactData;\nconst name = contact.name || 'there';\nconst firstName = name.split(' ')[0];\nconst bookingLink = 'https://calendar.app.google/SviZ9tszMEwt5EjA6';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 400,\n    system: 'You are a professional sales assistant. Write a warm, concise LinkedIn reply (2-3 sentences max) that thanks the person for their interest, suggests a quick call to explore how you can help them, and naturally includes the booking link. Do NOT use generic phrases like I hope this message finds you well. Sound human and specific.',\n    messages: [{ role: 'user', content: 'Write a LinkedIn reply to ' + firstName + ' who responded positively to our outreach. Their message: \"' + classification.originalMessage + '\". Include this booking link: ' + bookingLink + '. Return ONLY the message text.' }],\n    contactId: classification.contactId,\n    contactName: name,\n    contactEmail: contact.email || '',\n    originalMessage: classification.originalMessage,\n    bookingLink: bookingLink\n  }\n}];"
+        "jsCode": "const classification = $('Parse Classification').first().json;\nconst contactData = $input.first().json;\nconst contact = contactData.contact || contactData;\nconst name = contact.name || 'there';\nconst firstName = name.split(' ')[0];\nconst bookingLink = '{{BOOKING_LINK}}';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 400,\n    system: 'You are a professional sales assistant. Write a warm, concise LinkedIn reply (2-3 sentences max) that thanks the person for their interest, suggests a quick call to explore how you can help them, and naturally includes the booking link. Do NOT use generic phrases like I hope this message finds you well. Sound human and specific.',\n    messages: [{ role: 'user', content: 'Write a LinkedIn reply to ' + firstName + ' who responded positively to our outreach. Their message: \"' + classification.originalMessage + '\". Include this booking link: ' + bookingLink + '. Return ONLY the message text.' }],\n    contactId: classification.contactId,\n    contactName: name,\n    contactEmail: contact.email || '',\n    originalMessage: classification.originalMessage,\n    bookingLink: bookingLink\n  }\n}];"
       }
     },
     {
@@ -469,14 +468,14 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "https://api.nodusaisystems.com/n8n/cmn38f9m20000z1w2l7habr2d/messages/email",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
         "sendBody": true,
         "specifyBody": "keypair",
         "bodyParameters": {
           "parameters": [
             {
               "name": "to",
-              "value": "={{ $json.contactEmail || 'lloyd@nodusaisystems.com' }}"
+              "value": "={{ $json.contactEmail || '{{OWNER_EMAIL}}' }}"
             },
             {
               "name": "subject",
@@ -484,7 +483,7 @@
             },
             {
               "name": "html",
-              "value": "={{ '<h2>A LinkedIn connection is interested in booking!</h2><p><strong>Name:</strong> ' + $json.contactName + '</p><p><strong>Their message:</strong> ' + $json.originalMessage + '</p><hr><p><strong>Suggested reply to send on LinkedIn (booking link included):</strong></p><blockquote style=\"border-left:3px solid #007bff;padding-left:12px;color:#333\">' + $json.replyText + '</blockquote><p><a href=\"https://calendar.app.google/SviZ9tszMEwt5EjA6\" style=\"background:#007bff;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none\">Open Booking Link</a></p>' }}"
+              "value": "={{ '<h2>A LinkedIn connection is interested in booking!</h2><p><strong>Name:</strong> ' + $json.contactName + '</p><p><strong>Their message:</strong> ' + $json.originalMessage + '</p><hr><p><strong>Suggested reply to send on LinkedIn (booking link included):</strong></p><blockquote style=\"border-left:3px solid #007bff;padding-left:12px;color:#333\">' + $json.replyText + '</blockquote><p><a href=\"{{BOOKING_LINK}}\" style=\"background:#007bff;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none\">Open Booking Link</a></p>' }}"
             }
           ]
         },
@@ -493,7 +492,7 @@
           "parameters": [
             {
               "name": "x-api-secret",
-              "value": "122e926f76600c4556de465f0961d89c448ec8df477da45f0bb36093ffdf8e56"
+              "value": "{{N8N_API_SECRET}}"
             }
           ]
         }
@@ -510,7 +509,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.nodusaisystems.com/n8n/cmn38f9m20000z1w2l7habr2d/contacts/' + $('Parse Booking Message').first().json.contactId + '/notes' }}",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Parse Booking Message').first().json.contactId + '/notes' }}",
         "sendBody": true,
         "specifyBody": "keypair",
         "bodyParameters": {
@@ -526,7 +525,7 @@
           "parameters": [
             {
               "name": "x-api-secret",
-              "value": "122e926f76600c4556de465f0961d89c448ec8df477da45f0bb36093ffdf8e56"
+              "value": "{{N8N_API_SECRET}}"
             }
           ]
         }

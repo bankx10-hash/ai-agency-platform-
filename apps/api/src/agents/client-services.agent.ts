@@ -79,7 +79,7 @@ Always be warm, proactive, and solutions-focused. You genuinely care about clien
        3. Monthly check-in framework
        4. Health score calculation based on: ${JSON.stringify(typedConfig.health_score_weights)}
        5. Churn risk intervention script
-       6. Upsell conversation framework triggered by: ${typedConfig.upsell_triggers.join(', ')}
+       6. Upsell conversation framework triggered by: ${(typedConfig.upsell_triggers || []).join(', ')}
        7. NPS survey follow-up based on score ranges
 
        Create specific message templates for each scenario.

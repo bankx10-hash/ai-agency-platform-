@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
+import cron from 'node-cron'
 import { PrismaClient } from '@prisma/client'
 import { apiRateLimit } from './middleware/rateLimit'
 import authRouter from './routes/auth'
@@ -12,6 +13,14 @@ import n8nCallbacksRouter from './routes/n8n-callbacks'
 import adminRouter from './routes/admin'
 import calendarRouter from './routes/calendar'
 import metaWebhooksRouter from './routes/meta-webhooks'
+import crmRouter from './routes/crm'
+import marketingRouter from './routes/marketing'
+import inboxRouter from './routes/inbox'
+import notificationsRouter from './routes/notifications'
+import { sendDailyDigest } from './services/digest'
+import sequencesRouter, { processSequences } from './routes/sequences'
+import smsRouter, { handleSmsWebhook } from './routes/sms'
+import callsRouter, { handleCallWebhook } from './routes/calls'
 import { logger } from './utils/logger'
 
 async function runStartupMigrations() {
@@ -94,6 +103,315 @@ async function runStartupMigrations() {
     logger.info('Startup migration: Contact and ContactNote tables ensured')
   } catch { /* already exist, skip */ }
 
+  // CRM Phase 1: add new columns to existing Contact table + create new CRM tables
+  try {
+    await prisma.$executeRaw`ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "pipelineStage" TEXT NOT NULL DEFAULT 'NEW_LEAD'`
+    await prisma.$executeRaw`ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "dealValue" DECIMAL(12,2)`
+    await prisma.$executeRaw`ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "dealCurrency" TEXT NOT NULL DEFAULT 'AUD'`
+    await prisma.$executeRaw`ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "lastContactedAt" TIMESTAMPTZ`
+    await prisma.$executeRaw`ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "score" INTEGER`
+    logger.info('Startup migration: CRM columns added to Contact table')
+  } catch { /* already exist, skip */ }
+
+  try {
+    await prisma.$executeRaw`ALTER TABLE "ContactNote" ADD COLUMN IF NOT EXISTS "authorType" TEXT NOT NULL DEFAULT 'agent'`
+    logger.info('Startup migration: authorType column added to ContactNote')
+  } catch { /* already exist, skip */ }
+
+  try {
+    await prisma.$executeRaw`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PipelineStage') THEN
+          CREATE TYPE "PipelineStage" AS ENUM ('NEW_LEAD','CONTACTED','QUALIFIED','PROPOSAL','CLOSED_WON','CLOSED_LOST');
+        END IF;
+      END $$
+    `
+    await prisma.$executeRaw`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ActivityType') THEN
+          CREATE TYPE "ActivityType" AS ENUM ('NOTE','CALL','EMAIL','SMS','APPOINTMENT','STAGE_CHANGE','SCORE_CHANGE','TASK_COMPLETED','AGENT_ACTION');
+        END IF;
+      END $$
+    `
+    await prisma.$executeRaw`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TaskStatus') THEN
+          CREATE TYPE "TaskStatus" AS ENUM ('PENDING','DONE','CANCELLED');
+        END IF;
+      END $$
+    `
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ContactActivity" (
+        "id"        TEXT        NOT NULL,
+        "contactId" TEXT        NOT NULL,
+        "clientId"  TEXT        NOT NULL,
+        "type"      TEXT        NOT NULL,
+        "title"     TEXT        NOT NULL,
+        "body"      TEXT,
+        "metadata"  JSONB,
+        "agentType" TEXT,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "ContactActivity_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "ContactActivity_contactId_fkey" FOREIGN KEY ("contactId")
+          REFERENCES "Contact"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "ContactActivity_contactId_createdAt_idx" ON "ContactActivity"("contactId","createdAt")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "ContactActivity_clientId_type_idx" ON "ContactActivity"("clientId","type")`
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ContactTask" (
+        "id"          TEXT        NOT NULL,
+        "contactId"   TEXT        NOT NULL,
+        "clientId"    TEXT        NOT NULL,
+        "title"       TEXT        NOT NULL,
+        "body"        TEXT,
+        "status"      TEXT        NOT NULL DEFAULT 'PENDING',
+        "dueAt"       TIMESTAMPTZ,
+        "completedAt" TIMESTAMPTZ,
+        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "ContactTask_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "ContactTask_contactId_fkey" FOREIGN KEY ("contactId")
+          REFERENCES "Contact"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "ContactTask_clientId_status_dueAt_idx" ON "ContactTask"("clientId","status","dueAt")`
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Deal" (
+        "id"          TEXT        NOT NULL,
+        "contactId"   TEXT        NOT NULL,
+        "clientId"    TEXT        NOT NULL,
+        "title"       TEXT        NOT NULL,
+        "value"       DECIMAL(12,2),
+        "currency"    TEXT        NOT NULL DEFAULT 'AUD',
+        "stage"       TEXT        NOT NULL DEFAULT 'NEW_LEAD',
+        "probability" INTEGER,
+        "closedAt"    TIMESTAMPTZ,
+        "lostReason"  TEXT,
+        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "Deal_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "Deal_contactId_fkey" FOREIGN KEY ("contactId")
+          REFERENCES "Contact"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "Deal_clientId_stage_idx" ON "Deal"("clientId","stage")`
+    logger.info('Startup migration: CRM tables (ContactActivity, ContactTask, Deal) ensured')
+  } catch { /* already exist, skip */ }
+
+  // Marketing tables
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Campaign" (
+        "id"              TEXT        NOT NULL,
+        "clientId"        TEXT        NOT NULL,
+        "name"            TEXT        NOT NULL,
+        "type"            TEXT        NOT NULL,
+        "subject"         TEXT,
+        "body"            TEXT        NOT NULL,
+        "status"          TEXT        NOT NULL DEFAULT 'DRAFT',
+        "scheduledAt"     TIMESTAMPTZ,
+        "sentAt"          TIMESTAMPTZ,
+        "recipientFilter" JSONB,
+        "stats"           JSONB,
+        "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "Campaign_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "Campaign_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "Campaign_clientId_status_idx" ON "Campaign"("clientId","status")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "Campaign_clientId_createdAt_idx" ON "Campaign"("clientId","createdAt")`
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "CampaignRecipient" (
+        "id"         TEXT        NOT NULL,
+        "campaignId" TEXT        NOT NULL,
+        "contactId"  TEXT        NOT NULL,
+        "status"     TEXT        NOT NULL DEFAULT 'PENDING',
+        "sentAt"     TIMESTAMPTZ,
+        "openedAt"   TIMESTAMPTZ,
+        "clickedAt"  TIMESTAMPTZ,
+        "error"      TEXT,
+        CONSTRAINT "CampaignRecipient_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "CampaignRecipient_campaignId_contactId_key" UNIQUE ("campaignId","contactId"),
+        CONSTRAINT "CampaignRecipient_campaignId_fkey" FOREIGN KEY ("campaignId")
+          REFERENCES "Campaign"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+        CONSTRAINT "CampaignRecipient_contactId_fkey" FOREIGN KEY ("contactId")
+          REFERENCES "Contact"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "CampaignRecipient_campaignId_status_idx" ON "CampaignRecipient"("campaignId","status")`
+    logger.info('Startup migration: Campaign tables ensured')
+  } catch { /* already exist, skip */ }
+
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Funnel" (
+        "id"          TEXT        NOT NULL,
+        "clientId"    TEXT        NOT NULL,
+        "name"        TEXT        NOT NULL,
+        "description" TEXT,
+        "status"      TEXT        NOT NULL DEFAULT 'DRAFT',
+        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "Funnel_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "Funnel_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "Funnel_clientId_status_idx" ON "Funnel"("clientId","status")`
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "FunnelStep" (
+        "id"          TEXT    NOT NULL,
+        "funnelId"    TEXT    NOT NULL,
+        "name"        TEXT    NOT NULL,
+        "type"        TEXT    NOT NULL,
+        "order"       INTEGER NOT NULL,
+        "headline"    TEXT,
+        "subheadline" TEXT,
+        "body"        TEXT,
+        "ctaText"     TEXT,
+        "config"      JSONB,
+        CONSTRAINT "FunnelStep_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "FunnelStep_funnelId_fkey" FOREIGN KEY ("funnelId")
+          REFERENCES "Funnel"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "FunnelStep_funnelId_order_idx" ON "FunnelStep"("funnelId","order")`
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "FunnelSubmission" (
+        "id"        TEXT        NOT NULL,
+        "funnelId"  TEXT        NOT NULL,
+        "stepId"    TEXT,
+        "contactId" TEXT,
+        "data"      JSONB,
+        "ip"        TEXT,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "FunnelSubmission_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "FunnelSubmission_funnelId_fkey" FOREIGN KEY ("funnelId")
+          REFERENCES "Funnel"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "FunnelSubmission_funnelId_createdAt_idx" ON "FunnelSubmission"("funnelId","createdAt")`
+    logger.info('Startup migration: Funnel tables ensured')
+  } catch { /* already exist, skip */ }
+
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Notification" (
+        "id"        TEXT        NOT NULL,
+        "clientId"  TEXT        NOT NULL,
+        "type"      TEXT        NOT NULL,
+        "title"     TEXT        NOT NULL,
+        "body"      TEXT,
+        "link"      TEXT,
+        "isRead"    BOOLEAN     NOT NULL DEFAULT FALSE,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "Notification_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "Notification_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "Notification_clientId_createdAt_idx" ON "Notification"("clientId","createdAt")`
+    logger.info('Startup migration: Notification table ensured')
+  } catch { /* already exist, skip */ }
+
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "EmailSequence" (
+        "id"          TEXT        NOT NULL,
+        "clientId"    TEXT        NOT NULL,
+        "name"        TEXT        NOT NULL,
+        "description" TEXT,
+        "steps"       JSONB       NOT NULL DEFAULT '[]',
+        "isActive"    BOOLEAN     NOT NULL DEFAULT TRUE,
+        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "EmailSequence_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "EmailSequence_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE
+      )
+    `
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "SequenceEnrollment" (
+        "id"           TEXT        NOT NULL,
+        "clientId"     TEXT        NOT NULL,
+        "contactId"    TEXT        NOT NULL,
+        "sequenceId"   TEXT        NOT NULL,
+        "currentStep"  INTEGER     NOT NULL DEFAULT 1,
+        "status"       TEXT        NOT NULL DEFAULT 'ACTIVE',
+        "nextSendAt"   TIMESTAMPTZ,
+        "enrolledAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "completedAt"  TIMESTAMPTZ,
+        CONSTRAINT "SequenceEnrollment_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "SequenceEnrollment_contactId_fkey" FOREIGN KEY ("contactId")
+          REFERENCES "Contact"("id") ON DELETE CASCADE,
+        CONSTRAINT "SequenceEnrollment_sequenceId_fkey" FOREIGN KEY ("sequenceId")
+          REFERENCES "EmailSequence"("id") ON DELETE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "SequenceEnrollment_status_nextSendAt_idx" ON "SequenceEnrollment"("status","nextSendAt")`
+    logger.info('Startup migration: EmailSequence and SequenceEnrollment tables ensured')
+  } catch { /* already exist, skip */ }
+
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "SmsMessage" (
+        "id"         TEXT        NOT NULL,
+        "clientId"   TEXT        NOT NULL,
+        "contactId"  TEXT,
+        "from"       TEXT        NOT NULL,
+        "to"         TEXT        NOT NULL,
+        "body"       TEXT        NOT NULL,
+        "direction"  TEXT        NOT NULL DEFAULT 'OUTBOUND',
+        "twilioSid"  TEXT,
+        "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "SmsMessage_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "SmsMessage_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "SmsMessage_clientId_createdAt_idx" ON "SmsMessage"("clientId","createdAt")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "SmsMessage_clientId_from_idx" ON "SmsMessage"("clientId","from")`
+    logger.info('Startup migration: SmsMessage table ensured')
+  } catch { /* already exist, skip */ }
+
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "CallLog" (
+        "id"               TEXT        NOT NULL,
+        "clientId"         TEXT        NOT NULL,
+        "retellCallId"     TEXT,
+        "retellAgentId"    TEXT,
+        "direction"        TEXT        NOT NULL DEFAULT 'INBOUND',
+        "fromNumber"       TEXT,
+        "toNumber"         TEXT,
+        "status"           TEXT        NOT NULL DEFAULT 'completed',
+        "durationSeconds"  INTEGER     NOT NULL DEFAULT 0,
+        "transcript"       TEXT,
+        "transcriptObject" JSONB,
+        "startedAt"        TIMESTAMPTZ,
+        "endedAt"          TIMESTAMPTZ,
+        "callerName"       TEXT,
+        "callerEmail"      TEXT,
+        "intent"           TEXT,
+        "appointmentBooked" BOOLEAN    NOT NULL DEFAULT false,
+        "summary"          TEXT,
+        "contactId"        TEXT,
+        "analysisData"     JSONB,
+        "createdAt"        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "CallLog_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "CallLog_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE UNIQUE INDEX IF NOT EXISTS "CallLog_retellCallId_key" ON "CallLog"("retellCallId") WHERE "retellCallId" IS NOT NULL`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "CallLog_clientId_createdAt_idx" ON "CallLog"("clientId","createdAt")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "CallLog_clientId_direction_idx" ON "CallLog"("clientId","direction")`
+    logger.info('Startup migration: CallLog table ensured')
+  } catch { /* already exist, skip */ }
+
   await prisma.$disconnect()
 }
 
@@ -144,6 +462,15 @@ app.use('/webhooks', webhooksRouter)
 app.use('/n8n', n8nCallbacksRouter)
 app.use('/admin', adminRouter)
 app.use('/calendar', calendarRouter)
+app.use('/crm', crmRouter)
+app.use('/marketing', marketingRouter)
+app.use('/inbox', inboxRouter)
+app.use('/notifications', notificationsRouter)
+app.use('/sequences', sequencesRouter)
+app.post('/sms/webhook', handleSmsWebhook)
+app.use('/sms', smsRouter)
+app.post('/calls/webhook', handleCallWebhook)
+app.use('/calls', callsRouter)
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', {
@@ -167,7 +494,21 @@ runStartupMigrations().then(() => {
       port: PORT,
       environment: process.env.NODE_ENV || 'development'
     })
+
+    // Daily digest — 7am UTC every day
+    cron.schedule('0 7 * * *', () => {
+      sendDailyDigest().catch(err => logger.error('Daily digest cron failed', { err }))
+    })
+    logger.info('Daily digest cron scheduled at 07:00 UTC')
+
+    // Sequence processor — every 15 minutes
+    cron.schedule('*/15 * * * *', () => {
+      processSequences().catch(err => logger.error('Sequence processor failed', { err }))
+    })
+    logger.info('Sequence processor cron scheduled every 15 minutes')
   })
 })
 
+
 export default app
+

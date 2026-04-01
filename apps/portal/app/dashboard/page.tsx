@@ -8,6 +8,7 @@ import axios from 'axios'
 import AgentCard from '../../components/AgentCard'
 import MetricsDashboard from '../../components/MetricsDashboard'
 import ThemeToggle from '../../components/ThemeToggle'
+import NotificationBell from '../../components/NotificationBell'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
@@ -137,11 +138,17 @@ export default function DashboardPage() {
             <Link href="/dashboard" className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Dashboard</Link>
             <Link href="/dashboard/agents" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Agents</Link>
             <Link href="/dashboard/analytics" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Analytics</Link>
+            <Link href="/dashboard/crm/contacts" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">CRM</Link>
+            <Link href="/dashboard/voice" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Voice</Link>
+            <Link href="/dashboard/marketing/campaigns" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Marketing</Link>
+            <Link href="/dashboard/inbox" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Inbox</Link>
+            <Link href="/dashboard/sms" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">SMS</Link>
             <Link href="/dashboard/connections" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Connections</Link>
             <Link href="/dashboard/settings" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Settings</Link>
           </nav>
 
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <ThemeToggle />
             <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-semibold text-sm">
               {businessName.charAt(0)}

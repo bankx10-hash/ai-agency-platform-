@@ -12,7 +12,6 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [0, 0],
-      "webhookId": "social-engage-{{CLIENT_ID}}"
     },
     {
       "parameters": {

@@ -12,7 +12,6 @@
         "path": "onboarding-{{CLIENT_ID}}",
         "responseMode": "onReceived"
       },
-      "webhookId": "onboarding-{{CLIENT_ID}}"
     },
     {
       "id": "deploy-agents",

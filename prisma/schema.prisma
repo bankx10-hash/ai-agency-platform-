@@ -50,6 +50,33 @@ enum AgentType {
   CLIENT_SERVICES
 }
 
+enum PipelineStage {
+  NEW_LEAD
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  SMS
+  APPOINTMENT
+  STAGE_CHANGE
+  SCORE_CHANGE
+  TASK_COMPLETED
+  AGENT_ACTION
+}
+
+enum TaskStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
 model Client {
   id               String           @id @default(cuid())
   businessName     String
@@ -69,6 +96,9 @@ model Client {
   agents           AgentDeployment[]
   credentials      ClientCredential[]
   onboarding       Onboarding?
+  contacts         Contact[]
+  campaigns        Campaign[]
+  funnels          Funnel[]
 }
 
 model AgentDeployment {
@@ -102,4 +132,224 @@ model Onboarding {
   status      OnboardingStatus @default(IN_PROGRESS)
   completedAt DateTime?
   data        Json
+}
+
+// ── CRM Models ────────────────────────────────────────────────────────────────
+
+model Contact {
+  id              String          @id @default(cuid())
+  clientId        String
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name            String?
+  email           String?
+  phone           String?
+  source          String?
+  stage           String          @default("new")
+  score           Int?
+  tags            Json            @default("[]")
+  summary         String?
+  nextAction      String?
+  crmId           String?
+  pipelineStage   PipelineStage   @default(NEW_LEAD)
+  dealValue       Decimal?        @db.Decimal(12, 2)
+  dealCurrency    String          @default("AUD")
+  lastContactedAt DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  notes              ContactNote[]
+  activities         ContactActivity[]
+  tasks              ContactTask[]
+  deals              Deal[]
+  campaignRecipients CampaignRecipient[]
+
+  @@index([clientId, pipelineStage])
+  @@index([clientId, source])
+  @@index([clientId, score])
+  @@index([clientId, createdAt])
+}
+
+model ContactNote {
+  id         String   @id @default(cuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  body       String
+  authorType String   @default("agent")
+  createdAt  DateTime @default(now())
+
+  @@index([contactId])
+}
+
+model ContactActivity {
+  id         String       @id @default(cuid())
+  contactId  String
+  contact    Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  clientId   String
+  type       ActivityType
+  title      String
+  body       String?
+  metadata   Json?
+  agentType  String?
+  createdAt  DateTime     @default(now())
+
+  @@index([contactId, createdAt])
+  @@index([clientId, type])
+}
+
+model ContactTask {
+  id          String     @id @default(cuid())
+  contactId   String
+  contact     Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  clientId    String
+  title       String
+  body        String?
+  status      TaskStatus @default(PENDING)
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([clientId, status, dueAt])
+  @@index([contactId])
+}
+
+model Deal {
+  id          String        @id @default(cuid())
+  contactId   String
+  contact     Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  clientId    String
+  title       String
+  value       Decimal?      @db.Decimal(12, 2)
+  currency    String        @default("AUD")
+  stage       PipelineStage @default(NEW_LEAD)
+  probability Int?
+  closedAt    DateTime?
+  lostReason  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([clientId, stage])
+  @@index([clientId, createdAt])
+}
+
+// ── Marketing Models ──────────────────────────────────────────────────────────
+
+enum CampaignType {
+  EMAIL
+  SMS
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  OPENED
+  CLICKED
+  FAILED
+}
+
+enum FunnelStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum StepType {
+  LANDING
+  OPT_IN
+  UPSELL
+  THANK_YOU
+  SALES_PAGE
+  WEBINAR
+  CHECKOUT
+}
+
+model Campaign {
+  id              String              @id @default(cuid())
+  clientId        String
+  client          Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name            String
+  type            CampaignType
+  subject         String?
+  body            String
+  status          CampaignStatus      @default(DRAFT)
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  recipientFilter Json?
+  stats           Json?
+  recipients      CampaignRecipient[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([clientId, status])
+  @@index([clientId, createdAt])
+}
+
+model CampaignRecipient {
+  id         String          @id @default(cuid())
+  campaignId String
+  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  String
+  contact    Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status     RecipientStatus @default(PENDING)
+  sentAt     DateTime?
+  openedAt   DateTime?
+  clickedAt  DateTime?
+  error      String?
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+}
+
+model Funnel {
+  id          String             @id @default(cuid())
+  clientId    String
+  client      Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      FunnelStatus       @default(DRAFT)
+  steps       FunnelStep[]
+  submissions FunnelSubmission[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([clientId, status])
+}
+
+model FunnelStep {
+  id          String             @id @default(cuid())
+  funnelId    String
+  funnel      Funnel             @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  name        String
+  type        StepType
+  order       Int
+  headline    String?
+  subheadline String?
+  body        String?
+  ctaText     String?
+  config      Json?
+  submissions FunnelSubmission[]
+
+  @@index([funnelId, order])
+}
+
+model FunnelSubmission {
+  id        String      @id @default(cuid())
+  funnelId  String
+  funnel    Funnel      @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  stepId    String?
+  step      FunnelStep? @relation(fields: [stepId], references: [id])
+  contactId String?
+  data      Json?
+  ip        String?
+  createdAt DateTime    @default(now())
+
+  @@index([funnelId, createdAt])
+  @@index([stepId])
 }

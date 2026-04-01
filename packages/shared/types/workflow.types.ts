@@ -45,6 +45,7 @@ export interface WorkflowDeployConfig {
   icpDescription?: string
   connectionTemplate?: string
   platforms?: string
+  ownerEmail?: string
   n8nApiSecret?: string
   retellApiKey?: string
   anthropicApiKey?: string

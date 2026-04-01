@@ -69,7 +69,6 @@
         "path": "voice-outbound-{{CLIENT_ID}}",
         "responseMode": "onReceived"
       },
-      "webhookId": "voice-outbound-{{CLIENT_ID}}"
     },
     {
       "id": "get-call-result",
