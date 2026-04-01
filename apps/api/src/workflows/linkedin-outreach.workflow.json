@@ -89,7 +89,28 @@
       "typeVersion": 2,
       "position": [1250, 200],
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\n// fetch-output returns the console log as a string field\nconst log = raw.output || raw.log || JSON.stringify(raw);\nconst match = String(log).match(/JSON saved at (https:\\/\\/[^\\s\\\\n]+\\.json)/);\nif (!match) {\n  return [{ json: { skipped: true, reason: 'No S3 JSON URL found in Phantombuster output' } }];\n}\nreturn [{ json: { jsonUrl: match[1] } }];"
+        "jsCode": "const raw = $input.first().json;\nconst log = raw.output || raw.log || JSON.stringify(raw);\nconst match = String(log).match(/https:\\/\\/[^\\s'\"]+\\.json/);\nif (!match) {\n  return [{ json: { skipped: true, reason: 'No S3 JSON URL found in Phantombuster output' } }];\n}\nreturn [{ json: { jsonUrl: match[0] } }];"
+      }
+    },
+    {
+      "id": "if-has-url-001",
+      "name": "IF - Has URL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1500, 200],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "check-url",
+              "leftValue": "={{ $json.skipped }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        }
       }
     },
     {
@@ -97,7 +118,7 @@
       "name": "Fetch Profile JSON",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1500, 200],
+      "position": [1750, 200],
       "continueOnFail": true,
       "parameters": {
         "method": "GET",
@@ -109,7 +130,7 @@
       "name": "Parse Profiles",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1750, 200],
+      "position": [2000, 200],
       "parameters": {
         "jsCode": "const data = $input.first().json;\n// S3 returns the JSON array directly or as a string\nlet profiles = [];\nif (Array.isArray(data)) {\n  profiles = data;\n} else if (typeof data === 'string') {\n  try { profiles = JSON.parse(data); } catch { profiles = []; }\n} else if (Array.isArray(data.result)) {\n  profiles = data.result;\n}\nif (!Array.isArray(profiles) || profiles.length === 0) {\n  return [{ json: { skipped: true, reason: 'No profiles returned from Phantombuster' } }];\n}\nconst valid = profiles.filter(p => !p.error && (p.firstName || p.lastName || p.profileUrl || p.profileUrl));\nif (valid.length === 0) {\n  return [{ json: { skipped: true, reason: 'All profiles had errors' } }];\n}\nreturn valid.map(p => ({\n  json: {\n    firstName: p.firstName || '',\n    lastName: p.lastName || '',\n    fullName: ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || 'Unknown',\n    headline: p.headline || p.title || p.occupation || '',\n    company: p.company || p.companyName || '',\n    location: p.location || '',\n    profileUrl: p.profileUrl || p.linkedInProfileUrl || '',\n    email: p.email || '',\n    connectedAt: p.timestamp || new Date().toISOString()\n  }\n}));"
       }
@@ -611,7 +632,13 @@
       "main": [[{ "node": "Extract S3 JSON URL", "type": "main", "index": 0 }]]
     },
     "Extract S3 JSON URL": {
-      "main": [[{ "node": "Fetch Profile JSON", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "IF - Has URL?", "type": "main", "index": 0 }]]
+    },
+    "IF - Has URL?": {
+      "main": [
+        [{ "node": "Fetch Profile JSON", "type": "main", "index": 0 }],
+        []
+      ]
     },
     "Fetch Profile JSON": {
       "main": [[{ "node": "Parse Profiles", "type": "main", "index": 0 }]]
