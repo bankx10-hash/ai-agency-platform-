@@ -7,83 +7,62 @@ import Link from 'next/link'
 import axios from 'axios'
 import AgentCard from '../../components/AgentCard'
 import MetricsDashboard from '../../components/MetricsDashboard'
-import ThemeToggle from '../../components/ThemeToggle'
-import NotificationBell from '../../components/NotificationBell'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 interface AgentDeployment {
-  id: string
-  agentType: string
+  id: string; agentType: string
   status: 'ACTIVE' | 'INACTIVE' | 'PAUSED' | 'ERROR'
-  metrics?: {
-    totalLeads?: number
-    leadsToday?: number
-    callsMade?: number
-    appointmentsBooked?: number
-    emailsSent?: number
-    appointmentsToday?: number
-  }
+  metrics?: { totalLeads?: number; leadsToday?: number; callsMade?: number; appointmentsBooked?: number; emailsSent?: number; appointmentsToday?: number }
   updatedAt: string
 }
 
 interface DashboardMetrics {
-  leadsToday: number
-  callsMade: number
-  appointmentsBooked: number
-  emailsSent: number
-  activeAgents: number
+  leadsToday: number; callsMade: number; appointmentsBooked: number; emailsSent: number; activeAgents: number
 }
 
-const NAV_LINKS = [
-  { href: '/dashboard',                       label: 'Dashboard'   },
-  { href: '/dashboard/agents',                label: 'Agents'      },
-  { href: '/dashboard/analytics',             label: 'Analytics'   },
-  { href: '/dashboard/crm/contacts',          label: 'CRM'         },
-  { href: '/dashboard/voice',                 label: 'Voice'       },
-  { href: '/dashboard/marketing/campaigns',   label: 'Marketing'   },
-  { href: '/dashboard/inbox',                 label: 'Inbox'       },
-  { href: '/dashboard/sms',                   label: 'SMS'         },
-  { href: '/dashboard/connections',           label: 'Connections' },
-  { href: '/dashboard/settings',              label: 'Settings'    },
+const CONNECTIONS = [
+  { key: 'facebook',        label: 'Facebook',   color: '#1877f2', abbr: 'FB' },
+  { key: 'instagram',       label: 'Instagram',  color: '#e1306c', abbr: 'IG' },
+  { key: 'linkedin',        label: 'LinkedIn',   color: '#0a66c2', abbr: 'in' },
+  { key: 'gmail',           label: 'Gmail',      color: '#ea4335', abbr: 'G'  },
+  { key: 'google-calendar', label: 'G. Calendar',color: '#4285f4', abbr: 'GC' },
+  { key: 'calendly',        label: 'Calendly',   color: '#006bff', abbr: 'CL' },
+  { key: 'calcom',          label: 'Cal.com',    color: '#111',    abbr: 'CC' },
+  { key: 'hubspot',         label: 'HubSpot',    color: '#ff7a59', abbr: 'HS' },
+  { key: 'gohighlevel',     label: 'GHL',        color: '#ef4444', abbr: 'GH' },
+  { key: 'salesforce',      label: 'Salesforce', color: '#00a1e0', abbr: 'SF' },
+  { key: 'zoho',            label: 'Zoho',       color: '#e42527', abbr: 'Z'  },
+  { key: 'twilio-phone',    label: 'Phone',      color: '#f22f46', abbr: '☎'  },
 ]
 
-const CONNECTIONS = [
-  { key: 'facebook',        label: 'Facebook',    icon: 'F',  color: '#1877f2' },
-  { key: 'instagram',       label: 'Instagram',   icon: 'IG', color: '#e1306c' },
-  { key: 'linkedin',        label: 'LinkedIn',    icon: 'in', color: '#0a66c2' },
-  { key: 'gmail',           label: 'Gmail',       icon: 'G',  color: '#ea4335' },
-  { key: 'google-calendar', label: 'Google Cal',  icon: 'GC', color: '#4285f4' },
-  { key: 'calendly',        label: 'Calendly',    icon: 'CL', color: '#006bff' },
-  { key: 'calcom',          label: 'Cal.com',     icon: 'C',  color: '#292929' },
-  { key: 'hubspot',         label: 'HubSpot',     icon: 'HS', color: '#ff7a59' },
-  { key: 'gohighlevel',     label: 'GHL',         icon: 'GH', color: '#ef4444' },
-  { key: 'salesforce',      label: 'Salesforce',  icon: 'SF', color: '#00a1e0' },
-  { key: 'zoho',            label: 'Zoho CRM',    icon: 'Z',  color: '#e42527' },
-  { key: 'twilio-phone',    label: 'Phone',       icon: '☎',  color: '#f22f46' },
-]
+function SectionHeader({ title, badge, href, linkLabel = 'View all' }: { title: string; badge?: string; href: string; linkLabel?: string }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+        {badge && <span className="text-[11px] px-1.5 py-0.5 rounded-md font-medium" style={{ color: 'var(--text-muted)', background: 'var(--border-card)' }}>{badge}</span>}
+      </div>
+      <Link href={href} className="text-xs font-medium" style={{ color: '#2563eb' }}>{linkLabel} →</Link>
+    </div>
+  )
+}
 
 function getGreeting() {
   const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
 }
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [agents, setAgents] = useState<AgentDeployment[]>([])
-  const [metrics, setMetrics] = useState<DashboardMetrics>({
-    leadsToday: 0, callsMade: 0, appointmentsBooked: 0, emailsSent: 0, activeAgents: 0
-  })
+  const [metrics, setMetrics] = useState<DashboardMetrics>({ leadsToday: 0, callsMade: 0, appointmentsBooked: 0, emailsSent: 0, activeAgents: 0 })
   const [businessName, setBusinessName] = useState('')
   const [loading, setLoading] = useState(true)
   const [connections, setConnections] = useState<Record<string, boolean>>({})
 
-  useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login')
-  }, [status, router])
+  useEffect(() => { if (status === 'unauthenticated') router.push('/login') }, [status, router])
 
   useEffect(() => {
     if (!session) return
@@ -107,280 +86,101 @@ export default function DashboardPage() {
         setAgents(agentsData)
         setConnections((connectionsRes.data as { connected: Record<string, boolean> }).connected || {})
 
-        const computedMetrics = agentsData.reduce((acc, agent) => {
-          const m = agent.metrics || {}
-          return {
-            leadsToday: acc.leadsToday + (m.leadsToday || 0),
-            callsMade: acc.callsMade + (m.callsMade || 0),
-            appointmentsBooked: acc.appointmentsBooked + (m.appointmentsBooked || 0),
-            emailsSent: acc.emailsSent + (m.emailsSent || 0),
-            activeAgents: acc.activeAgents + (agent.status === 'ACTIVE' ? 1 : 0)
-          }
-        }, { leadsToday: 0, callsMade: 0, appointmentsBooked: 0, emailsSent: 0, activeAgents: 0 })
-
-        setMetrics(computedMetrics)
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err)
-      } finally {
-        setLoading(false)
-      }
+        setMetrics(agentsData.reduce((acc, a) => ({
+          leadsToday:         acc.leadsToday + (a.metrics?.leadsToday ?? 0),
+          callsMade:          acc.callsMade + (a.metrics?.callsMade ?? 0),
+          appointmentsBooked: acc.appointmentsBooked + (a.metrics?.appointmentsBooked ?? 0),
+          emailsSent:         acc.emailsSent + (a.metrics?.emailsSent ?? 0),
+          activeAgents:       acc.activeAgents + (a.status === 'ACTIVE' ? 1 : 0)
+        }), { leadsToday: 0, callsMade: 0, appointmentsBooked: 0, emailsSent: 0, activeAgents: 0 }))
+      } catch (err) { console.error(err) } finally { setLoading(false) }
     }
     fetchData()
   }, [session])
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#07080d' }}>
-        <div className="text-center">
-          <div
-            className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-4"
-            style={{ borderColor: 'rgba(99,102,241,0.3)', borderTopColor: '#6366f1' }}
-          />
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>Loading your workspace...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgba(37,99,235,0.3)', borderTopColor: '#2563eb' }} />
       </div>
     )
   }
 
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const connectedCount = Object.values(connections).filter(Boolean).length
 
   return (
-    <div className="min-h-screen mesh-bg" style={{ background: '#07080d' }}>
+    <div className="max-w-6xl space-y-6">
 
-      {/* ── Navigation ── */}
-      <header
-        className="sticky top-0 z-50"
-        style={{
-          background: 'rgba(7,8,13,0.80)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)'
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <img src="/nodus-logo.jpeg" alt="Nodus AI" className="h-7 w-auto object-contain rounded" />
-            <div className="hidden sm:block w-px h-4" style={{ background: 'rgba(255,255,255,0.10)' }} />
-            <span className="hidden sm:block text-xs font-medium" style={{ color: 'rgba(255,255,255,0.30)' }}>
-              AI Command Centre
-            </span>
+      {/* Page title */}
+      <div>
+        <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>{today}</p>
+        <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+          {getGreeting()}, <span style={{ color: '#2563eb' }}>{businessName}</span>
+        </h1>
+      </div>
+
+      {/* Metrics */}
+      <MetricsDashboard metrics={metrics} />
+
+      {/* Agents */}
+      <div>
+        <SectionHeader
+          title="AI Agents"
+          badge={`${metrics.activeAgents} active`}
+          href="/dashboard/agents"
+        />
+        {agents.length === 0 ? (
+          <div className="theme-card rounded-xl p-8 text-center">
+            <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>No agents deployed yet</p>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Your agents are being configured — usually takes 2–3 minutes.</p>
+            <Link href="/onboarding/complete" className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors">
+              Check setup status
+            </Link>
           </div>
-
-          {/* Nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {NAV_LINKS.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150"
-                style={{ color: 'rgba(255,255,255,0.50)' }}
-                onMouseEnter={e => {
-                  ;(e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.90)'
-                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.06)'
-                }}
-                onMouseLeave={e => {
-                  ;(e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.50)'
-                  ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
-                }}
-              >
-                {label}
-              </Link>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {agents.slice(0, 6).map(agent => (
+              <AgentCard key={agent.id} agent={agent} onStatusChange={() => {}} />
             ))}
-          </nav>
+          </div>
+        )}
+      </div>
 
-          {/* Right actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <NotificationBell />
-            <ThemeToggle />
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                color: '#fff',
-                boxShadow: '0 0 12px rgba(99,102,241,0.35)'
-              }}
-            >
-              {businessName.charAt(0).toUpperCase()}
-            </div>
+      {/* Connected accounts */}
+      <div>
+        <SectionHeader
+          title="Connected Accounts"
+          badge={`${connectedCount}/${CONNECTIONS.length}`}
+          href="/dashboard/connections"
+          linkLabel="Manage"
+        />
+        <div className="theme-card rounded-xl p-4">
+          <div className="flex flex-wrap gap-2">
+            {CONNECTIONS.map(({ key, label, color, abbr }) => {
+              const on = !!connections[key]
+              return (
+                <div
+                  key={key}
+                  title={`${label} — ${on ? 'Connected' : 'Not connected'}`}
+                  className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                  style={{
+                    background:   on ? `${color}10` : 'var(--border-card)',
+                    border:       `1px solid ${on ? `${color}30` : 'transparent'}`,
+                    color:        on ? color : 'var(--text-muted)',
+                  }}
+                >
+                  <span className="font-bold text-[11px]">{abbr}</span>
+                  <span style={{ color: on ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{label}</span>
+                  {/* status dot */}
+                  <span className="w-1.5 h-1.5 rounded-full ml-0.5" style={{ background: on ? '#22c55e' : '#cbd5e1' }} />
+                </div>
+              )
+            })}
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* ── Main Content ── */}
-      <main className="max-w-7xl mx-auto px-6 py-10">
-
-        {/* Hero */}
-        <div className="mb-10">
-          <p className="text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em' }}>
-            {today.toUpperCase()}
-          </p>
-          <h1 className="text-2xl font-bold text-white mb-1.5">
-            {getGreeting()},{' '}
-            <span style={{
-              background: 'linear-gradient(90deg, #6366f1, #a78bfa)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}>
-              {businessName}
-            </span>
-          </h1>
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.38)' }}>
-            Your AI agents are running autonomously. Here&apos;s today&apos;s performance.
-          </p>
-        </div>
-
-        {/* Metrics */}
-        <MetricsDashboard metrics={metrics} />
-
-        {/* Agents */}
-        <div className="mt-12">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-base font-semibold text-white">AI Agents</h2>
-              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.28)' }}>
-                {metrics.activeAgents} of {agents.length} active
-              </p>
-            </div>
-            <Link
-              href="/dashboard/agents"
-              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
-              style={{
-                color: '#6366f1',
-                background: 'rgba(99,102,241,0.10)',
-                border: '1px solid rgba(99,102,241,0.20)'
-              }}
-            >
-              View all →
-            </Link>
-          </div>
-
-          {agents.length === 0 ? (
-            <div
-              className="rounded-2xl p-14 text-center"
-              style={{
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderStyle: 'dashed'
-              }}
-            >
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
-                style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)' }}
-              >
-                <svg className="w-7 h-7" fill="none" stroke="#6366f1" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h3 className="text-base font-semibold text-white mb-1.5">No agents deployed yet</h3>
-              <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                Your agents are being configured. This usually takes 2–3 minutes.
-              </p>
-              <Link
-                href="/onboarding/complete"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all"
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  boxShadow: '0 0 20px rgba(99,102,241,0.30)'
-                }}
-              >
-                Check setup status
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {agents.slice(0, 6).map(agent => (
-                <AgentCard key={agent.id} agent={agent} onStatusChange={() => {}} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Connected Accounts */}
-        <div className="mt-12">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-base font-semibold text-white">Connected Accounts</h2>
-              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.28)' }}>
-                {connectedCount} of {CONNECTIONS.length} connected
-              </p>
-            </div>
-            <Link
-              href="/dashboard/connections"
-              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
-              style={{
-                color: 'rgba(255,255,255,0.45)',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)'
-              }}
-            >
-              Manage →
-            </Link>
-          </div>
-
-          <div
-            className="rounded-2xl p-5"
-            style={{
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.06)'
-            }}
-          >
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-              {CONNECTIONS.map(({ key, label, icon, color }) => {
-                const isConnected = !!connections[key]
-                return (
-                  <div
-                    key={key}
-                    className="relative flex flex-col items-center gap-2.5 p-3.5 rounded-xl transition-all duration-200 group"
-                    style={{
-                      background: isConnected ? `${color}0d` : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${isConnected ? `${color}28` : 'rgba(255,255,255,0.05)'}`,
-                    }}
-                  >
-                    {/* Brand icon */}
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      style={{
-                        background: isConnected ? `${color}22` : 'rgba(255,255,255,0.05)',
-                        color: isConnected ? color : 'rgba(255,255,255,0.25)',
-                        border: `1px solid ${isConnected ? `${color}35` : 'transparent'}`
-                      }}
-                    >
-                      {icon}
-                    </div>
-
-                    <span
-                      className="text-xs font-medium text-center leading-tight"
-                      style={{ color: isConnected ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.25)' }}
-                    >
-                      {label}
-                    </span>
-
-                    {/* Status dot */}
-                    <div className="flex items-center gap-1">
-                      <div
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: isConnected ? '#34d399' : 'rgba(255,255,255,0.15)' }}
-                      />
-                      <span
-                        className="text-[10px] font-medium"
-                        style={{ color: isConnected ? '#34d399' : 'rgba(255,255,255,0.20)' }}
-                      >
-                        {isConnected ? 'Live' : 'Off'}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer spacer */}
-        <div className="h-16" />
-      </main>
     </div>
   )
 }
