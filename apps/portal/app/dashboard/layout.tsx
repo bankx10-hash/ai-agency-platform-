@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import ThemeToggle from '../../components/ThemeToggle'
-
 // ── Icon helpers ──────────────────────────────────────────────────────────────
 function Icon({ d, d2 }: { d: string; d2?: string }) {
   return (
@@ -247,9 +245,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        {/* User footer */}
-        <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border-sidebar)' }}>
-          <div className="flex items-center gap-2.5">
+        {/* Footer: theme toggle + user */}
+        <div className="px-3 py-3 flex-shrink-0 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border-sidebar)' }}>
+          {/* Theme toggle */}
+          <button
+            onClick={() => {
+              const html = document.documentElement
+              const isDark = html.classList.contains('dark')
+              html.classList.toggle('dark')
+              localStorage.setItem('theme', isDark ? 'light' : 'dark')
+            }}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 w-full"
+            style={{ color: 'rgba(255,255,255,0.45)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+            title="Toggle dark / light mode"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px] flex-shrink-0">
+              <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+            </svg>
+            {!collapsed && <span className="truncate">Toggle Theme</span>}
+          </button>
+          {/* User */}
+          <div className="flex items-center gap-2.5 px-3">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
               style={{ background: '#2563eb', color: '#fff' }}>
               {businessName.charAt(0).toUpperCase() || 'N'}
@@ -266,14 +284,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* ── Main ── */}
       <div className="flex flex-col flex-1 transition-all duration-200" style={{ marginLeft: sidebarW }}>
-
-        {/* Top bar — notifications only, no nav */}
-        <header
-          className="sticky top-0 z-30 flex items-center justify-end px-6 h-12"
-          style={{ background: 'var(--bg-topbar)', borderBottom: '1px solid var(--border-topbar)', transition: 'background 0.2s' }}
-        >
-          <ThemeToggle />
-        </header>
 
         <main className="flex-1 p-6">
           {children}

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import Link from 'next/link'
 import axios from 'axios'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
@@ -298,7 +297,7 @@ export default function AgentConfigurePage() {
 
   if (loading || status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center h-64">
         <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -306,7 +305,7 @@ export default function AgentConfigurePage() {
 
   if (!agent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center h-64">
         <p className="text-gray-500">Agent not found.</p>
       </div>
     )
@@ -317,30 +316,7 @@ export default function AgentConfigurePage() {
   const hasAppointments = agent.agentType === 'APPOINTMENT_SETTER'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/agents" className="text-gray-400 hover:text-gray-600">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{label}</h1>
-              <p className="text-xs text-gray-400 mt-0.5">Configure agent settings</p>
-            </div>
-          </div>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/dashboard" className="text-sm font-medium text-gray-600 hover:text-gray-900">Dashboard</Link>
-            <Link href="/dashboard/agents" className="text-sm font-medium text-indigo-600">Agents</Link>
-            <Link href="/dashboard/connections" className="text-sm font-medium text-gray-600 hover:text-gray-900">Connections</Link>
-            <Link href="/dashboard/settings" className="text-sm font-medium text-gray-600 hover:text-gray-900">Settings</Link>
-          </nav>
-        </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div>
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-8 w-fit">
           <button
@@ -420,7 +396,6 @@ export default function AgentConfigurePage() {
         {tab === 'appointments' && hasAppointments && (
           <AppointmentCalendar appointments={appointments} />
         )}
-      </main>
     </div>
   )
 }

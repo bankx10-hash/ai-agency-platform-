@@ -98,8 +98,36 @@ body {
 .dark .border-gray-300,.dark .border-slate-300 { border-color: var(--border-card) !important; }
 .dark .divide-gray-100>*+*,.dark .divide-gray-200>*+*,.dark .divide-slate-200>*+* { border-color: var(--border-card) !important; }
 .dark .shadow,.dark .shadow-sm,.dark .shadow-md { box-shadow: var(--shadow-card) !important; }
+.dark .text-white                       { color: #f1f5f9 !important; }
+.dark .border-gray-700,.dark .border-gray-800 { border-color: var(--border-card) !important; }
+.dark .bg-gray-800,.dark .bg-gray-900  { background: var(--bg-card) !important; }
+.dark .bg-gray-950                       { background: var(--bg-page) !important; }
+.dark .hover\:bg-gray-50:hover          { background: rgba(255,255,255,0.04) !important; }
+.dark .hover\:bg-gray-100:hover         { background: rgba(255,255,255,0.06) !important; }
+.dark .hover\:bg-gray-800:hover         { background: rgba(255,255,255,0.08) !important; }
+.dark .hover\:text-gray-900:hover       { color: var(--text-primary)   !important; }
+.dark .hover\:text-white:hover          { color: #f1f5f9 !important; }
+.dark .placeholder-gray-400::placeholder { color: var(--text-muted) !important; }
+.dark .ring-indigo-500                   { --tw-ring-color: #6366f1 !important; }
 .dark input,.dark textarea,.dark select {
   background: var(--bg-card) !important;
   color: var(--text-primary) !important;
   border-color: var(--border-card) !important;
+}
+
+/* ── Light-mode reinforcement ─────────────────────────
+   Ensures text is always visible on the light background */
+:root .text-gray-900, :root .text-slate-900 { color: #0f172a; }
+:root .text-gray-800, :root .text-slate-800 { color: #1e293b; }
+:root .text-gray-700, :root .text-slate-700 { color: #334155; }
+:root .text-gray-600, :root .text-slate-600 { color: #475569; }
+:root .text-gray-500, :root .text-slate-500 { color: #64748b; }
+:root .bg-white                              { background: #ffffff; }
+:root .bg-gray-50, :root .bg-slate-50       { background: #f8fafc; }
+:root .border-gray-200, :root .border-slate-200 { border-color: #e2e8f0; }
+:root .border-gray-300                       { border-color: #cbd5e1; }
+:root input, :root textarea, :root select {
+  color: #0f172a;
+  background: #ffffff;
+  border-color: #e2e8f0;
 }

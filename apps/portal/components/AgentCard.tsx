@@ -3,22 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import axios from 'axios'
-import AgentStatusBadge from './AgentStatusBadge'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 interface AgentDeployment {
-  id: string
-  agentType: string
+  id: string; agentType: string
   status: 'ACTIVE' | 'INACTIVE' | 'PAUSED' | 'ERROR'
-  metrics?: {
-    totalLeads?: number
-    leadsToday?: number
-    callsMade?: number
-    appointmentsBooked?: number
-    emailsSent?: number
-    appointmentsToday?: number
-  }
+  metrics?: { totalLeads?: number; leadsToday?: number; callsMade?: number; appointmentsBooked?: number; emailsSent?: number; appointmentsToday?: number }
   updatedAt: string
 }
 
@@ -28,145 +19,82 @@ interface AgentCardProps {
   showConfigure?: boolean
 }
 
-const agentConfig: Record<string, {
-  label: string
-  icon: string
-  metricLabel: string
-  metricKey: string
-  accent: string
-  glow: string
-}> = {
-  LEAD_GENERATION:    { label: 'Lead Generation',    icon: '◎', metricLabel: 'Leads today',        metricKey: 'leadsToday',        accent: '#38bdf8', glow: 'rgba(56,189,248,0.15)' },
-  LINKEDIN_OUTREACH:  { label: 'LinkedIn Outreach',  icon: '⟡', metricLabel: 'Connections sent',   metricKey: 'connectionsSent',   accent: '#6366f1', glow: 'rgba(99,102,241,0.15)' },
-  SOCIAL_MEDIA:       { label: 'Social Media',       icon: '◈', metricLabel: 'Posts published',    metricKey: 'postsPublished',    accent: '#f472b6', glow: 'rgba(244,114,182,0.15)' },
-  SOCIAL_ENGAGEMENT:  { label: 'Social Engagement',  icon: '◇', metricLabel: 'Replies sent',       metricKey: 'repliesSent',       accent: '#c084fc', glow: 'rgba(192,132,252,0.15)' },
-  ADVERTISING:        { label: 'Advertising',        icon: '▲', metricLabel: 'Ads optimised',      metricKey: 'adsOptimised',      accent: '#fb923c', glow: 'rgba(251,146,60,0.15)'  },
-  APPOINTMENT_SETTER: { label: 'Appointment Setter', icon: '◻', metricLabel: 'Appointments today', metricKey: 'appointmentsToday', accent: '#34d399', glow: 'rgba(52,211,153,0.15)'  },
-  VOICE_INBOUND:      { label: 'Voice Inbound',      icon: '⊙', metricLabel: 'Calls answered',     metricKey: 'callsAnswered',     accent: '#818cf8', glow: 'rgba(129,140,248,0.15)' },
-  VOICE_OUTBOUND:     { label: 'Voice Outbound',     icon: '⊚', metricLabel: 'Calls made',         metricKey: 'callsMade',         accent: '#a78bfa', glow: 'rgba(167,139,250,0.15)' },
-  VOICE_CLOSER:       { label: 'Voice Closer',       icon: '◆', metricLabel: 'Deals closed',       metricKey: 'dealsClosed',       accent: '#e879f9', glow: 'rgba(232,121,249,0.15)' },
-  CLIENT_SERVICES:    { label: 'Client Services',    icon: '◉', metricLabel: 'Clients helped',     metricKey: 'clientsHelped',     accent: '#2dd4bf', glow: 'rgba(45,212,191,0.15)'  }
+const STATUS_DOT: Record<string, string> = {
+  ACTIVE: '#22c55e', PAUSED: '#f59e0b', ERROR: '#ef4444', INACTIVE: '#94a3b8'
+}
+const STATUS_LABEL: Record<string, string> = {
+  ACTIVE: 'Active', PAUSED: 'Paused', ERROR: 'Error', INACTIVE: 'Inactive'
+}
+
+const AGENTS: Record<string, { label: string; metricLabel: string; metricKey: string; color: string; iconPath: string }> = {
+  LEAD_GENERATION:    { label: 'Lead Generation',    metricLabel: 'Leads today',    metricKey: 'leadsToday',        color: '#2563eb', iconPath: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+  LINKEDIN_OUTREACH:  { label: 'LinkedIn Outreach',  metricLabel: 'Connections',    metricKey: 'connectionsSent',   color: '#0a66c2', iconPath: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zM4 6a2 2 0 100-4 2 2 0 000 4z' },
+  SOCIAL_MEDIA:       { label: 'Social Media',       metricLabel: 'Posts',          metricKey: 'postsPublished',    color: '#e1306c', iconPath: 'M22 12h-4l-3 9L9 3l-3 9H2' },
+  SOCIAL_ENGAGEMENT:  { label: 'Social Engagement',  metricLabel: 'Replies',        metricKey: 'repliesSent',       color: '#7c3aed', iconPath: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' },
+  ADVERTISING:        { label: 'Advertising',        metricLabel: 'Ads optimised',  metricKey: 'adsOptimised',      color: '#ea580c', iconPath: 'M3 3v18h18M7 16l4-4 4 4 4-4' },
+  APPOINTMENT_SETTER: { label: 'Appointment Setter', metricLabel: 'Appointments',   metricKey: 'appointmentsToday', color: '#059669', iconPath: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+  VOICE_INBOUND:      { label: 'Voice Inbound',      metricLabel: 'Calls answered', metricKey: 'callsAnswered',     color: '#2563eb', iconPath: 'M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z' },
+  VOICE_OUTBOUND:     { label: 'Voice Outbound',     metricLabel: 'Calls made',     metricKey: 'callsMade',         color: '#7c3aed', iconPath: 'M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z' },
+  VOICE_CLOSER:       { label: 'Voice Closer',       metricLabel: 'Deals closed',   metricKey: 'dealsClosed',       color: '#db2777', iconPath: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+  CLIENT_SERVICES:    { label: 'Client Services',    metricLabel: 'Clients helped', metricKey: 'clientsHelped',     color: '#0d9488', iconPath: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
 }
 
 export default function AgentCard({ agent, onStatusChange, showConfigure }: AgentCardProps) {
   const [toggling, setToggling] = useState(false)
-  const config = agentConfig[agent.agentType] || {
-    label: agent.agentType.replace(/_/g, ' '),
-    icon: '◌',
-    metricLabel: 'Actions',
-    metricKey: 'totalLeads',
-    accent: '#6366f1',
-    glow: 'rgba(99,102,241,0.15)'
-  }
-
-  const metricValue = (agent.metrics as Record<string, number | undefined> | undefined)?.[config.metricKey] || 0
+  const cfg = AGENTS[agent.agentType] ?? { label: agent.agentType.replace(/_/g, ' '), metricLabel: 'Actions', metricKey: 'totalLeads', color: '#2563eb', iconPath: 'M12 12m-9 0a9 9 0 1018 0 9 9 0 01-18 0' }
+  const metricValue = (agent.metrics as Record<string, number | undefined> | undefined)?.[cfg.metricKey] ?? 0
 
   async function handleToggle() {
     setToggling(true)
-    const token = localStorage.getItem('token') || ''
     const action = agent.status === 'ACTIVE' ? 'pause' : 'resume'
     try {
-      await axios.post(`${API_URL}/agents/${agent.id}/${action}`, {}, { headers: { Authorization: `Bearer ${token}` } })
-      const newStatus = action === 'pause' ? 'PAUSED' : 'ACTIVE'
-      onStatusChange?.(agent.id, newStatus)
-    } catch (err) {
-      console.error('Failed to toggle agent:', err)
-    } finally {
-      setToggling(false)
-    }
+      await axios.post(`${API_URL}/agents/${agent.id}/${action}`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } })
+      onStatusChange?.(agent.id, action === 'pause' ? 'PAUSED' : 'ACTIVE')
+    } catch { /* silent */ } finally { setToggling(false) }
   }
 
   return (
-    <div
-      className="relative rounded-2xl overflow-hidden transition-all duration-300 group cursor-default"
-      style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-      }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.10)`
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)'
-      }}
-    >
-      {/* Colored accent line at top */}
-      <div className="h-[2px] w-full" style={{ background: `linear-gradient(90deg, ${config.accent}, transparent)` }} />
-
-      {/* Ambient glow */}
-      <div
-        className="absolute top-0 left-0 right-0 h-24 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-        style={{ background: `radial-gradient(ellipse 70% 60% at 20% 0%, ${config.glow} 0%, transparent 70%)` }}
-      />
-
-      <div className="relative p-5">
-        {/* Header row */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center text-lg font-bold flex-shrink-0"
-              style={{ background: `${config.accent}18`, border: `1px solid ${config.accent}28`, color: config.accent }}
-            >
-              {config.icon}
-            </div>
-            <AgentStatusBadge status={agent.status} size="sm" />
-          </div>
-
-          {/* Toggle switch */}
-          <button
-            onClick={handleToggle}
-            disabled={toggling || agent.status === 'ERROR' || agent.status === 'INACTIVE'}
-            className="relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 focus:outline-none disabled:opacity-40"
-            style={{
-              background: agent.status === 'ACTIVE' ? config.accent : 'rgba(255,255,255,0.10)',
-              boxShadow: agent.status === 'ACTIVE' ? `0 0 10px ${config.glow}` : 'none'
-            }}
-            title={agent.status === 'ACTIVE' ? 'Pause agent' : 'Resume agent'}
-          >
-            <span
-              className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200"
-              style={{ transform: agent.status === 'ACTIVE' ? 'translateX(18px)' : 'translateX(3px)' }}
-            />
-          </button>
+    <div className="theme-card rounded-xl p-4">
+      {/* Top row: icon + name + toggle */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${cfg.color}15`, color: cfg.color }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+            <path d={cfg.iconPath} />
+          </svg>
         </div>
-
-        {/* Agent name */}
-        <h3 className="text-sm font-semibold text-white mb-4">{config.label} Agent</h3>
-
-        {/* Metrics */}
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-widest font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.30)' }}>
-              {config.metricLabel}
-            </p>
-            <p className="num text-2xl font-bold text-white" style={{ letterSpacing: '-0.02em' }}>
-              {metricValue.toLocaleString()}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.25)' }}>Total leads</p>
-            <p className="num text-base font-semibold" style={{ color: 'rgba(255,255,255,0.65)' }}>
-              {(agent.metrics?.totalLeads || 0).toLocaleString()}
-            </p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{cfg.label}</p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_DOT[agent.status] }} />
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{STATUS_LABEL[agent.status]}</span>
           </div>
         </div>
+        <button
+          onClick={handleToggle}
+          disabled={toggling || agent.status === 'ERROR' || agent.status === 'INACTIVE'}
+          className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 flex-shrink-0"
+          style={{ background: agent.status === 'ACTIVE' ? cfg.color : 'var(--border-card)' }}
+        >
+          <span className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"
+            style={{ transform: agent.status === 'ACTIVE' ? 'translateX(18px)' : 'translateX(3px)' }} />
+        </button>
+      </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.22)' }}>
-            {new Date(agent.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-          </p>
-          {showConfigure && (
-            <Link
-              href={`/dashboard/agents/${agent.id}/configure`}
-              className="text-xs font-medium transition-colors"
-              style={{ color: config.accent }}
-            >
-              Configure →
-            </Link>
-          )}
+      {/* Metric row */}
+      <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--border-card)' }}>
+        <div>
+          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{cfg.metricLabel}</p>
+          <p className="num text-lg font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{metricValue.toLocaleString()}</p>
         </div>
+        <div className="text-right">
+          <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Total</p>
+          <p className="num text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>{(agent.metrics?.totalLeads ?? 0).toLocaleString()}</p>
+        </div>
+        {showConfigure && (
+          <Link href={`/dashboard/agents/${agent.id}/configure`} className="text-xs font-medium" style={{ color: cfg.color }}>
+            Configure →
+          </Link>
+        )}
       </div>
     </div>
   )
