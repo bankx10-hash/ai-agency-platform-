@@ -21,6 +21,12 @@ function retellAuth(req: Request, res: Response, next: () => void) {
   next()
 }
 
+// Retell sends tool calls as { name, call, args: {...} } by default.
+// Extract args from either nested or root level for compatibility.
+function extractArgs(body: Record<string, any>): Record<string, any> {
+  return body.args && typeof body.args === 'object' ? body.args : body
+}
+
 // POST /calendar/:clientId/availability
 // Returns available appointment slots as text suitable for the voice agent to read aloud.
 // Retell tool calling always sends POST regardless of the operation.
@@ -52,12 +58,14 @@ router.post('/:clientId/availability', retellAuth, async (req: Request, res: Res
 // Body: { start_time: string, caller_name: string, caller_email: string, caller_phone?: string }
 router.post('/:clientId/book', retellAuth, async (req: Request, res: Response): Promise<void> => {
   const { clientId } = req.params
-  const { start_time, caller_name, caller_email, caller_phone } = req.body as {
+  const args = extractArgs(req.body)
+  const { start_time, caller_name, caller_email, caller_phone } = args as {
     start_time: string
     caller_name: string
     caller_email: string
     caller_phone?: string
   }
+  logger.info('Calendar book endpoint called', { clientId, hasArgs: !!req.body.args, start_time, caller_name, caller_email })
 
   if (!start_time || !caller_name || !caller_email) {
     res.json({ result: 'I need your name, email address, and preferred time to complete the booking. Could you confirm those details?' })

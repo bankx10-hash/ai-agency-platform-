@@ -117,11 +117,12 @@ Respond naturally as if in a real phone conversation.`
       {
         type: 'custom',
         name: 'check_availability',
-        description: 'Check available appointment times in the calendar. Call this when the caller wants to book an appointment.',
+        description: 'Check available appointment times in the calendar. Call this IMMEDIATELY when the caller mentions booking, appointments, or scheduling. Do NOT make up times — you MUST call this tool to get real availability.',
         url: `${apiBaseUrl}/calendar/${clientId}/availability`,
         speak_during_execution: true,
-        speak_after_execution: false,
+        speak_after_execution: true,
         execution_message_description: "Let me check our available appointment times for you...",
+        timeout_ms: 15000,
         parameters: {
           type: 'object',
           properties: {},
@@ -131,11 +132,12 @@ Respond naturally as if in a real phone conversation.`
       {
         type: 'custom',
         name: 'book_appointment',
-        description: 'Book an appointment for the caller once they have confirmed a time slot. Requires their name, email, and chosen start time in ISO 8601 format.',
+        description: 'Book an appointment for the caller. You MUST call this tool to actually create the booking — do NOT pretend the booking is done without calling this tool. Requires the caller name, email, and chosen start time.',
         url: `${apiBaseUrl}/calendar/${clientId}/book`,
         speak_during_execution: true,
-        speak_after_execution: false,
+        speak_after_execution: true,
         execution_message_description: "Let me lock that appointment in for you...",
+        timeout_ms: 15000,
         parameters: {
           type: 'object',
           properties: {
