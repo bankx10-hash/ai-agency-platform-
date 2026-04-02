@@ -62,6 +62,7 @@ export interface RetellTool {
   speak_during_execution: boolean
   speak_after_execution: boolean
   execution_message_description: string
+  timeout_ms?: number
   parameters: {
     type: 'object'
     properties: Record<string, { type: string; description: string }>
