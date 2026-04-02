@@ -250,7 +250,7 @@ export class VoiceService {
         await retellApi.post('/import-phone-number', {
           phone_number: phoneNumber,
           termination_uri: terminationUri,
-          inbound_agent_id: agentId,
+          inbound_agents: [{ agent_id: agentId, weight: 1 }],
           nickname: `${businessName} - ${clientId}`
         })
         logger.info('AU number imported to Retell and linked to agent', { phoneNumber, clientId })
@@ -265,7 +265,7 @@ export class VoiceService {
         // US/CA: Retell auto-provisions via Twilio
         const phoneRes = await retellApi.post('/create-phone-number', {
           area_code: 512,
-          inbound_agent_id: agentId,
+          inbound_agents: [{ agent_id: agentId, weight: 1 }],
           nickname: `${businessName} - ${clientId}`,
           twilio_account_sid: TWILIO_ACCOUNT_SID,
           twilio_auth_token: TWILIO_AUTH_TOKEN
