@@ -169,6 +169,7 @@ Respond naturally as if in a real phone conversation.`
         callWebhook: `${process.env.API_URL || 'https://api.nodusaisystems.com'}/calls/webhook`,
         country: typedConfig.country || 'AU',
         tools: calendarTools.length > 0 ? calendarTools : undefined,
+        existingPhoneNumber: (config as Record<string, any>).existingPhoneNumber,
         address: typedConfig.address
       })
 

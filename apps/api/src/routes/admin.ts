@@ -433,12 +433,29 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
     }
 
     // Find existing deployments BEFORE deleting so we can clean up N8N
+    // and preserve phone numbers / Retell agent IDs for reuse
     const existingDeployments = await prisma.agentDeployment.findMany({
       where: { clientId, agentType: agentType as never },
-      select: { n8nWorkflowId: true }
+      select: { n8nWorkflowId: true, retellAgentId: true, config: true }
     })
 
-    // Delete the N8N workflow(s) by ID — reliable, no name-matching ambiguity
+    // Extract existing phone number and Retell agent ID to avoid re-purchasing
+    let existingPhoneNumber: string | undefined
+    let existingRetellAgentId: string | undefined
+    for (const dep of existingDeployments) {
+      const depConfig = dep.config as Record<string, any> | null
+      if (depConfig?.phone_number) existingPhoneNumber = depConfig.phone_number
+      if (dep.retellAgentId) existingRetellAgentId = dep.retellAgentId
+    }
+
+    if (existingPhoneNumber) {
+      logger.info('Reusing existing phone number on redeploy', { clientId, agentType, phone: existingPhoneNumber })
+    }
+    if (existingRetellAgentId) {
+      logger.info('Will clean up old Retell agent on redeploy', { clientId, agentType, retellAgentId: existingRetellAgentId })
+    }
+
+    // Delete the N8N workflow(s) by ID
     for (const dep of existingDeployments) {
       if (dep.n8nWorkflowId) {
         await n8nService.deleteWorkflow(dep.n8nWorkflowId).catch(err =>
@@ -449,8 +466,15 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
       }
     }
 
-    // Also sweep by name in case a workflow exists without a matching DB record
-    // (e.g. a previously failed deployment that partially created an N8N workflow)
+    // Delete old Retell agent (LLM + agent) but NOT the phone number
+    if (existingRetellAgentId) {
+      const { voiceService } = await import('../services/voice.service')
+      await voiceService.deleteAgent(existingRetellAgentId).catch(err =>
+        logger.warn('Could not delete old Retell agent on redeploy', { clientId, retellAgentId: existingRetellAgentId, err })
+      )
+    }
+
+    // Sweep N8N by name in case of orphaned workflows
     await n8nService.deleteAllClientWorkflowsByType(clientId, agentType).catch(err =>
       logger.warn('N8N name-sweep cleanup failed (non-fatal)', { clientId, agentType, err })
     )
@@ -463,6 +487,8 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
       locationId: '',
       businessName: client.businessName,
       country: client.country || 'AU',
+      // Pass existing phone number so deploy() skips purchasing a new one
+      existingPhoneNumber,
       ...config
     }
 

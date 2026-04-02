@@ -80,6 +80,7 @@ export interface CreateInboundAgentParams {
   callWebhook?: string
   country?: string
   tools?: RetellTool[]
+  existingPhoneNumber?: string
   address?: {
     street: string
     city: string
@@ -125,7 +126,7 @@ export class VoiceService {
   }
 
   async createInboundAgent(params: CreateInboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, callWebhook, country, tools, address } = params
+    const { prompt, voice, firstSentence, clientId, businessName, transferNumber, callWebhook, country, tools, address, existingPhoneNumber } = params
     const clientCountry = (country || 'AU').toUpperCase()
 
     // Step 1: create the LLM with the system prompt (and optional tools)
@@ -150,7 +151,20 @@ export class VoiceService {
     let phoneNumber: string | undefined
     const provisionNumbers = process.env.VOICE_PROVISION_NUMBERS !== 'false'
 
-    if (!provisionNumbers) {
+    // Reuse existing phone number on redeploy — just re-link to new agent in Retell
+    if (existingPhoneNumber) {
+      phoneNumber = existingPhoneNumber
+      logger.info('Reusing existing phone number — updating Retell agent link', { clientId, phoneNumber, agentId })
+
+      try {
+        await retellApi.patch(`/update-phone-number/${encodeURIComponent(phoneNumber)}`, {
+          inbound_agents: [{ agent_id: agentId, weight: 1 }]
+        })
+        logger.info('Phone number re-linked to new Retell agent', { clientId, phoneNumber, agentId })
+      } catch (relinkErr) {
+        logger.error('Failed to re-link phone number to new agent', { clientId, phoneNumber, agentId, error: relinkErr })
+      }
+    } else if (!provisionNumbers) {
       logger.info('Phone number provisioning disabled (VOICE_PROVISION_NUMBERS=false)', { clientId })
     } else try {
       if (clientCountry === 'AU') {
