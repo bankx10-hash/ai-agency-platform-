@@ -215,10 +215,12 @@ router.post('/sync', async (req: Request, res: Response) => {
 
     for (const { retellAgentId } of agentRows) {
       try {
-        const listRes = await retellApi.get('/list-calls', {
-          params: { agent_id: retellAgentId, limit: 200, sort_order: 'descending' }
+        const listRes = await retellApi.post('/v2/list-calls', {
+          filter_criteria: { agent_id: [retellAgentId] },
+          limit: 200,
+          sort_order: 'descending'
         })
-        const calls: any[] = Array.isArray(listRes.data) ? listRes.data : (listRes.data?.calls || [])
+        const calls: any[] = Array.isArray(listRes.data) ? listRes.data : []
 
         for (const call of calls) {
           if (!call.call_id) continue

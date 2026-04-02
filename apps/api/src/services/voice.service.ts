@@ -335,7 +335,7 @@ export class VoiceService {
   }
 
   async getCallTranscript(callId: string): Promise<string> {
-    const res = await retellApi.get(`/get-call/${callId}`)
+    const res = await retellApi.get(`/v2/get-call/${callId}`)
     const transcript = res.data.transcript || ''
     return transcript
   }
