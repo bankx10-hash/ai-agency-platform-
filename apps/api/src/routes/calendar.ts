@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import axios from 'axios'
 import { calendarService } from '../services/calendar.service'
+import { emailService } from '../services/email.service'
 import { logger } from '../utils/logger'
 
 const router = Router()
@@ -76,22 +77,49 @@ router.post('/:clientId/book', retellAuth, async (req: Request, res: Response): 
 
     res.json({ result: result.confirmationMessage, booked: result.booked, eventLink: result.eventLink })
 
-    // Notify N8N workflow so it sends branded confirmation email + logs metrics
-    if (result.booked) {
+    // Notify N8N workflow for ALL booking attempts (booked or link sent)
+    // N8N handles confirmation email + appointment metrics logging
+    if (result.success !== false && caller_email) {
       const n8nBase = process.env.N8N_BASE_URL || process.env.N8N_WEBHOOK_BASE
       if (n8nBase) {
-        axios.post(`${n8nBase}/webhook/voice-calendar-${clientId}`, {
+        const webhookUrl = `${n8nBase}/webhook/voice-calendar-${clientId}`
+        logger.info('Sending N8N calendar webhook', { webhookUrl, clientId, caller_email, booked: result.booked })
+        axios.post(webhookUrl, {
           contactName: caller_name,
           contactEmail: caller_email,
           contactPhone: caller_phone,
           startTime: start_time,
           businessName,
           eventLink: result.eventLink,
+          booked: result.booked,
           bookedAt: new Date().toISOString(),
         }).then(() => {
-          logger.info('N8N calendar webhook notified', { clientId, caller_email })
+          logger.info('N8N calendar webhook notified successfully', { clientId, caller_email })
         }).catch((err) => {
-          logger.warn('N8N calendar webhook failed — email may not send', { clientId, error: err.message })
+          logger.error('N8N calendar webhook FAILED', { clientId, webhookUrl, error: err.message, status: err.response?.status, data: err.response?.data })
+        })
+      } else {
+        logger.error('N8N_BASE_URL not set — cannot notify N8N of booking', { clientId })
+      }
+
+      // Direct email fallback — ensures confirmation email is sent even if N8N fails
+      if (result.booked && caller_email) {
+        const time = new Date(start_time).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        emailService.sendSystemEmail(
+          caller_email,
+          `Appointment confirmed with ${businessName}`,
+          `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">` +
+          `<div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:10px;text-align:center;margin-bottom:30px">` +
+          `<h1 style="color:white;margin:0">Appointment Confirmed!</h1></div>` +
+          `<p style="font-size:16px;color:#333">Hi ${caller_name},</p>` +
+          `<p style="font-size:16px;color:#333">Your appointment with <strong>${businessName}</strong> is confirmed for <strong>${time}</strong>.</p>` +
+          `<p style="font-size:16px;color:#333">A calendar invitation has been sent to your email.</p>` +
+          (result.eventLink ? `<div style="text-align:center;margin:30px 0"><a href="${result.eventLink}" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 30px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:bold">View Calendar Event</a></div>` : '') +
+          `<p style="font-size:14px;color:#666">We look forward to seeing you!<br><strong>The ${businessName} Team</strong></p></div>`
+        ).then(() => {
+          logger.info('Direct booking confirmation email sent', { clientId, caller_email })
+        }).catch((err) => {
+          logger.error('Direct booking confirmation email failed', { clientId, caller_email, error: err.message })
         })
       }
     }
