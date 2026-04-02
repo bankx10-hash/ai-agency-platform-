@@ -448,8 +448,16 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
       if (dep.retellAgentId) existingRetellAgentId = dep.retellAgentId
     }
 
+    // Log what we found in the existing deployment config for debugging
+    for (const dep of existingDeployments) {
+      const depConfig = dep.config as Record<string, any> | null
+      logger.info('Existing deployment config keys', { clientId, keys: depConfig ? Object.keys(depConfig) : 'null', phone_number: depConfig?.phone_number })
+    }
+
     if (existingPhoneNumber) {
       logger.info('Reusing existing phone number on redeploy', { clientId, agentType, phone: existingPhoneNumber })
+    } else {
+      logger.warn('No existing phone number found — will provision new number', { clientId, agentType })
     }
     if (existingRetellAgentId) {
       logger.info('Will clean up old Retell agent on redeploy', { clientId, agentType, retellAgentId: existingRetellAgentId })
