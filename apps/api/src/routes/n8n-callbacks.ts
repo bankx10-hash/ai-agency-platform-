@@ -750,7 +750,7 @@ MANDATORY PRINCIPLES — every single post must have ALL of these:
       system: systemPrompt,
       messages: [{
         role: 'user',
-        content: `${userMessage}.\n\nPlatforms: ${platformList.join(', ')}.\n\nReturn a single JSON object with keys for each platform. Each value must be an object with:\n- content: the full post text ready to copy-paste\n- hashtags: array of hashtag strings (with # prefix)\n- image_prompt: A prompt for AI image generation that pairs with this post. STYLE RULES: professional business photography OR bold graphic design — NOT cinematic, NOT dramatic film lighting, NOT artistic/abstract. Use: real business scenarios, confident professionals, clean modern workspaces, bold text-on-gradient backgrounds, or flat-design infographic styles. The image must look native and credible on the platform, not like a movie poster.\n\nOnly include the platforms listed. Return valid JSON only, no markdown code blocks.`
+        content: `${userMessage}.\n\nPlatforms: ${platformList.join(', ')}.\n\nReturn a single JSON object with keys for each platform. Each value must be an object with:\n- content: the full post text ready to copy-paste\n- hashtags: array of hashtag strings (with # prefix)\n- image_prompt: A prompt for AI image generation that pairs with this post.\n\nIMAGE PROMPT RULES (STRICT — follow every single one):\n1. ABSOLUTELY NO TEXT, WORDS, LETTERS, NUMBERS, OR WRITING of any kind in the image. Never include text overlays, captions, titles, quotes, watermarks, logos with text, or any written characters. This is the #1 rule.\n2. Style: clean, high-end PHOTOGRAPHY only. Real people in real business settings. Think: premium stock photography that a Fortune 500 company would use.\n3. Subject ideas: confident professional at a modern desk, team collaborating in a bright office, entrepreneur on a phone call smiling, person using a laptop in a clean workspace, handshake between professionals, aerial view of a modern office.\n4. Lighting: bright, natural, soft diffused light. NO dramatic shadows, NO moody lighting, NO neon, NO cinematic color grading.\n5. Color palette: clean whites, light grays, soft blues, natural tones. NO dark/grungy aesthetics.\n6. Composition: simple, uncluttered, one clear subject with shallow depth of field.\n7. NEVER: text overlays, infographics, charts, diagrams, illustrations, cartoons, AI-looking renders, stock photo watermarks, collages, split screens.\n8. The image should look like it was taken by a professional photographer for a business magazine.\n\nOnly include the platforms listed. Return valid JSON only, no markdown code blocks.`
       }]
     })
 
@@ -789,9 +789,9 @@ router.post('/:clientId/social/generate-images', async (req, res) => {
 
       // Fal AI — flux/dev model, aspect ratio based on platform
       const aspectRatio = platform === 'instagram' ? '1:1' : '16:9'
-      // Append style reinforcement to prevent cinematic/dramatic defaults from Flux
-      const styleGuide = ', professional business photography style, clean modern design, sharp lighting, NOT cinematic, NOT film grain, NOT dramatic'
-      const styledPrompt = (prompt.substring(0, 900) + styleGuide).substring(0, 1000)
+      // Append style reinforcement — no text/writing, professional photography only
+      const styleGuide = ', professional business photography, clean bright natural lighting, shallow depth of field, modern office setting, NO TEXT, NO WORDS, NO LETTERS, NO WRITING, NO LOGOS, NO WATERMARKS, NO CAPTIONS, NO OVERLAYS, no cinematic look, no film grain, no dramatic lighting, no illustrations, no cartoons, no infographics'
+      const styledPrompt = (prompt.substring(0, 800) + styleGuide).substring(0, 1000)
       const response = await axios.post(
         'https://fal.run/fal-ai/flux/dev',
         {
