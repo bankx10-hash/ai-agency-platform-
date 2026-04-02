@@ -72,27 +72,36 @@ export default function DashboardPage() {
         const token = localStorage.getItem('token') || (session as { accessToken?: string })?.accessToken || ''
         if (!clientId) return
 
-        const [clientRes, agentsRes, connectionsRes] = await Promise.all([
-          axios.get(`${API_URL}/clients/${clientId}`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${API_URL}/clients/${clientId}/agents`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${API_URL}/onboarding/${clientId}/connections`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: { connected: {} } }))
+        const headers = { Authorization: `Bearer ${token}` }
+        const [clientRes, agentsRes, connectionsRes, callStatsRes] = await Promise.all([
+          axios.get(`${API_URL}/clients/${clientId}`, { headers }),
+          axios.get(`${API_URL}/clients/${clientId}/agents`, { headers }),
+          axios.get(`${API_URL}/onboarding/${clientId}/connections`, { headers }).catch(() => ({ data: { connected: {} } })),
+          axios.get(`${API_URL}/calls/stats`, { headers }).catch(() => ({ data: { total: 0, today: 0, appointmentsBooked: 0 } }))
         ])
 
         const clientData = clientRes.data.client
         if (clientData.status === 'PENDING') { router.push(`/onboarding/connect?clientId=${clientId}`); return }
 
         const agentsData: AgentDeployment[] = agentsRes.data.agents
+        const callStats = callStatsRes.data
         setBusinessName(clientData.businessName)
         setAgents(agentsData)
         setConnections((connectionsRes.data as { connected: Record<string, boolean> }).connected || {})
 
         setMetrics(agentsData.reduce((acc, a) => ({
           leadsToday:         acc.leadsToday + (a.metrics?.leadsToday ?? 0),
-          callsMade:          acc.callsMade + (a.metrics?.callsMade ?? 0),
-          appointmentsBooked: acc.appointmentsBooked + (a.metrics?.appointmentsBooked ?? 0),
+          callsMade:          acc.callsMade,
+          appointmentsBooked: acc.appointmentsBooked,
           emailsSent:         acc.emailsSent + (a.metrics?.emailsSent ?? 0),
           activeAgents:       acc.activeAgents + (a.status === 'ACTIVE' ? 1 : 0)
-        }), { leadsToday: 0, callsMade: 0, appointmentsBooked: 0, emailsSent: 0, activeAgents: 0 }))
+        }), {
+          leadsToday: 0,
+          callsMade: callStats.total || 0,
+          appointmentsBooked: callStats.appointmentsBooked || 0,
+          emailsSent: 0,
+          activeAgents: 0
+        }))
       } catch (err) { console.error(err) } finally { setLoading(false) }
     }
     fetchData()
