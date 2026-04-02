@@ -554,4 +554,57 @@ router.post('/test-digest', async (_req: Request, res: Response): Promise<void> 
   }
 })
 
+// GET /admin/test-email?to=you@example.com
+// Diagnostic endpoint — tests Resend email delivery and returns full response
+router.get('/test-email', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  const to = (req.query.to as string) || ''
+  if (!to) {
+    res.status(400).json({ error: 'Provide ?to=email@example.com' })
+    return
+  }
+
+  const resendApiKey = process.env.SMTP_PASSWORD
+  const from = process.env.SMTP_FROM || 'Nodus AI Systems <hello@nodusaisystems.com>'
+
+  if (!resendApiKey) {
+    res.status(500).json({ error: 'SMTP_PASSWORD (Resend API key) is not set', env_keys: Object.keys(process.env).filter(k => k.includes('SMTP') || k.includes('RESEND')) })
+    return
+  }
+
+  try {
+    const payload = {
+      from,
+      to,
+      subject: 'Nodus AI — Email Test',
+      html: '<h1>Email is working!</h1><p>This is a test from the Nodus AI platform.</p>'
+    }
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    const body = await response.text()
+
+    res.json({
+      status: response.status,
+      ok: response.ok,
+      resendResponse: body,
+      config: {
+        from,
+        to,
+        keyPrefix: resendApiKey.slice(0, 8) + '...',
+        keyLength: resendApiKey.length
+      }
+    })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    res.status(500).json({ error: msg })
+  }
+})
+
 export default router
