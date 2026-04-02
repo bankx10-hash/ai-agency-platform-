@@ -109,27 +109,6 @@ router.post('/:clientId/book', retellAuth, async (req: Request, res: Response): 
       } else {
         logger.error('N8N_BASE_URL not set — cannot notify N8N of booking', { clientId })
       }
-
-      // Direct email fallback — ensures confirmation email is sent even if N8N fails
-      if (result.booked && caller_email) {
-        const time = new Date(start_time).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-        emailService.sendSystemEmail(
-          caller_email,
-          `Appointment confirmed with ${businessName}`,
-          `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">` +
-          `<div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:10px;text-align:center;margin-bottom:30px">` +
-          `<h1 style="color:white;margin:0">Appointment Confirmed!</h1></div>` +
-          `<p style="font-size:16px;color:#333">Hi ${caller_name},</p>` +
-          `<p style="font-size:16px;color:#333">Your appointment with <strong>${businessName}</strong> is confirmed for <strong>${time}</strong>.</p>` +
-          `<p style="font-size:16px;color:#333">A calendar invitation has been sent to your email.</p>` +
-          (result.eventLink ? `<div style="text-align:center;margin:30px 0"><a href="${result.eventLink}" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 30px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:bold">View Calendar Event</a></div>` : '') +
-          `<p style="font-size:14px;color:#666">We look forward to seeing you!<br><strong>The ${businessName} Team</strong></p></div>`
-        ).then(() => {
-          logger.info('Direct booking confirmation email sent', { clientId, caller_email })
-        }).catch((err) => {
-          logger.error('Direct booking confirmation email failed', { clientId, caller_email, error: err.message })
-        })
-      }
     }
   } catch (error) {
     logger.error('Calendar booking failed', { clientId, error })
