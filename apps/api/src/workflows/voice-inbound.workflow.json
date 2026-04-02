@@ -209,6 +209,58 @@
         "path": "voice-calendar-{{CLIENT_ID}}",
         "responseMode": "onReceived"
       }
+    },
+    {
+      "id": "build-calendar-confirmation",
+      "name": "Build Calendar Confirmation Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 600],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\nconst name = body.contactName || body.caller_name || 'there';\nconst email = body.contactEmail || body.caller_email || '';\nconst startTime = body.startTime || body.start_time || '';\nconst businessName = body.businessName || '{{BUSINESS_NAME}}';\nconst eventLink = body.eventLink || '';\nif (!email) return [];\nconst formattedTime = startTime ? new Date(startTime).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'as discussed';\nconst html = '<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px\">'\n  + '<div style=\"background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;border-radius:10px;text-align:center;margin-bottom:30px\">'\n  + '<h1 style=\"color:white;margin:0\">Appointment Confirmed!</h1></div>'\n  + '<p style=\"font-size:16px;color:#333\">Hi ' + name + ',</p>'\n  + '<p style=\"font-size:16px;color:#333\">Your appointment with <strong>' + businessName + '</strong> has been confirmed for <strong>' + formattedTime + '</strong>.</p>'\n  + '<p style=\"font-size:16px;color:#333\">A calendar invitation has been sent to your email.</p>'\n  + (eventLink ? '<div style=\"text-align:center;margin:30px 0\"><a href=\"' + eventLink + '\" style=\"background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 30px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:bold\">View Calendar Event</a></div>' : '')\n  + '<p style=\"font-size:14px;color:#666\">If you need to reschedule, please reply to this email or call us directly.</p>'\n  + '<p style=\"font-size:14px;color:#666\">We look forward to seeing you!<br><strong>The ' + businessName + ' Team</strong></p></div>';\nreturn [{ json: { to: email, subject: 'Appointment confirmed with ' + businessName, html, contactName: name, contactEmail: email, startTime, eventLink } }];"
+      }
+    },
+    {
+      "id": "send-calendar-confirmation",
+      "name": "Send Calendar Confirmation Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 600],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $json.to, subject: $json.subject, body: $json.html }) }}"
+      }
+    },
+    {
+      "id": "log-appointment-metric",
+      "name": "Log Appointment to Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 600],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactName: $('Build Calendar Confirmation Email').first().json.contactName, contactEmail: $('Build Calendar Confirmation Email').first().json.contactEmail, startTime: $('Build Calendar Confirmation Email').first().json.startTime, title: 'Inbound Call Booking' }) }}"
+      }
     }
   ],
   "connections": {
@@ -251,7 +303,13 @@
       "main": [[{ "node": "Send Booking Link Email", "type": "main", "index": 0 }]]
     },
     "Calendar Booking Webhook": {
-      "main": [[]]
+      "main": [[{ "node": "Build Calendar Confirmation Email", "type": "main", "index": 0 }]]
+    },
+    "Build Calendar Confirmation Email": {
+      "main": [[{ "node": "Send Calendar Confirmation Email", "type": "main", "index": 0 }]]
+    },
+    "Send Calendar Confirmation Email": {
+      "main": [[{ "node": "Log Appointment to Dashboard", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import axios from 'axios'
 import { calendarService } from '../services/calendar.service'
 import { logger } from '../utils/logger'
 
@@ -74,6 +75,26 @@ router.post('/:clientId/book', retellAuth, async (req: Request, res: Response): 
     )
 
     res.json({ result: result.confirmationMessage, booked: result.booked, eventLink: result.eventLink })
+
+    // Notify N8N workflow so it sends branded confirmation email + logs metrics
+    if (result.booked) {
+      const n8nBase = process.env.N8N_BASE_URL || process.env.N8N_WEBHOOK_BASE
+      if (n8nBase) {
+        axios.post(`${n8nBase}/webhook/voice-calendar-${clientId}`, {
+          contactName: caller_name,
+          contactEmail: caller_email,
+          contactPhone: caller_phone,
+          startTime: start_time,
+          businessName,
+          eventLink: result.eventLink,
+          bookedAt: new Date().toISOString(),
+        }).then(() => {
+          logger.info('N8N calendar webhook notified', { clientId, caller_email })
+        }).catch((err) => {
+          logger.warn('N8N calendar webhook failed — email may not send', { clientId, error: err.message })
+        })
+      }
+    }
   } catch (error) {
     logger.error('Calendar booking failed', { clientId, error })
     res.json({ result: 'I was unable to complete the booking right now. I will have someone from the team follow up with you to confirm.' })
