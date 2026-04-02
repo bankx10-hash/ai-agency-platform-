@@ -607,4 +607,99 @@ router.get('/test-email', adminAuth, async (req: Request, res: Response): Promis
   }
 })
 
+// GET /admin/diagnose-voice/:clientId
+// Check the deployed Retell agent's config — tools, LLM, phone number
+router.get('/diagnose-voice/:clientId', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  const { clientId } = req.params
+  const retellApiKey = process.env.RETELL_API_KEY
+
+  try {
+    // Get agent deployment from DB
+    const deployment = await prisma.agentDeployment.findFirst({
+      where: { clientId, agentType: 'VOICE_INBOUND' as never },
+      select: { id: true, status: true, config: true, n8nWorkflowId: true }
+    })
+
+    if (!deployment) {
+      res.json({ error: 'No VOICE_INBOUND deployment found', clientId })
+      return
+    }
+
+    const config = deployment.config as Record<string, unknown>
+    const retellAgentId = config?.retellAgentId || config?.retell_agent_id
+
+    // Check calendar provider
+    const { calendarService } = await import('../services/calendar.service')
+    const calendarProvider = await calendarService.getCalendarProvider(clientId)
+
+    // Check Retell agent
+    let retellAgent = null
+    let retellLlm = null
+    if (retellAgentId && retellApiKey) {
+      try {
+        const agentRes = await fetch(`https://api.retellai.com/get-agent/${retellAgentId}`, {
+          headers: { Authorization: `Bearer ${retellApiKey}` }
+        })
+        retellAgent = await agentRes.json()
+
+        // Get LLM config
+        const llmId = retellAgent?.response_engine?.llm_id
+        if (llmId) {
+          const llmRes = await fetch(`https://api.retellai.com/get-retell-llm/${llmId}`, {
+            headers: { Authorization: `Bearer ${retellApiKey}` }
+          })
+          retellLlm = await llmRes.json()
+        }
+      } catch (err) {
+        retellAgent = { error: String(err) }
+      }
+    }
+
+    // Check N8N workflow
+    let n8nWorkflow = null
+    if (deployment.n8nWorkflowId) {
+      try {
+        const { n8nService: n8n } = await import('../services/n8n.service')
+        const verification = await n8n.verifyDeployment(deployment.n8nWorkflowId)
+        n8nWorkflow = verification
+      } catch (err) {
+        n8nWorkflow = { error: String(err) }
+      }
+    }
+
+    res.json({
+      clientId,
+      deployment: { id: deployment.id, status: deployment.status, n8nWorkflowId: deployment.n8nWorkflowId },
+      retellAgentId,
+      calendarProvider,
+      retellAgent: {
+        agent_name: retellAgent?.agent_name,
+        voice_id: retellAgent?.voice_id,
+        webhook_url: retellAgent?.webhook_url,
+        llm_id: retellAgent?.response_engine?.llm_id,
+      },
+      retellLlm: {
+        model: retellLlm?.model,
+        toolCount: retellLlm?.general_tools?.length || 0,
+        tools: retellLlm?.general_tools?.map((t: Record<string, unknown>) => ({
+          name: t.name,
+          type: t.type,
+          url: t.url,
+        })),
+        promptPreview: retellLlm?.general_prompt?.substring(0, 200) + '...',
+      },
+      n8nWorkflow,
+      envCheck: {
+        API_BASE_URL: process.env.API_BASE_URL ? 'SET' : 'MISSING',
+        API_URL: process.env.API_URL ? 'SET' : 'MISSING',
+        N8N_BASE_URL: process.env.N8N_BASE_URL ? 'SET' : 'MISSING',
+        RETELL_API_KEY: retellApiKey ? 'SET' : 'MISSING',
+      }
+    })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    res.status(500).json({ error: msg })
+  }
+})
+
 export default router
