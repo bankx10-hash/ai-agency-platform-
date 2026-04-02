@@ -718,8 +718,19 @@ export class N8NService {
     const createResponse = await this.client.post('/workflows', deployPayload)
     const workflowId = createResponse.data.id
 
-    // Activate the workflow
-    await this.client.post(`/workflows/${workflowId}/activate`)
+    // Activate the workflow — deactivate first to ensure clean webhook registration
+    try {
+      await this.client.post(`/workflows/${workflowId}/deactivate`).catch(() => {})
+      await new Promise(r => setTimeout(r, 1000))
+      await this.client.post(`/workflows/${workflowId}/activate`)
+      // Give N8N time to register webhook URLs
+      await new Promise(r => setTimeout(r, 3000))
+    } catch (activationErr) {
+      logger.error('Workflow activation failed, retrying once', { workflowId, error: activationErr })
+      await new Promise(r => setTimeout(r, 2000))
+      await this.client.post(`/workflows/${workflowId}/activate`)
+      await new Promise(r => setTimeout(r, 3000))
+    }
 
     logger.info('N8N workflow deployed, running post-deployment verification', {
       workflowId, templateName, clientId: clientConfig.clientId
