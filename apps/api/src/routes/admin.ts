@@ -633,22 +633,21 @@ router.get('/diagnose-voice/:clientId', adminAuth, async (req: Request, res: Res
     const calendarProvider = await calendarService.getCalendarProvider(clientId)
 
     // Check Retell agent
-    let retellAgent = null
-    let retellLlm = null
+    let retellAgent: Record<string, any> | null = null
+    let retellLlm: Record<string, any> | null = null
     if (retellAgentId && retellApiKey) {
       try {
         const agentRes = await fetch(`https://api.retellai.com/get-agent/${retellAgentId}`, {
           headers: { Authorization: `Bearer ${retellApiKey}` }
         })
-        retellAgent = await agentRes.json()
+        retellAgent = await agentRes.json() as Record<string, any>
 
-        // Get LLM config
         const llmId = retellAgent?.response_engine?.llm_id
         if (llmId) {
           const llmRes = await fetch(`https://api.retellai.com/get-retell-llm/${llmId}`, {
             headers: { Authorization: `Bearer ${retellApiKey}` }
           })
-          retellLlm = await llmRes.json()
+          retellLlm = await llmRes.json() as Record<string, any>
         }
       } catch (err) {
         retellAgent = { error: String(err) }
@@ -656,12 +655,12 @@ router.get('/diagnose-voice/:clientId', adminAuth, async (req: Request, res: Res
     }
 
     // Check N8N workflow
-    let n8nWorkflow = null
+    let n8nWorkflow: Record<string, any> | null = null
     if (deployment.n8nWorkflowId) {
       try {
         const { n8nService: n8n } = await import('../services/n8n.service')
         const verification = await n8n.verifyDeployment(deployment.n8nWorkflowId)
-        n8nWorkflow = verification
+        n8nWorkflow = verification as any
       } catch (err) {
         n8nWorkflow = { error: String(err) }
       }
@@ -681,7 +680,7 @@ router.get('/diagnose-voice/:clientId', adminAuth, async (req: Request, res: Res
       retellLlm: {
         model: retellLlm?.model,
         toolCount: retellLlm?.general_tools?.length || 0,
-        tools: retellLlm?.general_tools?.map((t: Record<string, unknown>) => ({
+        tools: retellLlm?.general_tools?.map((t: any) => ({
           name: t.name,
           type: t.type,
           url: t.url,
