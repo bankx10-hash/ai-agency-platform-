@@ -180,7 +180,7 @@
         },
         "sendBody": true,
         "specifyBody": "string",
-        "body": "={{ JSON.stringify({ contactId: $('Parse Lead Score').first().json.contactId, score: $('Parse Lead Score').first().json.score, summary: $('Parse Lead Score').first().json.summary, nextAction: $('Parse Lead Score').first().json.nextAction }) }}"
+        "body": "={{ JSON.stringify({ contactId: $('Parse Lead Score').first().json.contactId, score: $('Parse Lead Score').first().json.score, summary: $('Parse Lead Score').first().json.summary, nextAction: $('Parse Lead Score').first().json.nextAction, contactName: $('Prepare Lead Data').first().json.lead.name || '', contactEmail: $('Prepare Lead Data').first().json.lead.email || '', contactPhone: $('Prepare Lead Data').first().json.lead.phone || '' }) }}"
       }
     },
     {
