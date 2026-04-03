@@ -230,6 +230,7 @@ router.post('/', async (req, res) => {
 })
 
 // ─── Forward normalised event to client's N8N engagement workflow ─────────────
+// Falls back to direct in-process analysis + reply when N8N is unavailable.
 async function forwardEngagementEvent(clientId: string, event: EngagementEvent): Promise<void> {
   if (!event.message?.trim()) return  // skip empty messages (reactions, etc.)
 
@@ -250,7 +251,63 @@ async function forwardEngagementEvent(clientId: string, event: EngagementEvent):
     )
     logger.info('Engagement event forwarded to N8N', { clientId, type: event.type, platform: event.platform })
   } catch (err) {
-    logger.error('Failed to forward engagement event to N8N', { clientId, err })
+    logger.warn('N8N forwarding failed, processing engagement directly', { clientId, type: event.type, platform: event.platform })
+    await handleEngagementDirectly(clientId, event).catch(directErr => {
+      logger.error('Direct engagement processing also failed', { clientId, error: directErr })
+    })
+  }
+}
+
+// ─── Direct engagement processing (fallback when N8N is unavailable) ─────────
+async function handleEngagementDirectly(clientId: string, event: EngagementEvent): Promise<void> {
+  const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 4000}`
+  const apiSecret = process.env.N8N_API_SECRET || ''
+  const headers = { 'Content-Type': 'application/json', 'x-api-secret': apiSecret }
+
+  try {
+    // Step 1: Save contact
+    await axios.post(`${apiBaseUrl}/n8n/${clientId}/contacts`, {
+      name: event.senderName || `${event.platform}_${event.senderId}`,
+      email: `${event.platform}_${event.senderId}@social.nodus`,
+      phone: '',
+      source: `${event.platform}-${event.type}`,
+      tags: [event.platform, event.type]
+    }, { headers, timeout: 10000 }).catch(() => { /* contact may already exist */ })
+
+    // Step 2: Analyse engagement with Claude
+    const analysisRes = await axios.post(`${apiBaseUrl}/n8n/${clientId}/social/analyse-engagement`, {
+      type: event.type,
+      platform: event.platform,
+      senderId: event.senderId,
+      senderName: event.senderName,
+      message: event.message,
+      postId: event.postId,
+      commentId: event.commentId
+    }, { headers, timeout: 30000 })
+
+    const analysis = analysisRes.data
+    logger.info('Direct engagement analysis complete', { clientId, intent: analysis.intent, platform: event.platform })
+
+    // Step 3: Send reply (skip spam)
+    if (analysis.intent !== 'spam' && analysis.reply) {
+      await axios.post(`${apiBaseUrl}/n8n/${clientId}/social/send-reply`, {
+        type: event.type,
+        platform: event.platform,
+        senderId: event.senderId,
+        reply: analysis.reply,
+        postId: event.postId,
+        commentId: event.commentId
+      }, { headers, timeout: 15000 })
+      logger.info('Direct engagement reply sent', { clientId, platform: event.platform, type: event.type })
+    }
+  } catch (err) {
+    const axiosErr = err as { response?: { status?: number; data?: unknown } }
+    logger.error('Direct engagement handler failed', {
+      clientId,
+      platform: event.platform,
+      status: axiosErr.response?.status,
+      error: axiosErr.response?.data || (err instanceof Error ? err.message : err)
+    })
   }
 }
 

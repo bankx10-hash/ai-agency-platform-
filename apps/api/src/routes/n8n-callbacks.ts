@@ -1172,16 +1172,34 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
 
   try {
     // Get the page access token for this client
-    const service = platform === 'instagram' ? 'instagram' : 'facebook'
-    const cred = await prisma.clientCredential.findFirst({ where: { clientId, service } })
-    if (!cred) {
-      return res.status(404).json({ error: `No ${service} credentials found for client` })
+    // Instagram DMs use the Facebook Page access token (needs pages_messaging permission)
+    // Try instagram creds first, fall back to facebook creds, then env override
+    let accessToken: string | undefined
+
+    if (process.env.META_PAGE_ACCESS_TOKEN) {
+      accessToken = process.env.META_PAGE_ACCESS_TOKEN
+    } else {
+      // Try the platform-specific credential first
+      const primaryService = platform === 'instagram' ? 'instagram' : 'facebook'
+      const primaryCred = await prisma.clientCredential.findFirst({ where: { clientId, service: primaryService } })
+      if (primaryCred) {
+        const data = decryptJSON<Record<string, string>>(primaryCred.credentials)
+        accessToken = data.pageAccessToken || data.accessToken
+      }
+
+      // For Instagram DMs, fall back to the Facebook page token (it's the same page)
+      if (!accessToken && platform === 'instagram') {
+        const fbCred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'facebook' } })
+        if (fbCred) {
+          const data = decryptJSON<Record<string, string>>(fbCred.credentials)
+          accessToken = data.accessToken
+        }
+      }
     }
-    const credentials = decryptJSON<Record<string, string>>(cred.credentials)
-    // Instagram messaging requires the Messenger-generated page access token (has messaging capability)
-    const accessToken = platform === 'instagram' && process.env.META_PAGE_ACCESS_TOKEN
-      ? process.env.META_PAGE_ACCESS_TOKEN
-      : credentials.accessToken
+
+    if (!accessToken) {
+      return res.status(404).json({ error: `No ${platform} credentials found for client` })
+    }
 
     let result: { success: boolean; id?: string; error?: string }
 
@@ -1230,7 +1248,13 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
     }
     res.json(result)
   } catch (err) {
-    logger.error('Send reply failed', { clientId, err })
+    const axiosErr = err as { response?: { status?: number; data?: unknown } }
+    logger.error('Send reply failed', {
+      clientId, platform, type,
+      status: axiosErr.response?.status,
+      metaError: axiosErr.response?.data,
+      error: err instanceof Error ? err.message : err
+    })
     res.status(500).json({ error: 'Failed to send reply' })
   }
 })
