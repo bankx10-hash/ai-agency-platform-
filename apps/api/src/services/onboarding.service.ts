@@ -272,6 +272,9 @@ export class OnboardingService {
           usage: 0.2
         },
         upsell_triggers: ['high_engagement', 'plan_limit_reached', '90_days_active']
+      },
+      [AgentType.CONVERSATIONAL_WORKFLOW]: {
+        ...baseConfig
       }
     }
 

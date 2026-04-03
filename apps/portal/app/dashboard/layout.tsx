@@ -81,6 +81,11 @@ const NAV: NavItem[] = [
   },
   {
     type: 'link',
+    href: '/dashboard/workflows', label: 'Workflows',
+    icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" d2="M9 14l2 2 4-4" />
+  },
+  {
+    type: 'link',
     href: '/dashboard/inbox', label: 'Inbox',
     icon: <Icon d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" d2="M22 6l-10 7L2 6" />
   },

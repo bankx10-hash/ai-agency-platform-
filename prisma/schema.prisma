@@ -48,6 +48,35 @@ enum AgentType {
   VOICE_OUTBOUND
   VOICE_CLOSER
   CLIENT_SERVICES
+  CONVERSATIONAL_WORKFLOW
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum QuestionType {
+  TEXT
+  MULTIPLE_CHOICE
+  OPEN_ENDED
+  YES_NO
+}
+
+enum ConversationStatus {
+  IN_PROGRESS
+  COMPLETED
+  QUALIFIED
+  DISQUALIFIED
+  TIMED_OUT
+}
+
+enum MessageChannel {
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
 }
 
 enum PipelineStage {
@@ -99,6 +128,8 @@ model Client {
   contacts         Contact[]
   campaigns        Campaign[]
   funnels          Funnel[]
+  workflows        ConversationWorkflow[]
+  workflowConversations WorkflowConversation[]
 }
 
 model AgentDeployment {
@@ -352,4 +383,70 @@ model FunnelSubmission {
 
   @@index([funnelId, createdAt])
   @@index([stepId])
+}
+
+// ── Conversational Workflow Models ────────────────────────────────────────────
+
+model ConversationWorkflow {
+  id                String              @id @default(cuid())
+  clientId          String
+  client            Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  status            WorkflowStatus      @default(DRAFT)
+  channels          Json                @default("[]")
+  qualifyThreshold  Int                 @default(70)
+  welcomeMessage    String?
+  completionMessage String?
+  disqualifyMessage String?
+  triggerKeywords   Json                @default("[]")
+  triggerOn         Json                @default("[\"dm\"]")          // ["dm","comment","story_reply","story_mention"]
+  commentReplyText  String?                                          // Auto-reply to the comment before DM
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  questions         WorkflowQuestion[]
+  conversations     WorkflowConversation[]
+
+  @@index([clientId, status])
+}
+
+model WorkflowQuestion {
+  id           String               @id @default(cuid())
+  workflowId   String
+  workflow     ConversationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  order        Int
+  questionText String
+  questionType QuestionType         @default(TEXT)
+  options      Json?
+  scoreWeight  Int                  @default(0)
+  crmField     String?
+  isRequired   Boolean              @default(true)
+  branchRules  Json?
+  createdAt    DateTime             @default(now())
+
+  @@index([workflowId, order])
+}
+
+model WorkflowConversation {
+  id                String             @id @default(cuid())
+  workflowId        String
+  workflow          ConversationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  clientId          String
+  client            Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  channel           MessageChannel
+  senderId          String
+  senderName        String?
+  status            ConversationStatus @default(IN_PROGRESS)
+  currentQuestionId String?
+  score             Int                @default(0)
+  answers           Json               @default("{}")
+  extractedData     Json?
+  contactId         String?
+  startedAt         DateTime           @default(now())
+  completedAt       DateTime?
+  lastMessageAt     DateTime           @default(now())
+
+  @@unique([workflowId, channel, senderId])
+  @@index([clientId, status])
+  @@index([senderId, channel])
 }

@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma'
 import { decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
 import axios from 'axios'
+import { workflowEngine } from '../services/workflow-engine.service'
 
 const router = express.Router()
 
@@ -83,15 +84,29 @@ router.post('/', async (req, res) => {
 
     // DMs — same messaging[] structure for both Facebook (Messenger) and Instagram
     for (const event of (entry.messaging || [])) {
+      const dmPlatform = isInstagram ? 'instagram' : 'facebook'
+      const dmText = event.message?.text || ''
+      const dmSenderId = event.sender?.id
+
       await forwardEngagementEvent(clientId, {
         type: 'dm',
-        platform: isInstagram ? 'instagram' : 'facebook',
-        senderId: event.sender?.id,
+        platform: dmPlatform,
+        senderId: dmSenderId,
         recipientId: event.recipient?.id,
-        message: event.message?.text || '',
+        message: dmText,
         messageId: event.message?.mid,
         timestamp: event.timestamp
       })
+
+      // Also route DMs through the conversational workflow engine
+      if (dmText && dmSenderId) {
+        workflowEngine.handleIncomingMessage({
+          clientId,
+          channel: dmPlatform as 'instagram' | 'facebook',
+          senderId: dmSenderId,
+          messageText: dmText
+        }).catch(err => logger.error('Workflow engine error (messaging DM)', { clientId, error: err }))
+      }
     }
 
     // Facebook Lead Ads — lead form submissions
@@ -122,19 +137,46 @@ router.post('/', async (req, res) => {
               commentId: value.comment_id,
               timestamp: value.created_time
             })
+
+            // Trigger workflow for Facebook comments
+            if (value.from?.id) {
+              workflowEngine.handleEngagementTrigger({
+                clientId,
+                channel: 'facebook',
+                senderId: value.from.id,
+                senderName: value.from.name,
+                triggerType: 'comment',
+                commentText: value.message || '',
+                postId: value.post_id,
+                commentId: value.comment_id
+              }).catch(err => logger.error('Workflow engine error (FB comment)', { clientId, error: err }))
+            }
           }
         }
 
         // Instagram DMs arrive as object=page with changes[].field=messages
         if (change.field === 'messages') {
           const value = change.value as Record<string, unknown>
+          const igDmSenderId = (value.sender as Record<string, string>)?.id
+          const igDmText = (value.message as Record<string, string>)?.text || ''
+
           await forwardEngagementEvent(clientId, {
             type: 'dm',
             platform: 'instagram',
-            senderId: (value.sender as Record<string, string>)?.id,
-            message: (value.message as Record<string, string>)?.text || '',
+            senderId: igDmSenderId,
+            message: igDmText,
             timestamp: value.timestamp as number
           })
+
+          // Also route through conversational workflow engine
+          if (igDmText && igDmSenderId) {
+            workflowEngine.handleIncomingMessage({
+              clientId,
+              channel: 'instagram',
+              senderId: igDmSenderId,
+              messageText: igDmText
+            }).catch(err => logger.error('Workflow engine error (IG page DM)', { clientId, error: err }))
+          }
         }
       }
     }
@@ -153,6 +195,34 @@ router.post('/', async (req, res) => {
             postId: value.media?.id,
             commentId: value.id,
           })
+
+          // Trigger workflow for Instagram comments
+          if (value.from?.id) {
+            workflowEngine.handleEngagementTrigger({
+              clientId,
+              channel: 'instagram',
+              senderId: value.from.id,
+              senderName: value.from.username,
+              triggerType: 'comment',
+              commentText: value.text || '',
+              postId: value.media?.id,
+              commentId: value.id
+            }).catch(err => logger.error('Workflow engine error (IG comment)', { clientId, error: err }))
+          }
+        }
+
+        // Instagram story mentions/replies
+        if (change.field === 'story_insights' || change.field === 'mentions') {
+          const value = change.value as Record<string, unknown>
+          const mentionSenderId = (value.sender as Record<string, string>)?.id
+          if (mentionSenderId) {
+            workflowEngine.handleEngagementTrigger({
+              clientId,
+              channel: 'instagram',
+              senderId: mentionSenderId,
+              triggerType: 'story_mention'
+            }).catch(err => logger.error('Workflow engine error (IG story mention)', { clientId, error: err }))
+          }
         }
       }
     }

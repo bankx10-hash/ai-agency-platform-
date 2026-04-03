@@ -22,6 +22,9 @@ import sequencesRouter, { processSequences } from './routes/sequences'
 import smsRouter, { handleSmsWebhook } from './routes/sms'
 import callsRouter, { handleCallWebhook } from './routes/calls'
 import leadsRouter from './routes/leads'
+import workflowsRouter from './routes/workflows'
+import whatsappWebhooksRouter from './routes/whatsapp-webhooks'
+import { startWorkflowTimeoutScheduler } from './queue/workflow-timeout.queue'
 import { logger } from './utils/logger'
 
 // Prevent silent crashes — log and keep running
@@ -67,6 +70,11 @@ async function runStartupMigrations() {
   try {
     await prisma.$executeRaw`ALTER TYPE "AgentType" ADD VALUE IF NOT EXISTS 'SOCIAL_ENGAGEMENT'`
     logger.info('Startup migration: SOCIAL_ENGAGEMENT enum value ensured')
+  } catch { /* already exists, skip */ }
+
+  try {
+    await prisma.$executeRaw`ALTER TYPE "AgentType" ADD VALUE IF NOT EXISTS 'CONVERSATIONAL_WORKFLOW'`
+    logger.info('Startup migration: CONVERSATIONAL_WORKFLOW enum value ensured')
   } catch { /* already exists, skip */ }
 
   try {
@@ -455,8 +463,9 @@ app.use((req, res, next) => {
 
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }))
 
-// Meta webhooks must be registered before rate limiter — Meta's IPs must never be blocked
+// Meta & WhatsApp webhooks must be registered before rate limiter — Meta's IPs must never be blocked
 app.use('/webhooks/meta', metaWebhooksRouter)
+app.use('/webhooks/whatsapp', whatsappWebhooksRouter)
 
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
@@ -480,6 +489,7 @@ app.use('/crm', crmRouter)
 app.use('/marketing', marketingRouter)
 app.use('/inbox', inboxRouter)
 app.use('/notifications', notificationsRouter)
+app.use('/workflows', workflowsRouter)
 app.use('/sequences', sequencesRouter)
 app.post('/sms/webhook', handleSmsWebhook)
 app.use('/sms', smsRouter)
@@ -528,6 +538,9 @@ runStartupMigrations().then(() => {
       processSequences().catch(err => logger.error('Sequence processor failed', { err }))
     })
     logger.info('Sequence processor cron scheduled every 15 minutes')
+
+    // Workflow conversation timeout checker
+    startWorkflowTimeoutScheduler()
   })
 })
 

@@ -8,7 +8,8 @@ export enum AgentType {
   VOICE_INBOUND = 'VOICE_INBOUND',
   VOICE_OUTBOUND = 'VOICE_OUTBOUND',
   VOICE_CLOSER = 'VOICE_CLOSER',
-  CLIENT_SERVICES = 'CLIENT_SERVICES'
+  CLIENT_SERVICES = 'CLIENT_SERVICES',
+  CONVERSATIONAL_WORKFLOW = 'CONVERSATIONAL_WORKFLOW'
 }
 
 export enum AgentStatus {
@@ -41,6 +42,7 @@ export type AgentConfig =
   | VoiceOutboundConfig
   | VoiceCloserConfig
   | ClientServicesConfig
+  | ConversationalWorkflowConfig
 
 export interface LeadGenerationConfig {
   icp_description: string
@@ -127,6 +129,13 @@ export interface ClientServicesConfig {
   upsell_triggers: string[]
 }
 
+export interface ConversationalWorkflowConfig {
+  workflowId: string
+  channels: ('whatsapp' | 'instagram' | 'facebook')[]
+  qualifyThreshold: number
+  handoffToAppointmentSetter?: boolean
+}
+
 export interface AgentMetrics {
   totalLeads?: number
   leadsToday?: number
@@ -150,7 +159,8 @@ export const PLANS = {
       AgentType.LEAD_GENERATION,
       AgentType.SOCIAL_ENGAGEMENT,
       AgentType.APPOINTMENT_SETTER,
-      AgentType.VOICE_INBOUND
+      AgentType.VOICE_INBOUND,
+      AgentType.CONVERSATIONAL_WORKFLOW
     ]
   },
   GROWTH: {
@@ -163,7 +173,8 @@ export const PLANS = {
       AgentType.SOCIAL_ENGAGEMENT,
       AgentType.APPOINTMENT_SETTER,
       AgentType.VOICE_INBOUND,
-      AgentType.VOICE_OUTBOUND
+      AgentType.VOICE_OUTBOUND,
+      AgentType.CONVERSATIONAL_WORKFLOW
     ]
   },
   AGENCY: {
@@ -179,7 +190,8 @@ export const PLANS = {
       AgentType.VOICE_INBOUND,
       AgentType.VOICE_OUTBOUND,
       AgentType.VOICE_CLOSER,
-      AgentType.CLIENT_SERVICES
+      AgentType.CLIENT_SERVICES,
+      AgentType.CONVERSATIONAL_WORKFLOW
     ]
   }
 } as const
