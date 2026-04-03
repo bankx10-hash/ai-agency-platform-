@@ -576,7 +576,7 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
         try {
           await axios.post(
             `https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`,
-            { subscribed_fields: 'messages,feed,mention', access_token: page.access_token },
+            { subscribed_fields: 'messages,feed,mention,leadgen', access_token: page.access_token },
             { headers: { 'Content-Type': 'application/json' } }
           )
           logger.info('Meta page subscribed to webhooks', { clientId, pageId: page.id })
@@ -604,7 +604,7 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
         try {
           await axios.post(
             `https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`,
-            { subscribed_fields: 'messages,feed,mention', access_token: page.access_token },
+            { subscribed_fields: 'messages,feed,mention,leadgen', access_token: page.access_token },
             { headers: { 'Content-Type': 'application/json' } }
           )
           logger.info('Meta page subscribed to webhooks', { clientId, pageId: page.id })

@@ -94,6 +94,18 @@ router.post('/', async (req, res) => {
       })
     }
 
+    // Facebook Lead Ads — lead form submissions
+    if (!isInstagram) {
+      for (const change of (entry.changes || [])) {
+        if (change.field === 'leadgen') {
+          const value = change.value as { leadgen_id?: string; page_id?: string; form_id?: string }
+          if (value.leadgen_id) {
+            await handleLeadgenEvent(clientId, accountId, value.leadgen_id)
+          }
+        }
+      }
+    }
+
     // Facebook feed comments + Instagram DMs delivered via page changes
     if (!isInstagram) {
       for (const change of (entry.changes || [])) {
@@ -169,6 +181,51 @@ async function forwardEngagementEvent(clientId: string, event: EngagementEvent):
     logger.info('Engagement event forwarded to N8N', { clientId, type: event.type, platform: event.platform })
   } catch (err) {
     logger.error('Failed to forward engagement event to N8N', { clientId, err })
+  }
+}
+
+// ─── Facebook Lead Ads: fetch lead data and forward to lead gen pipeline ──────
+async function handleLeadgenEvent(clientId: string, pageId: string, leadgenId: string): Promise<void> {
+  try {
+    // Get page access token
+    const fbCred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'facebook' } })
+    if (!fbCred) { logger.warn('Leadgen: no FB credential for client', { clientId }); return }
+    const { accessToken } = decryptJSON<{ accessToken: string }>(fbCred.credentials)
+
+    // Fetch lead data from Meta Graph API
+    const leadRes = await axios.get(`https://graph.facebook.com/v18.0/${leadgenId}`, {
+      params: { access_token: accessToken, fields: 'field_data,created_time' }
+    })
+    const fieldData: Array<{ name: string; values: string[] }> = leadRes.data.field_data || []
+
+    const getValue = (name: string) => fieldData.find(f => f.name === name)?.values?.[0] || ''
+    const name = getValue('full_name') || getValue('first_name') || ''
+    const email = getValue('email')
+    const phone = getValue('phone_number') || getValue('phone')
+
+    if (!name && !email && !phone) {
+      logger.warn('Leadgen: no useful contact data', { clientId, leadgenId })
+      return
+    }
+
+    await forwardToLeadGen(clientId, { name, email, phone, source: 'facebook-lead-ad' })
+  } catch (err) {
+    logger.error('Leadgen event processing failed', { clientId, pageId, leadgenId, err })
+  }
+}
+
+// ─── Forward a lead to the lead generation N8N workflow ──────────────────────
+export async function forwardToLeadGen(clientId: string, lead: { name: string; email: string; phone: string; source: string }): Promise<void> {
+  const n8nBase = process.env.N8N_BASE_URL || 'http://localhost:5678'
+  try {
+    await axios.post(
+      `${n8nBase}/webhook/lead-gen-${clientId}`,
+      lead,
+      { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+    )
+    logger.info('Lead forwarded to lead-gen pipeline', { clientId, source: lead.source, name: lead.name })
+  } catch (err) {
+    logger.error('Failed to forward lead to lead-gen pipeline', { clientId, source: lead.source, err })
   }
 }
 

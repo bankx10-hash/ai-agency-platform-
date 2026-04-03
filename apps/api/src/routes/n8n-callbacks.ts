@@ -616,6 +616,31 @@ router.post('/:clientId/appointments', async (req, res) => {
   }
 })
 
+// POST /:clientId/linkedin-lead — LinkedIn outreach reply captured as a lead
+router.post('/:clientId/linkedin-lead', async (req, res) => {
+  const { clientId } = req.params
+  const { name, email, phone, linkedinUrl, message } = req.body as {
+    name?: string; email?: string; phone?: string; linkedinUrl?: string; message?: string
+  }
+  try {
+    if (!name && !email && !linkedinUrl) {
+      return res.status(400).json({ error: 'At least name, email, or linkedinUrl required' })
+    }
+    const { forwardToLeadGen } = await import('./meta-webhooks')
+    await forwardToLeadGen(clientId, {
+      name: name || '',
+      email: email || '',
+      phone: phone || '',
+      source: 'linkedin-reply'
+    })
+    logger.info('LinkedIn reply forwarded to lead-gen', { clientId, name, linkedinUrl })
+    res.json({ success: true })
+  } catch (err) {
+    logger.error('LinkedIn lead capture error', { clientId, err })
+    res.status(500).json({ error: 'Failed to capture LinkedIn lead' })
+  }
+})
+
 // POST /:clientId/call-outcomes
 router.post('/:clientId/call-outcomes', async (req, res) => {
   const { clientId } = req.params
@@ -1107,6 +1132,20 @@ Return JSON only:
     }
 
     logger.info('Engagement analysed', { clientId, platform, type, intent: analysis.intent })
+
+    // Bridge: if DM shows buying intent, forward to lead gen pipeline
+    const intent = analysis.intent as string
+    if ((intent === 'interested' || intent === 'booking_ready') && type === 'dm') {
+      const { forwardToLeadGen } = await import('./meta-webhooks')
+      await forwardToLeadGen(clientId, {
+        name: senderName || `${platform}-${senderId}`,
+        email: '',
+        phone: '',
+        source: `${platform}-dm`
+      }).catch(err => logger.warn('DM-to-lead bridge failed (non-fatal)', { clientId, err }))
+      logger.info('DM lead forwarded to lead-gen pipeline', { clientId, platform, senderId, intent })
+    }
+
     res.json({ ...analysis, clientId, platform, type, senderId, postId, commentId })
   } catch (err) {
     logger.error('Engagement analysis failed', { clientId, err })
