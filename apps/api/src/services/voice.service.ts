@@ -1,11 +1,9 @@
 // Retell AI voice service — v1 endpoint names, v2 response_engine format
 import axios from 'axios'
 import twilio from 'twilio'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { encryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
-
-const prisma = new PrismaClient()
 
 const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''

@@ -1,5 +1,5 @@
 import { Router, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { google } from 'googleapis'
 import Anthropic from '@anthropic-ai/sdk'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
@@ -10,7 +10,6 @@ import nodemailer from 'nodemailer'
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const router = Router()
-const prisma = new PrismaClient()
 
 router.use(authMiddleware)
 

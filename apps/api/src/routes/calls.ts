@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { authMiddleware } from '../middleware/auth'
 import { logger } from '../utils/logger'
 import axios from 'axios'
 import { randomUUID } from 'crypto'
 
 const router = Router()
-const prisma = new PrismaClient()
 
 const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
 const API_URL = process.env.API_URL || 'https://api.nodusaisystems.com'

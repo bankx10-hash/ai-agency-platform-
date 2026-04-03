@@ -3,10 +3,8 @@ import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { n8nService } from '../services/n8n.service'
 import { voiceService, RetellTool } from '../services/voice.service'
 import { calendarService } from '../services/calendar.service'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
-
-const prisma = new PrismaClient()
 
 export interface VoiceInboundConfig {
   greeting_script: string

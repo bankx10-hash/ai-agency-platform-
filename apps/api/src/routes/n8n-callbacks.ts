@@ -1,5 +1,6 @@
 import express from 'express'
-import { PrismaClient, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { randomUUID } from 'crypto'
 import twilio from 'twilio'
 import { emailService } from '../services/email.service'
@@ -9,7 +10,6 @@ import { logger } from '../utils/logger'
 import axios from 'axios'
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // Parse JSON bodies regardless of Content-Type (N8N sends empty content-type)
 router.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {

@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import axios from 'axios'
 import { calendarService } from '../services/calendar.service'
 import { emailService } from '../services/email.service'
 import { logger } from '../utils/logger'
 
 const router = Router()
-const prisma = new PrismaClient()
 
 // These endpoints are called by Retell AI tool calling mid-call.
 // Auth: simple secret check via x-retell-secret header (set as env var RETELL_TOOL_SECRET).

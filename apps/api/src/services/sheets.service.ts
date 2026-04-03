@@ -1,9 +1,7 @@
 import { google } from 'googleapis'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { decryptJSON, encryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
-
-const prisma = new PrismaClient()
 
 interface GoogleCredentials {
   accessToken: string

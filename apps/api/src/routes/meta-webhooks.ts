@@ -1,11 +1,10 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
 import axios from 'axios'
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // Parse JSON bodies — this router is mounted before the global json middleware
 router.use(express.json({ limit: '1mb' }))

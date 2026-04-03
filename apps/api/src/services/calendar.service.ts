@@ -1,11 +1,9 @@
 import axios from 'axios'
 import { google } from 'googleapis'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { decryptJSON, encryptJSON } from '../utils/encrypt'
 import { emailService } from './email.service'
 import { logger } from '../utils/logger'
-
-const prisma = new PrismaClient()
 
 export interface TimeSlot {
   start: string   // ISO 8601

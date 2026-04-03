@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import cron from 'node-cron'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from './lib/prisma'
 import { apiRateLimit } from './middleware/rateLimit'
 import authRouter from './routes/auth'
 import billingRouter from './routes/billing'
@@ -23,8 +23,15 @@ import smsRouter, { handleSmsWebhook } from './routes/sms'
 import callsRouter, { handleCallWebhook } from './routes/calls'
 import { logger } from './utils/logger'
 
+// Prevent silent crashes — log and keep running
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', { reason })
+})
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception', { message: err.message, stack: err.stack })
+})
+
 async function runStartupMigrations() {
-  const prisma = new PrismaClient()
   try {
     // Convert enum column to plain text so Prisma String? mapping works
     await prisma.$executeRaw`ALTER TABLE "Client" ALTER COLUMN "crmType" TYPE TEXT USING "crmType"::text`
@@ -418,7 +425,6 @@ async function runStartupMigrations() {
     logger.info('Startup migration: CallLog table ensured')
   } catch { /* already exist, skip */ }
 
-  await prisma.$disconnect()
 }
 
 const app = express()
@@ -428,16 +434,17 @@ const PORT = process.env.PORT || 4000
 const ALLOWED_ORIGINS = [
   'https://app.nodusaisystems.com',
   'http://localhost:3000',
+  'http://localhost:3001',
 ]
 
 app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-admin-secret,x-api-secret')
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-admin-secret,x-api-secret')
-  res.setHeader('Access-Control-Allow-Credentials', 'true')
   if (req.method === 'OPTIONS') {
     res.sendStatus(204)
     return

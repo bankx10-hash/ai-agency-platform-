@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { randomUUID } from 'crypto'
 import twilio from 'twilio'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
@@ -7,7 +7,6 @@ import { decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
 
 const router = Router()
-const prisma = new PrismaClient()
 
 router.use(authMiddleware)
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import bcrypt from 'bcryptjs'
 import { onboardingQueue } from '../queue/onboarding.queue'
 import { n8nService } from '../services/n8n.service'
@@ -9,7 +9,6 @@ import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { sendDailyDigest } from '../services/digest'
 
 const router = Router()
-const prisma = new PrismaClient()
 
 function adminAuth(req: Request, res: Response, next: () => void) {
   const secret = req.headers['x-admin-secret']
@@ -138,37 +137,52 @@ router.post('/rerun/:clientId', async (req: Request, res: Response): Promise<voi
       return
     }
 
-    // 1. Delete ALL N8N workflows for this client (by name search) to clear webhook conflicts
+    // 1. Preserve existing phone numbers and Retell agent IDs before deleting
+    const existingDeployments = await prisma.agentDeployment.findMany({
+      where: { clientId },
+      select: { agentType: true, retellAgentId: true, config: true, n8nWorkflowId: true }
+    })
+
+    const preservedPhones: Record<string, string> = {}
+    for (const dep of existingDeployments) {
+      const depConfig = dep.config as Record<string, any> | null
+      if (depConfig?.phone_number) {
+        preservedPhones[dep.agentType] = depConfig.phone_number
+        logger.info('Preserving phone number for rerun', { clientId, agentType: dep.agentType, phone: depConfig.phone_number })
+      }
+    }
+
+    // 2. Delete ALL N8N workflows for this client (by name search) to clear webhook conflicts
     const n8nDeleted = await n8nService.deleteAllClientWorkflows(clientId)
     logger.info('Deleted N8N workflows for rerun', { clientId, count: n8nDeleted })
 
     const deleted = await prisma.agentDeployment.deleteMany({ where: { clientId } })
     logger.info('Cleared agent deployments for rerun', { clientId, count: deleted.count })
 
-    // 2. Reset or recreate the onboarding record
+    // 3. Reset or recreate the onboarding record — store preserved phones in data
     await prisma.onboarding.upsert({
       where: { clientId },
       update: {
         step: 1,
         status: 'IN_PROGRESS',
         completedAt: null,
-        data: { message: 'Re-run triggered' }
+        data: { message: 'Re-run triggered', preservedPhones }
       },
       create: {
         clientId,
         step: 1,
         status: 'IN_PROGRESS',
-        data: { message: 'Re-run triggered' }
+        data: { message: 'Re-run triggered', preservedPhones }
       }
     })
 
-    // 3. Set client back to PENDING so the progress screen shows correctly
+    // 4. Set client back to PENDING so the progress screen shows correctly
     await prisma.client.update({
       where: { id: clientId },
       data: { status: 'PENDING' }
     })
 
-    // 4. Remove any stale queued/failed jobs for this client
+    // 5. Remove any stale queued/failed jobs for this client
     const existingJobs = await onboardingQueue.getJobs(['waiting', 'active', 'failed', 'delayed'])
     for (const job of existingJobs) {
       if (job.data?.clientId === clientId) {
@@ -176,7 +190,8 @@ router.post('/rerun/:clientId', async (req: Request, res: Response): Promise<voi
       }
     }
 
-    // 5. Re-queue — existing ClientCredential records are untouched and will be reused
+    // 6. Re-queue — existing ClientCredential records are untouched and will be reused
+    //    preservedPhones are stored in onboarding.data for deployAgentsByPlan to use
     await onboardingQueue.add(
       { clientId },
       { jobId: `onboarding-${clientId}-${Date.now()}` }

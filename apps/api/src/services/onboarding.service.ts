@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { prisma, Prisma } from '../lib/prisma'
 import { n8nService } from './n8n.service'
 import { emailService } from './email.service'
 import { encryptJSON } from '../utils/encrypt'
@@ -7,8 +7,6 @@ import { voiceService } from './voice.service'
 import { AgentType, AgentStatus, PLANS } from '../../../../packages/shared/types/agent.types'
 import { Plan } from '../../../../packages/shared/types/client.types'
 import { AGENT_REGISTRY } from '../agents'
-
-const prisma = new PrismaClient()
 
 export class OnboardingService {
   async runOnboarding(clientId: string): Promise<void> {
@@ -32,6 +30,7 @@ export class OnboardingService {
     await this.updateOnboardingStep(clientId, 2, { workspaceReady: true })
 
     const onboardingData = (client.onboarding?.data ?? {}) as Record<string, unknown>
+    const preservedPhones = (onboardingData.preservedPhones ?? {}) as Record<string, string>
     const voiceConfig = onboardingData.voiceConfig as Record<string, unknown> | undefined
     // Merge root-level bookingLink (auto-saved from Calendly OAuth) into voiceConfig so agents can use it
     const rootBookingLink = onboardingData.bookingLink as string | undefined
@@ -50,7 +49,8 @@ export class OnboardingService {
       clientRecord.country as string | undefined,
       mergedVoiceConfig,
       clientRecord.businessDescription as string | undefined,
-      clientRecord.icpDescription as string | undefined
+      clientRecord.icpDescription as string | undefined,
+      preservedPhones
     )
 
     await this.updateOnboardingStep(clientId, 3, { agentsDeployed: true })
@@ -74,7 +74,8 @@ export class OnboardingService {
     country?: string,
     voiceConfig?: Record<string, unknown>,
     businessDescription?: string,
-    icpDescription?: string
+    icpDescription?: string,
+    preservedPhones?: Record<string, string>
   ): Promise<void> {
     const planConfig = PLANS[plan]
     const agentTypes = [...planConfig.agents] as AgentType[]
@@ -97,7 +98,7 @@ export class OnboardingService {
         }
 
         const agent = new AgentClass()
-        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName, country, voiceConfig, businessDescription, icpDescription)
+        const defaultConfig = this.getDefaultAgentConfig(agentType, locationId, client.businessName, country, voiceConfig, businessDescription, icpDescription, preservedPhones)
 
         await agent.deploy(clientId, defaultConfig)
 
@@ -128,12 +129,19 @@ export class OnboardingService {
     country?: string,
     voiceConfig?: Record<string, unknown>,
     businessDescription?: string,
-    icpDescription?: string
+    icpDescription?: string,
+    preservedPhones?: Record<string, string>
   ): Record<string, unknown> {
-    const baseConfig = {
+    const baseConfig: Record<string, unknown> = {
       locationId,
       businessName,
       country: country || 'AU'
+    }
+
+    // Reuse existing phone number on redeploy — prevents buying a new number
+    const existingPhone = preservedPhones?.[agentType]
+    if (existingPhone) {
+      baseConfig.existingPhoneNumber = existingPhone
     }
 
     const configs: Record<AgentType, Record<string, unknown>> = {

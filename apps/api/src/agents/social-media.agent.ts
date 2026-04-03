@@ -4,9 +4,7 @@ import { n8nService } from '../services/n8n.service'
 import { socialService } from '../services/social.service'
 import { createSocialMediaSheet } from '../services/sheets.service'
 import { logger } from '../utils/logger'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '../lib/prisma'
 
 export type SupportedPlatform = 'instagram' | 'facebook' | 'linkedin'
 
