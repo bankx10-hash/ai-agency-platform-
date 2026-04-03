@@ -163,13 +163,24 @@ function generateICalContent(
   ].join('\r\n')
 }
 
+const CLIENT_TIMEZONE = 'Australia/Perth' // AWST (UTC+8)
+
 function formatSlotLabel(isoDate: string): string {
   const d = new Date(isoDate)
   return d.toLocaleString('en-AU', {
     weekday: 'long', day: 'numeric', month: 'long',
     hour: 'numeric', minute: '2-digit', hour12: true,
-    timeZone: 'Australia/Sydney'
+    timeZone: CLIENT_TIMEZONE
   })
+}
+
+// Convert a local AWST date/hour to a UTC Date object
+function awstToUtc(date: Date, hour: number): Date {
+  // Format the date portion in AWST to get the correct calendar day
+  const dateStr = date.toLocaleDateString('en-CA', { timeZone: CLIENT_TIMEZONE }) // YYYY-MM-DD
+  // Build an ISO string at the desired AWST hour, then subtract 8h offset for UTC
+  const awstMs = new Date(`${dateStr}T${String(hour).padStart(2, '0')}:00:00+08:00`).getTime()
+  return new Date(awstMs)
 }
 
 function buildSlotsFromFreebusy(busySlots: { start: string; end: string }[], daysAhead = 7): TimeSlot[] {
@@ -177,11 +188,10 @@ function buildSlotsFromFreebusy(busySlots: { start: string; end: string }[], day
   const now = new Date()
   const end = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000)
 
-  // Generate 9am–5pm hourly slots for each day, skip busy
+  // Generate 9am–9pm AWST hourly slots for each day, skip busy
   for (let d = new Date(now); d < end; d.setDate(d.getDate() + 1)) {
-    for (let hour = 9; hour < 17; hour++) {
-      const slotStart = new Date(d)
-      slotStart.setHours(hour, 0, 0, 0)
+    for (let hour = 9; hour < 21; hour++) {
+      const slotStart = awstToUtc(d, hour)
       if (slotStart <= now) continue
 
       const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000)
@@ -332,8 +342,8 @@ export class CalendarService {
           requestBody: {
             summary: `Appointment — ${contact.name}`,
             description: `Booked via inbound call for ${businessName}`,
-            start: { dateTime: startTime },
-            end: { dateTime: endTime },
+            start: { dateTime: startTime, timeZone: CLIENT_TIMEZONE },
+            end: { dateTime: endTime, timeZone: CLIENT_TIMEZONE },
             attendees: [{ email: contact.email, displayName: contact.name }]
           }
         })
@@ -363,7 +373,7 @@ export class CalendarService {
             start: startTime,
             end: endTime,
             responses: { name: contact.name, email: contact.email, phone: contact.phone || '' },
-            timeZone: 'Australia/Sydney',
+            timeZone: CLIENT_TIMEZONE,
             language: 'en',
             metadata: { source: 'voice-inbound' }
           }
