@@ -21,6 +21,7 @@ import { sendDailyDigest } from './services/digest'
 import sequencesRouter, { processSequences } from './routes/sequences'
 import smsRouter, { handleSmsWebhook } from './routes/sms'
 import callsRouter, { handleCallWebhook } from './routes/calls'
+import leadsRouter from './routes/leads'
 import { logger } from './utils/logger'
 
 // Prevent silent crashes — log and keep running
@@ -484,6 +485,14 @@ app.post('/sms/webhook', handleSmsWebhook)
 app.use('/sms', smsRouter)
 app.post('/calls/webhook', handleCallWebhook)
 app.use('/calls', callsRouter)
+// Public lead capture — allow any origin (embedded on client websites)
+app.use('/leads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') { res.sendStatus(204); return }
+  next()
+}, leadsRouter)
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', {
