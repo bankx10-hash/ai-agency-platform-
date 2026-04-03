@@ -49,14 +49,20 @@ export default function ContactsPage() {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
+  // Debounce search to avoid firing on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const fetchContacts = useCallback(async () => {
     if (!session) return
     setLoading(true)
     try {
-      const clientId = (session.user as { clientId?: string })?.clientId
       const token = localStorage.getItem('token') || ''
       const params = new URLSearchParams({ limit: '100' })
-      if (search) params.set('search', search)
+      if (debouncedSearch) params.set('search', debouncedSearch)
       if (stageFilter) params.set('stage', stageFilter)
       const res = await axios.get(`${API_URL}/crm/contacts?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -67,7 +73,7 @@ export default function ContactsPage() {
     } finally {
       setLoading(false)
     }
-  }, [session, search, stageFilter])
+  }, [session, debouncedSearch, stageFilter])
 
   useEffect(() => { fetchContacts() }, [fetchContacts])
 

@@ -99,22 +99,30 @@ router.get('/contacts', async (req: AuthRequest, res: Response): Promise<void> =
     const clientId = req.clientId!
     const { stage, source, minScore, maxScore, search, limit = '50', cursor } = req.query as Record<string, string>
 
-    const where: Record<string, unknown> = { clientId }
-    if (stage) where.pipelineStage = stage
-    if (source) where.source = source
+    // Build AND conditions — each filter is a separate condition
+    const andConditions: Record<string, unknown>[] = [{ clientId }]
+
+    if (stage) andConditions.push({ pipelineStage: stage })
+    if (source) andConditions.push({ source })
     if (minScore || maxScore) {
-      where.score = {
-        ...(minScore ? { gte: parseInt(minScore) } : {}),
-        ...(maxScore ? { lte: parseInt(maxScore) } : {})
-      }
+      andConditions.push({
+        score: {
+          ...(minScore ? { gte: parseInt(minScore) } : {}),
+          ...(maxScore ? { lte: parseInt(maxScore) } : {})
+        }
+      })
     }
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } }
-      ]
+      andConditions.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search } }
+        ]
+      })
     }
+
+    const where = { AND: andConditions }
 
     const take = Math.min(parseInt(limit) || 50, 200)
     const contacts = await prisma.contact.findMany({
