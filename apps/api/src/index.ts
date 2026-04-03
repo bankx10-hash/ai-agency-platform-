@@ -119,6 +119,18 @@ async function runStartupMigrations() {
     logger.info('Startup migration: Contact and ContactNote tables ensured')
   } catch { /* already exist, skip */ }
 
+  // Fix: cast pipelineStage from TEXT to PipelineStage enum so Prisma queries work
+  try {
+    await prisma.$executeRaw`ALTER TABLE "Contact" ALTER COLUMN "pipelineStage" TYPE "PipelineStage" USING "pipelineStage"::"PipelineStage"`
+    logger.info('Startup migration: pipelineStage cast to PipelineStage enum')
+  } catch { /* already enum type or enum doesn't exist yet, skip */ }
+
+  // Also cast Deal.stage from TEXT to PipelineStage enum
+  try {
+    await prisma.$executeRaw`ALTER TABLE "Deal" ALTER COLUMN "stage" TYPE "PipelineStage" USING "stage"::"PipelineStage"`
+    logger.info('Startup migration: Deal.stage cast to PipelineStage enum')
+  } catch { /* already enum type, skip */ }
+
   // CRM Phase 1: add new columns to existing Contact table + create new CRM tables
   try {
     await prisma.$executeRaw`ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "pipelineStage" TEXT NOT NULL DEFAULT 'NEW_LEAD'`
