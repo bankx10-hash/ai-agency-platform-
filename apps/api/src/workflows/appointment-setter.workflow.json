@@ -214,7 +214,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $('Parse Classification').first().json.contactId, calendarId: '{{CALENDAR_ID}}', startTime: $json.slots && $json.slots[0] ? $json.slots[0] : null, title: 'Appointment via AI Agent' }) }}"
+        "jsonBody": "={{ JSON.stringify({ contactId: $('Parse Classification').first().json.contactId, calendarId: '{{CALENDAR_ID}}', startTime: $json.slots && $json.slots[0] ? $json.slots[0] : null, title: 'Appointment via AI Agent', contactName: $('Get Contact').first().json.contact ? $('Get Contact').first().json.contact.name : ($('Get Contact').first().json.name || ''), contactEmail: $('Get Contact').first().json.contact ? $('Get Contact').first().json.contact.email : ($('Get Contact').first().json.email || '') }) }}"
       }
     },
     {

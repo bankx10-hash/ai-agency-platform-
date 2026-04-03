@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { randomUUID } from 'crypto'
 import twilio from 'twilio'
 import { emailService } from '../services/email.service'
+import { calendarService } from '../services/calendar.service'
 import { encryptJSON, decryptJSON } from '../utils/encrypt'
 import { appendPostRows } from '../services/sheets.service'
 import { logger } from '../utils/logger'
@@ -556,20 +557,9 @@ router.post('/:clientId/messages/email', async (req, res) => {
 router.get('/:clientId/calendar-slots', async (req, res) => {
   const { clientId } = req.params
   try {
-    const slots: string[] = []
-    const now = new Date()
-    for (let d = 1; d <= 7; d++) {
-      const date = new Date(now)
-      date.setDate(date.getDate() + d)
-      if (date.getDay() === 0 || date.getDay() === 6) continue
-      for (let h = 9; h <= 16; h++) {
-        const slot = new Date(date)
-        slot.setHours(h, 0, 0, 0)
-        slots.push(slot.toISOString())
-      }
-    }
-    logger.info('N8N calendar slots returned', { clientId, count: slots.length })
-    res.json({ slots })
+    const { provider, slots } = await calendarService.getAvailableSlots(clientId)
+    logger.info('N8N calendar slots returned', { clientId, provider, count: slots.length })
+    res.json({ slots: slots.map(s => s.start), provider, fullSlots: slots })
   } catch (err) {
     logger.error('N8N calendar slots error', { clientId, err })
     res.status(500).json({ error: 'Failed to get calendar slots' })
@@ -581,12 +571,28 @@ router.post('/:clientId/appointments', async (req, res) => {
   const { clientId } = req.params
   const { contactId, calendarId, startTime, title, contactName, contactEmail } = req.body
   try {
-    logger.info('N8N appointment booked', { clientId, contactId, startTime })
+    logger.info('N8N appointment booking', { clientId, contactId, startTime, contactName, contactEmail })
+
+    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { businessName: true } })
+    const businessName = client?.businessName || 'our business'
+
+    // Book on real calendar (Google Calendar / Calendly / Cal.com)
+    let bookingResult: { success: boolean; booked: boolean; confirmationMessage: string; eventLink?: string } | undefined
+    if (startTime && contactName && contactEmail) {
+      bookingResult = await calendarService.bookAppointment(
+        clientId,
+        startTime,
+        { name: contactName, email: contactEmail },
+        businessName
+      )
+      logger.info('Calendar booking result', { clientId, booked: bookingResult.booked, message: bookingResult.confirmationMessage })
+    }
+
+    // Update agent metrics
     const agent = await prisma.agentDeployment.findFirst({ where: { clientId, agentType: 'APPOINTMENT_SETTER' as never } })
     const current = (agent?.metrics as Record<string, unknown>) || {}
     const existing = (current.appointments as unknown[]) || []
-    const newAppt = { id: `appt-${Date.now()}`, contactId, contactName, contactEmail, calendarId, startTime, title, bookedAt: new Date().toISOString() }
-    // Keep last 500 appointments
+    const newAppt = { id: `appt-${Date.now()}`, contactId, contactName, contactEmail, calendarId, startTime, title, bookedAt: new Date().toISOString(), calendarBooked: bookingResult?.booked || false }
     const appointments = [newAppt, ...existing].slice(0, 500)
     await incrementAgentMetrics(
       clientId, 'APPOINTMENT_SETTER',
@@ -594,14 +600,16 @@ router.post('/:clientId/appointments', async (req, res) => {
       { appointmentsBooked: 1, totalLeads: 1 },
       { appointments, lastAppointment: newAppt }
     )
+
     // CRM activity: log appointment
     if (contactId) {
       await prisma.contactActivity.create({
-        data: { id: randomUUID(), contactId, clientId, type: 'APPOINTMENT' as never, title: `Appointment booked: ${title || 'Meeting'}`, body: startTime, metadata: { calendarId, startTime, title } as never, agentType: 'APPOINTMENT_SETTER' }
+        data: { id: randomUUID(), contactId, clientId, type: 'APPOINTMENT' as never, title: `Appointment booked: ${title || 'Meeting'}`, body: startTime, metadata: { calendarId, startTime, title, calendarBooked: bookingResult?.booked } as never, agentType: 'APPOINTMENT_SETTER' }
       }).catch(() => {})
       await prisma.contact.updateMany({ where: { id: contactId, clientId }, data: { lastContactedAt: new Date(), pipelineStage: 'QUALIFIED' as never } }).catch(() => {})
     }
-    res.json({ success: true, appointmentId: newAppt.id, startTime, contactId })
+
+    res.json({ success: true, appointmentId: newAppt.id, startTime, contactId, calendarBooked: bookingResult?.booked || false, eventLink: bookingResult?.eventLink })
   } catch (err) {
     logger.error('N8N appointment error', { clientId, err })
     res.status(500).json({ error: 'Failed to book appointment' })
