@@ -99,45 +99,76 @@ router.get('/contacts', async (req: AuthRequest, res: Response): Promise<void> =
     const clientId = req.clientId!
     const { stage, source, minScore, maxScore, search, limit = '50', cursor } = req.query as Record<string, string>
 
-    // Build AND conditions — each filter is a separate condition
-    const andConditions: Record<string, unknown>[] = [{ clientId }]
+    const take = Math.min(parseInt(limit) || 50, 200)
 
-    if (stage) andConditions.push({ pipelineStage: stage })
-    if (source) andConditions.push({ source })
-    if (minScore || maxScore) {
-      andConditions.push({
-        score: {
-          ...(minScore ? { gte: parseInt(minScore) } : {}),
-          ...(maxScore ? { lte: parseInt(maxScore) } : {})
-        }
-      })
+    // Use raw SQL to avoid Prisma enum type mismatch (pipelineStage stored as TEXT in DB)
+    // Build WHERE clauses
+    const conditions: string[] = ['"clientId" = $1']
+    const params: unknown[] = [clientId]
+    let paramIndex = 2
+
+    if (stage) {
+      conditions.push(`"pipelineStage" = $${paramIndex}`)
+      params.push(stage)
+      paramIndex++
+    }
+    if (source) {
+      conditions.push(`"source" = $${paramIndex}`)
+      params.push(source)
+      paramIndex++
+    }
+    if (minScore) {
+      conditions.push(`"score" >= $${paramIndex}`)
+      params.push(parseInt(minScore))
+      paramIndex++
+    }
+    if (maxScore) {
+      conditions.push(`"score" <= $${paramIndex}`)
+      params.push(parseInt(maxScore))
+      paramIndex++
     }
     if (search) {
-      andConditions.push({
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { phone: { contains: search } }
-        ]
-      })
+      conditions.push(`("name" ILIKE $${paramIndex} OR "email" ILIKE $${paramIndex} OR "phone" LIKE $${paramIndex})`)
+      params.push(`%${search}%`)
+      paramIndex++
     }
 
-    const where = { AND: andConditions }
+    const whereClause = conditions.join(' AND ')
+    const cursorClause = cursor ? `AND "id" < $${paramIndex}` : ''
+    if (cursor) { params.push(cursor); paramIndex++ }
 
-    const take = Math.min(parseInt(limit) || 50, 200)
-    const contacts = await prisma.contact.findMany({
-      where: where as never,
+    params.push(take)
+
+    const contacts = await prisma.$queryRawUnsafe<Contact[]>(
+      `SELECT "id", "clientId", "name", "email", "phone", "source", "score",
+              "pipelineStage", "dealValue", "dealCurrency", "lastContactedAt",
+              "createdAt", "updatedAt"
+       FROM "Contact"
+       WHERE ${whereClause} ${cursorClause}
+       ORDER BY "createdAt" DESC
+       LIMIT $${paramIndex}`,
+      ...params
+    )
+
+    // Fetch activity counts and last activity for each contact
+    const contactIds = contacts.map(c => c.id)
+    const activities = contactIds.length > 0 ? await prisma.contactActivity.findMany({
+      where: { contactId: { in: contactIds } },
       orderBy: { createdAt: 'desc' },
-      take,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-      include: {
-        _count: { select: { activities: true, tasks: true } },
-        activities: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true, title: true } }
+      select: { contactId: true, createdAt: true, title: true }
+    }) : []
+
+    const result = contacts.map(c => {
+      const contactActivities = activities.filter(a => a.contactId === c.id)
+      return {
+        ...c,
+        _count: { activities: contactActivities.length, tasks: 0 },
+        activities: contactActivities.slice(0, 1)
       }
     })
 
     const nextCursor = contacts.length === take ? contacts[contacts.length - 1].id : null
-    res.json({ contacts, nextCursor })
+    res.json({ contacts: result, nextCursor })
   } catch (err) {
     logger.error('CRM get contacts error', { err })
     res.status(500).json({ error: 'Failed to fetch contacts' })
