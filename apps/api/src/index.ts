@@ -121,12 +121,15 @@ async function runStartupMigrations() {
 
   // Fix: cast pipelineStage from TEXT to PipelineStage enum so Prisma queries work
   try {
+    // First, fix any invalid values that would prevent the cast
+    await prisma.$executeRaw`UPDATE "Contact" SET "pipelineStage" = 'NEW_LEAD' WHERE "pipelineStage" NOT IN ('NEW_LEAD','CONTACTED','QUALIFIED','PROPOSAL','CLOSED_WON','CLOSED_LOST')`
     await prisma.$executeRaw`ALTER TABLE "Contact" ALTER COLUMN "pipelineStage" TYPE "PipelineStage" USING "pipelineStage"::"PipelineStage"`
     logger.info('Startup migration: pipelineStage cast to PipelineStage enum')
   } catch { /* already enum type or enum doesn't exist yet, skip */ }
 
   // Also cast Deal.stage from TEXT to PipelineStage enum
   try {
+    await prisma.$executeRaw`UPDATE "Deal" SET "stage" = 'NEW_LEAD' WHERE "stage" NOT IN ('NEW_LEAD','CONTACTED','QUALIFIED','PROPOSAL','CLOSED_WON','CLOSED_LOST')`
     await prisma.$executeRaw`ALTER TABLE "Deal" ALTER COLUMN "stage" TYPE "PipelineStage" USING "stage"::"PipelineStage"`
     logger.info('Startup migration: Deal.stage cast to PipelineStage enum')
   } catch { /* already enum type, skip */ }
@@ -521,6 +524,13 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
     message: err.message,
     stack: err.stack
   })
+
+  // Ensure CORS headers are set even on error responses
+  const origin = _req.headers.origin
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+  }
 
   res.status(500).json({
     error: 'Internal server error',
