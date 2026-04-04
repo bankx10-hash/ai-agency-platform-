@@ -144,7 +144,7 @@ router.post('/posts', async (req: AuthRequest, res: Response) => {
 router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
   try {
     const clientId = req.clientId!
-    const { platform = 'instagram', topic, contentPillar = 'education' } = req.body
+    const { platform = 'instagram', topic, contentPillar = 'education', customImagePrompt } = req.body
 
     const client = await prisma.client.findUnique({ where: { id: clientId } })
     if (!client) { res.status(404).json({ error: 'Client not found' }); return }
@@ -169,13 +169,18 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
       scheduledAt.setHours(10, 0, 0, 0)
     }
 
+    // Use custom image prompt if provided, otherwise use AI-generated one
+    const imagePromptToUse = customImagePrompt || parsed.image_prompt
+
     // Auto-generate image via fal.ai if image_prompt exists
     let imageUrl: string | undefined
-    if (parsed.image_prompt && process.env.FAL_API_KEY) {
+    if (imagePromptToUse && process.env.FAL_API_KEY) {
       try {
         const aspectRatio = platform.toUpperCase() === 'INSTAGRAM' ? '1:1' : '16:9'
-        const styleGuide = ', hyper-realistic cinematic DSLR photography, professionals in smart business attire as main subject, dark moody lighting with soft shadows and cool undertones, dramatic contrast, depth-of-field bokeh, crisp lens reflections, slightly darker tone, premium editorial aesthetic, modern sleek workplace, shot on 85mm f/1.4 lens, NO TEXT, NO WORDS, NO LETTERS, NO WRITING, NO LOGOS, NO WATERMARKS, NO OVERLAYS, no illustrations, no cartoons, no bright airy aesthetics'
-        const styledPrompt = (parsed.image_prompt.substring(0, 800) + styleGuide).substring(0, 1000)
+        const styleGuide = customImagePrompt
+          ? '' // Don't add style guide if client provided their own prompt — respect their vision
+          : ', hyper-realistic cinematic DSLR photography, professionals in smart business attire as main subject, dark moody lighting with soft shadows and cool undertones, dramatic contrast, depth-of-field bokeh, crisp lens reflections, slightly darker tone, premium editorial aesthetic, modern sleek workplace, shot on 85mm f/1.4 lens, NO TEXT, NO WORDS, NO LETTERS, NO WRITING, NO LOGOS, NO WATERMARKS, NO OVERLAYS, no illustrations, no cartoons, no bright airy aesthetics'
+        const styledPrompt = (imagePromptToUse.substring(0, 800) + styleGuide).substring(0, 1000)
         const falResponse = await axios.post(
           'https://fal.run/fal-ai/flux/dev',
           {
@@ -205,7 +210,7 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
         source: 'AI_GENERATED' as never,
         content: parsed.content,
         imageUrl: imageUrl || null,
-        imagePrompt: parsed.image_prompt,
+        imagePrompt: imagePromptToUse,
         hashtags: parsed.hashtags || [],
         contentPillar,
         scheduledAt,
@@ -619,8 +624,8 @@ router.delete('/posts/:id', async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id, clientId: req.clientId! }
     })
     if (!post) { res.status(404).json({ error: 'Post not found' }); return }
-    if (post.status !== 'DRAFT' && post.status !== 'SCHEDULED') {
-      res.status(400).json({ error: 'Can only delete DRAFT or SCHEDULED posts' })
+    if (post.status === 'PUBLISHING') {
+      res.status(400).json({ error: 'Cannot delete a post that is currently publishing' })
       return
     }
 
