@@ -462,14 +462,25 @@ async function runStartupMigrations() {
     await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "postReviewLeadHours" INTEGER NOT NULL DEFAULT 24`
     await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "postReminderHours" JSONB NOT NULL DEFAULT '[6, 2]'`
 
-    // Create PostStatus, SocialPlatform, PostSource types (use TEXT, Prisma maps enums to text)
+    // Create PostgreSQL enum types required by Prisma
+    await prisma.$executeRaw`DO $$ BEGIN CREATE TYPE "PostStatus" AS ENUM ('DRAFT','SCHEDULED','PUBLISHING','PUBLISHED','FAILED'); EXCEPTION WHEN duplicate_object THEN null; END $$`
+    await prisma.$executeRaw`DO $$ BEGIN CREATE TYPE "SocialPlatform" AS ENUM ('FACEBOOK','INSTAGRAM','LINKEDIN'); EXCEPTION WHEN duplicate_object THEN null; END $$`
+    await prisma.$executeRaw`DO $$ BEGIN CREATE TYPE "PostSource" AS ENUM ('MANUAL','AI_GENERATED','NEWS_INSPIRED'); EXCEPTION WHEN duplicate_object THEN null; END $$`
+
+    // If tables already exist with TEXT columns, cast them to the proper enum types
+    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "ScheduledPost" ALTER COLUMN "status" TYPE "PostStatus" USING "status"::"PostStatus"; EXCEPTION WHEN others THEN null; END $$`
+    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "ScheduledPost" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform"; EXCEPTION WHEN others THEN null; END $$`
+    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "ScheduledPost" ALTER COLUMN "source" TYPE "PostSource" USING "source"::"PostSource"; EXCEPTION WHEN others THEN null; END $$`
+    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "PlatformInsight" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform"; EXCEPTION WHEN others THEN null; END $$`
+    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "Competitor" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform"; EXCEPTION WHEN others THEN null; END $$`
+
     await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "ScheduledPost" (
-        "id"             TEXT        NOT NULL,
-        "clientId"       TEXT        NOT NULL,
-        "platform"       TEXT        NOT NULL,
-        "status"         TEXT        NOT NULL DEFAULT 'DRAFT',
-        "source"         TEXT        NOT NULL DEFAULT 'MANUAL',
+        "id"             TEXT             NOT NULL,
+        "clientId"       TEXT             NOT NULL,
+        "platform"       "SocialPlatform" NOT NULL,
+        "status"         "PostStatus"     NOT NULL DEFAULT 'DRAFT'::"PostStatus",
+        "source"         "PostSource"     NOT NULL DEFAULT 'MANUAL'::"PostSource",
         "content"        TEXT        NOT NULL,
         "imageUrl"       TEXT,
         "imagePrompt"    TEXT,
@@ -519,9 +530,9 @@ async function runStartupMigrations() {
 
     await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "PlatformInsight" (
-        "id"        TEXT        NOT NULL,
-        "clientId"  TEXT        NOT NULL,
-        "platform"  TEXT        NOT NULL,
+        "id"        TEXT             NOT NULL,
+        "clientId"  TEXT             NOT NULL,
+        "platform"  "SocialPlatform" NOT NULL,
         "metric"    TEXT        NOT NULL,
         "period"    TEXT        NOT NULL DEFAULT 'day',
         "value"     INTEGER     NOT NULL,
@@ -535,10 +546,10 @@ async function runStartupMigrations() {
 
     await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "Competitor" (
-        "id"        TEXT        NOT NULL,
-        "clientId"  TEXT        NOT NULL,
-        "name"      TEXT        NOT NULL,
-        "platform"  TEXT        NOT NULL,
+        "id"        TEXT             NOT NULL,
+        "clientId"  TEXT             NOT NULL,
+        "name"      TEXT             NOT NULL,
+        "platform"  "SocialPlatform" NOT NULL,
         "handle"    TEXT        NOT NULL,
         "avatarUrl" TEXT,
         "isActive"  BOOLEAN     NOT NULL DEFAULT true,
