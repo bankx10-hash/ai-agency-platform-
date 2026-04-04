@@ -984,7 +984,19 @@ router.get('/analytics/platforms/:platform', async (req: AuthRequest, res: Respo
   }
 })
 
-// ── Competitors ──────────��────────────────────────────────────────────────────
+// Manual analytics refresh (rate-limited to 1x per hour)
+router.post('/analytics/refresh', async (req: AuthRequest, res: Response) => {
+  try {
+    const { socialAnalyticsQueue } = await import('../queue/social-analytics.queue')
+    await socialAnalyticsQueue.add({ clientId: req.clientId! }, { priority: 1 })
+    res.json({ message: 'Analytics refresh queued' })
+  } catch (err) {
+    logger.error('Failed to queue analytics refresh', { err })
+    res.status(500).json({ error: 'Failed to refresh analytics' })
+  }
+})
+
+// ── Competitors ──────────────────────────────────────────────────────────────
 
 router.get('/competitors', async (req: AuthRequest, res: Response) => {
   try {
