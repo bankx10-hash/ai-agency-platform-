@@ -166,7 +166,7 @@ export default function WorkflowsPage() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-3 gap-2 text-center mb-3">
                 <div>
                   <div className="text-lg font-bold text-gray-900 dark:text-white num">{w.questions.length}</div>
                   <div className="text-[10px] text-gray-500 dark:text-gray-400">Questions</div>
@@ -180,6 +180,27 @@ export default function WorkflowsPage() {
                   <div className="text-[10px] text-gray-500 dark:text-gray-400">Qualified</div>
                 </div>
               </div>
+
+              {/* Delete button */}
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  if (!confirm(`Delete workflow "${w.name}"? This will also delete all conversations and questions.`)) return
+                  try {
+                    const token = localStorage.getItem('token')
+                    await axios.delete(`${API_URL}/workflows/${w.id}`, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    })
+                    fetchWorkflows()
+                  } catch {
+                    alert('Failed to delete workflow')
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-red-200 dark:border-red-900/50 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                Delete
+              </button>
             </div>
           ))}
         </div>
