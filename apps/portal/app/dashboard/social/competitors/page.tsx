@@ -308,7 +308,7 @@ export default function CompetitorsPage() {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Engagement</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{latest.engagementRate.toFixed(2)}%</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{Number(latest.engagementRate).toFixed(2)}%</p>
                       </div>
                     </div>
                   )}
