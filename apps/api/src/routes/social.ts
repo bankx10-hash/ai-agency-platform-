@@ -617,7 +617,34 @@ router.patch('/posts/:id', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Delete post (only DRAFT/SCHEDULED)
+// Upload/save image for a post (accepts base64 data URL from canvas editor)
+router.post('/posts/:id/upload-image', async (req: AuthRequest, res: Response) => {
+  try {
+    const post = await prisma.scheduledPost.findFirst({
+      where: { id: req.params.id, clientId: req.clientId! }
+    })
+    if (!post) { res.status(404).json({ error: 'Post not found' }); return }
+
+    const { imageDataUrl } = req.body
+    if (!imageDataUrl || !imageDataUrl.startsWith('data:image/')) {
+      res.status(400).json({ error: 'imageDataUrl is required (data:image/... format)' })
+      return
+    }
+
+    const updated = await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: { imageUrl: imageDataUrl }
+    })
+
+    logger.info('Post image uploaded from editor', { postId: post.id })
+    res.json({ imageUrl: updated.imageUrl })
+  } catch (err) {
+    logger.error('Failed to upload image', { err })
+    res.status(500).json({ error: 'Failed to upload image' })
+  }
+})
+
+// Delete post
 router.delete('/posts/:id', async (req: AuthRequest, res: Response) => {
   try {
     const post = await prisma.scheduledPost.findFirst({

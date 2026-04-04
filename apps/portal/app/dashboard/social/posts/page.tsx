@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
+import dynamic from 'next/dynamic'
+
+const ImageEditor = dynamic(() => import('./ImageEditor'), { ssr: false })
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
@@ -111,6 +114,7 @@ export default function SocialPostsPage() {
   const [formTopic, setFormTopic] = useState('')
   const [formImagePrompt, setFormImagePrompt] = useState('')
   const [formScheduledAt, setFormScheduledAt] = useState('')
+  const [showImageEditor, setShowImageEditor] = useState(false)
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') router.push('/login')
@@ -906,6 +910,25 @@ export default function SocialPostsPage() {
                   )}
                 </div>
               )}
+              {/* Image Editor buttons */}
+              {selectedPost?.status !== 'PUBLISHED' && (
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={() => setShowImageEditor(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    {selectedPost?.imageUrl ? 'Edit Image' : 'Design Image'}
+                  </button>
+                  <button
+                    onClick={() => setShowImageEditor(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    Templates
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Ad details (if this post is an advert) */}
@@ -1173,6 +1196,34 @@ export default function SocialPostsPage() {
           </div>
         </div>
       )}
+
+      {/* Image Editor */}
+      <ImageEditor
+        isOpen={showImageEditor}
+        onClose={() => setShowImageEditor(false)}
+        onSave={async (imageDataUrl: string) => {
+          if (!selectedPost?.id) return
+          try {
+            const token = getToken()
+            await axios.post(
+              `${API_URL}/social/posts/${selectedPost.id}/upload-image`,
+              { imageDataUrl },
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+            setSelectedPost({ ...selectedPost, imageUrl: imageDataUrl })
+            fetchPosts()
+            setShowImageEditor(false)
+          } catch {
+            alert('Failed to save image')
+          }
+        }}
+        backgroundImageUrl={selectedPost?.imageUrl}
+        platform={selectedPost?.platform || formPlatform}
+        headline={(selectedPost?.metadata as Record<string, unknown>)?.headline as string}
+        primaryText={(selectedPost?.metadata as Record<string, unknown>)?.primaryText as string}
+        ctaText={(selectedPost?.metadata as Record<string, unknown>)?.ctaType as string}
+        businessName={undefined}
+      />
     </div>
   )
 }
