@@ -106,6 +106,28 @@ enum TaskStatus {
   CANCELLED
 }
 
+// ── Social Media Dashboard Enums ──────────────────────────────────────────────
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum SocialPlatform {
+  FACEBOOK
+  INSTAGRAM
+  LINKEDIN
+}
+
+enum PostSource {
+  MANUAL
+  AI_GENERATED
+  NEWS_INSPIRED
+}
+
 model Client {
   id               String           @id @default(cuid())
   businessName     String
@@ -120,6 +142,9 @@ model Client {
   country             String?          @default("AU")
   businessDescription String?
   icpDescription      String?
+  autoApprovePosts    Boolean          @default(false)
+  postReviewLeadHours Int              @default(24)
+  postReminderHours   Json             @default("[6, 2]")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   agents           AgentDeployment[]
@@ -130,6 +155,9 @@ model Client {
   funnels          Funnel[]
   workflows        ConversationWorkflow[]
   workflowConversations WorkflowConversation[]
+  scheduledPosts   ScheduledPost[]
+  competitors      Competitor[]
+  newsItems        NewsItem[]
 }
 
 model AgentDeployment {
@@ -449,4 +477,121 @@ model WorkflowConversation {
   @@unique([workflowId, channel, senderId])
   @@index([clientId, status])
   @@index([senderId, channel])
+}
+
+// ── Social Media Dashboard Models ─────────────────────────────────────────────
+
+model ScheduledPost {
+  id              String         @id @default(cuid())
+  clientId        String
+  client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  platform        SocialPlatform
+  status          PostStatus     @default(DRAFT)
+  source          PostSource     @default(MANUAL)
+  content         String
+  imageUrl        String?
+  imagePrompt     String?
+  hashtags        Json           @default("[]")
+  contentPillar   String?
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  externalPostId  String?
+  errorMessage    String?
+  autoApproved    Boolean        @default(false)
+  metadata        Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  analytics       PostAnalytics?
+
+  @@index([clientId, status])
+  @@index([clientId, platform])
+  @@index([clientId, scheduledAt])
+  @@index([status, scheduledAt])
+}
+
+model PostAnalytics {
+  id             String        @id @default(cuid())
+  postId         String        @unique
+  post           ScheduledPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  impressions    Int           @default(0)
+  reach          Int           @default(0)
+  engagements    Int           @default(0)
+  likes          Int           @default(0)
+  comments       Int           @default(0)
+  shares         Int           @default(0)
+  clicks         Int           @default(0)
+  saves          Int           @default(0)
+  engagementRate Decimal?      @db.Decimal(5, 4)
+  rawData        Json?
+  fetchedAt      DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([postId])
+}
+
+model PlatformInsight {
+  id          String         @id @default(cuid())
+  clientId    String
+  platform    SocialPlatform
+  metric      String
+  period      String         @default("day")
+  value        Int
+  endTime     DateTime
+  fetchedAt   DateTime       @default(now())
+
+  @@unique([clientId, platform, metric, period, endTime])
+  @@index([clientId, platform, fetchedAt])
+}
+
+model Competitor {
+  id          String              @id @default(cuid())
+  clientId    String
+  client      Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  platform    SocialPlatform
+  handle      String
+  avatarUrl   String?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  snapshots   CompetitorSnapshot[]
+
+  @@unique([clientId, platform, handle])
+  @@index([clientId, isActive])
+}
+
+model CompetitorSnapshot {
+  id             String     @id @default(cuid())
+  competitorId   String
+  competitor     Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  followers      Int?
+  posts          Int?
+  avgLikes       Int?
+  avgComments    Int?
+  engagementRate Decimal?   @db.Decimal(5, 4)
+  recentPosts    Json?
+  fetchedAt      DateTime   @default(now())
+
+  @@index([competitorId, fetchedAt])
+}
+
+model NewsItem {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  source      String
+  url         String
+  imageUrl    String?
+  summary     String?
+  category    String?
+  publishedAt DateTime
+  fetchedAt   DateTime @default(now())
+  isRead      Boolean  @default(false)
+  isSaved     Boolean  @default(false)
+
+  @@unique([clientId, url])
+  @@index([clientId, fetchedAt])
+  @@index([clientId, category])
 }

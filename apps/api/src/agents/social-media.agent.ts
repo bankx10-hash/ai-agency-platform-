@@ -5,6 +5,7 @@ import { socialService } from '../services/social.service'
 import { createSocialMediaSheet } from '../services/sheets.service'
 import { logger } from '../utils/logger'
 import { prisma } from '../lib/prisma'
+import { randomUUID } from 'crypto'
 
 export type SupportedPlatform = 'instagram' | 'facebook' | 'linkedin'
 
@@ -133,6 +134,57 @@ Return valid JSON: { "week_1": [...], "week_2": [...], "week_3": [...], "week_4"
 Each week is an array of post objects. Plan ${config.posting_frequency} per day.`,
       'You are a social media strategist who creates content calendars that drive viral growth. Be specific with topics — no vague filler.'
     )
+  }
+
+  // Generates content and saves as a reviewable draft (or auto-scheduled if client has autoApprovePosts)
+  async generateDraft(
+    clientId: string,
+    config: SocialMediaAgentConfig,
+    platform: SupportedPlatform,
+    topic: string,
+    contentPillar: string
+  ): Promise<{ id: string; status: string; content: string }> {
+    const prompt = this.generatePrompt(config, { platform, topic, content_pillar: contentPillar })
+    const raw = await this.callClaude(prompt, 'You are an elite social media content creator. Return only valid JSON.')
+
+    let parsed: { content: string; hashtags?: string[]; image_prompt?: string; hook_score?: number; predicted_engagement?: string; best_posting_time?: string } = { content: raw }
+    try {
+      parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
+    } catch { /* use raw text */ }
+
+    const client = await prisma.client.findUnique({ where: { id: clientId } })
+    const autoApprove = client?.autoApprovePosts ?? false
+
+    // Schedule for tomorrow at 10 AM by default
+    const scheduledAt = new Date()
+    scheduledAt.setDate(scheduledAt.getDate() + 1)
+    scheduledAt.setHours(10, 0, 0, 0)
+
+    const status = autoApprove ? 'SCHEDULED' : 'DRAFT'
+
+    const post = await prisma.scheduledPost.create({
+      data: {
+        id: randomUUID(),
+        clientId,
+        platform: platform.toUpperCase() as never,
+        status: status as never,
+        source: 'AI_GENERATED' as never,
+        content: parsed.content,
+        imagePrompt: parsed.image_prompt,
+        hashtags: parsed.hashtags || [],
+        contentPillar,
+        scheduledAt,
+        autoApproved: autoApprove,
+        metadata: {
+          hook_score: parsed.hook_score,
+          predicted_engagement: parsed.predicted_engagement,
+          best_posting_time: parsed.best_posting_time,
+        }
+      }
+    })
+
+    logger.info('Social media draft created', { clientId, postId: post.id, platform, status })
+    return { id: post.id, status, content: parsed.content }
   }
 
   // Generates and immediately posts/schedules content for a specific platform

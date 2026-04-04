@@ -25,6 +25,12 @@ import leadsRouter from './routes/leads'
 import workflowsRouter from './routes/workflows'
 import whatsappWebhooksRouter from './routes/whatsapp-webhooks'
 import { startWorkflowTimeoutScheduler } from './queue/workflow-timeout.queue'
+import { startSocialPublishScheduler } from './queue/social-publish.queue'
+import { startSocialReminderScheduler } from './queue/social-reminder.queue'
+import { startSocialAnalyticsScheduler } from './queue/social-analytics.queue'
+import { startSocialCompetitorScheduler } from './queue/social-competitor.queue'
+import { startSocialNewsScheduler } from './queue/social-news.queue'
+import socialRouter from './routes/social'
 import { logger } from './utils/logger'
 
 // Prevent silent crashes — log and keep running
@@ -449,6 +455,143 @@ async function runStartupMigrations() {
     logger.info('Startup migration: CallLog table ensured')
   } catch { /* already exist, skip */ }
 
+  // ── Social Media Dashboard tables ─────────────────────────────────────────
+  try {
+    // Add social settings columns to Client
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "autoApprovePosts" BOOLEAN NOT NULL DEFAULT false`
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "postReviewLeadHours" INTEGER NOT NULL DEFAULT 24`
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "postReminderHours" JSONB NOT NULL DEFAULT '[6, 2]'`
+
+    // Create PostStatus, SocialPlatform, PostSource types (use TEXT, Prisma maps enums to text)
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ScheduledPost" (
+        "id"             TEXT        NOT NULL,
+        "clientId"       TEXT        NOT NULL,
+        "platform"       TEXT        NOT NULL,
+        "status"         TEXT        NOT NULL DEFAULT 'DRAFT',
+        "source"         TEXT        NOT NULL DEFAULT 'MANUAL',
+        "content"        TEXT        NOT NULL,
+        "imageUrl"       TEXT,
+        "imagePrompt"    TEXT,
+        "hashtags"       JSONB       NOT NULL DEFAULT '[]',
+        "contentPillar"  TEXT,
+        "scheduledAt"    TIMESTAMPTZ,
+        "publishedAt"    TIMESTAMPTZ,
+        "externalPostId" TEXT,
+        "errorMessage"   TEXT,
+        "autoApproved"   BOOLEAN     NOT NULL DEFAULT false,
+        "metadata"       JSONB,
+        "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "ScheduledPost_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "ScheduledPost_clientId_fkey" FOREIGN KEY ("clientId")
+          REFERENCES "Client"("id") ON DELETE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "ScheduledPost_clientId_status_idx" ON "ScheduledPost"("clientId","status")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "ScheduledPost_clientId_platform_idx" ON "ScheduledPost"("clientId","platform")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "ScheduledPost_clientId_scheduledAt_idx" ON "ScheduledPost"("clientId","scheduledAt")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "ScheduledPost_status_scheduledAt_idx" ON "ScheduledPost"("status","scheduledAt")`
+
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "PostAnalytics" (
+        "id"             TEXT        NOT NULL,
+        "postId"         TEXT        NOT NULL UNIQUE,
+        "impressions"    INTEGER     NOT NULL DEFAULT 0,
+        "reach"          INTEGER     NOT NULL DEFAULT 0,
+        "engagements"    INTEGER     NOT NULL DEFAULT 0,
+        "likes"          INTEGER     NOT NULL DEFAULT 0,
+        "comments"       INTEGER     NOT NULL DEFAULT 0,
+        "shares"         INTEGER     NOT NULL DEFAULT 0,
+        "clicks"         INTEGER     NOT NULL DEFAULT 0,
+        "saves"          INTEGER     NOT NULL DEFAULT 0,
+        "engagementRate" DECIMAL(5,4),
+        "rawData"        JSONB,
+        "fetchedAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "PostAnalytics_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "PostAnalytics_postId_fkey" FOREIGN KEY ("postId")
+          REFERENCES "ScheduledPost"("id") ON DELETE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "PostAnalytics_postId_idx" ON "PostAnalytics"("postId")`
+
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "PlatformInsight" (
+        "id"        TEXT        NOT NULL,
+        "clientId"  TEXT        NOT NULL,
+        "platform"  TEXT        NOT NULL,
+        "metric"    TEXT        NOT NULL,
+        "period"    TEXT        NOT NULL DEFAULT 'day',
+        "value"     INTEGER     NOT NULL,
+        "endTime"   TIMESTAMPTZ NOT NULL,
+        "fetchedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "PlatformInsight_pkey" PRIMARY KEY ("id")
+      )
+    `
+    await prisma.$executeRaw`CREATE UNIQUE INDEX IF NOT EXISTS "PlatformInsight_clientId_platform_metric_period_endTime_key" ON "PlatformInsight"("clientId","platform","metric","period","endTime")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "PlatformInsight_clientId_platform_fetchedAt_idx" ON "PlatformInsight"("clientId","platform","fetchedAt")`
+
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "Competitor" (
+        "id"        TEXT        NOT NULL,
+        "clientId"  TEXT        NOT NULL,
+        "name"      TEXT        NOT NULL,
+        "platform"  TEXT        NOT NULL,
+        "handle"    TEXT        NOT NULL,
+        "avatarUrl" TEXT,
+        "isActive"  BOOLEAN     NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "Competitor_pkey" PRIMARY KEY ("id")
+      )
+    `
+    await prisma.$executeRaw`CREATE UNIQUE INDEX IF NOT EXISTS "Competitor_clientId_platform_handle_key" ON "Competitor"("clientId","platform","handle")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "Competitor_clientId_isActive_idx" ON "Competitor"("clientId","isActive")`
+
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "CompetitorSnapshot" (
+        "id"             TEXT        NOT NULL,
+        "competitorId"   TEXT        NOT NULL,
+        "followers"      INTEGER,
+        "posts"          INTEGER,
+        "avgLikes"       INTEGER,
+        "avgComments"    INTEGER,
+        "engagementRate" DECIMAL(5,4),
+        "recentPosts"    JSONB,
+        "fetchedAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT "CompetitorSnapshot_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "CompetitorSnapshot_competitorId_fkey" FOREIGN KEY ("competitorId")
+          REFERENCES "Competitor"("id") ON DELETE CASCADE
+      )
+    `
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "CompetitorSnapshot_competitorId_fetchedAt_idx" ON "CompetitorSnapshot"("competitorId","fetchedAt")`
+
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "NewsItem" (
+        "id"          TEXT        NOT NULL,
+        "clientId"    TEXT        NOT NULL,
+        "title"       TEXT        NOT NULL,
+        "source"      TEXT        NOT NULL,
+        "url"         TEXT        NOT NULL,
+        "imageUrl"    TEXT,
+        "summary"     TEXT,
+        "category"    TEXT,
+        "publishedAt" TIMESTAMPTZ NOT NULL,
+        "fetchedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "isRead"      BOOLEAN     NOT NULL DEFAULT false,
+        "isSaved"     BOOLEAN     NOT NULL DEFAULT false,
+        CONSTRAINT "NewsItem_pkey" PRIMARY KEY ("id")
+      )
+    `
+    await prisma.$executeRaw`CREATE UNIQUE INDEX IF NOT EXISTS "NewsItem_clientId_url_key" ON "NewsItem"("clientId","url")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "NewsItem_clientId_fetchedAt_idx" ON "NewsItem"("clientId","fetchedAt")`
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS "NewsItem_clientId_category_idx" ON "NewsItem"("clientId","category")`
+
+    logger.info('Startup migration: Social media dashboard tables ensured')
+  } catch (err) { logger.warn('Social media migration partial', { err }) }
+
 }
 
 const app = express()
@@ -508,6 +651,7 @@ app.use('/workflows', workflowsRouter)
 app.use('/sequences', sequencesRouter)
 app.post('/sms/webhook', handleSmsWebhook)
 app.use('/sms', smsRouter)
+app.use('/social', socialRouter)
 app.post('/calls/webhook', handleCallWebhook)
 app.use('/calls', callsRouter)
 // Public lead capture — allow any origin (embedded on client websites)
@@ -563,6 +707,13 @@ runStartupMigrations().then(() => {
 
     // Workflow conversation timeout checker
     startWorkflowTimeoutScheduler()
+
+    // Social media dashboard schedulers
+    startSocialPublishScheduler()
+    startSocialReminderScheduler()
+    startSocialAnalyticsScheduler()
+    startSocialCompetitorScheduler()
+    startSocialNewsScheduler()
   })
 })
 

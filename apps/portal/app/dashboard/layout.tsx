@@ -80,6 +80,18 @@ const NAV: NavItem[] = [
     ]
   },
   {
+    type: 'group',
+    href: '/dashboard/social', label: 'Social',
+    icon: <Icon d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z" />,
+    children: [
+      { href: '/dashboard/social/posts',       label: 'Posts'       },
+      { href: '/dashboard/social/calendar',    label: 'Calendar'    },
+      { href: '/dashboard/social/analytics',   label: 'Analytics'   },
+      { href: '/dashboard/social/competitors', label: 'Competitors' },
+      { href: '/dashboard/social/news',        label: 'News'        },
+    ]
+  },
+  {
     type: 'link',
     href: '/dashboard/workflows', label: 'Workflows',
     icon: <Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" d2="M9 14l2 2 4-4" />
