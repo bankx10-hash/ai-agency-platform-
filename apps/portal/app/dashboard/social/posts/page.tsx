@@ -891,7 +891,8 @@ export default function SocialPostsPage() {
                 </div>
               ) : null}
               {selectedPost?.status !== 'PUBLISHED' && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Generate Image with AI — creates image then opens editor */}
                   <button
                     onClick={async () => {
                       if (!selectedPost?.id) return
@@ -900,47 +901,43 @@ export default function SocialPostsPage() {
                         const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
                         const res = await axios.post(
                           `${API_URL}/social/posts/${selectedPost.id}/generate-image`,
-                          { imagePrompt: selectedPost.imagePrompt },
+                          { imagePrompt: selectedPost.imagePrompt || formImagePrompt },
                           { headers: { Authorization: `Bearer ${token}` } }
                         )
                         setSelectedPost({ ...selectedPost, imageUrl: res.data.imageUrl })
                         fetchPosts()
+                        // Open the editor with the newly generated image
+                        setShowImageEditor(true)
                       } catch {
                         alert('Failed to generate image')
                       } finally {
                         setGenerating(false)
                       }
                     }}
-                    disabled={generating || !selectedPost?.imagePrompt}
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={generating}
+                    className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {generating ? (
                       <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     ) : (
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" /></svg>
                     )}
-                    {selectedPost?.imageUrl ? 'Regenerate Image' : 'Generate Image'}
+                    {selectedPost?.imageUrl ? 'Regenerate with AI' : 'Generate Image with AI'}
                   </button>
-                  {selectedPost?.imagePrompt && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[200px]" title={selectedPost.imagePrompt}>
-                      Prompt: {selectedPost.imagePrompt.substring(0, 50)}...
-                    </span>
+                  {/* Edit in editor (if image exists) or Design from scratch */}
+                  {selectedPost?.imageUrl && (
+                    <button
+                      onClick={() => setShowImageEditor(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      Edit Image
+                    </button>
                   )}
-                </div>
-              )}
-              {/* Image Editor buttons */}
-              {selectedPost?.status !== 'PUBLISHED' && (
-                <div className="flex items-center gap-2 mt-2">
+                  {/* Templates — open editor with template selector */}
                   <button
                     onClick={() => setShowImageEditor(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
-                  >
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    {selectedPost?.imageUrl ? 'Edit Image' : 'Design Image'}
-                  </button>
-                  <button
-                    onClick={() => setShowImageEditor(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                     Templates
