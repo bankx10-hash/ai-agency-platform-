@@ -17,8 +17,8 @@ const router = Router()
 router.use(authMiddleware)
 
 // Ensure uploads directory exists
-const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads', 'social')
-fs.mkdirSync(UPLOADS_DIR, { recursive: true })
+const UPLOADS_DIR = path.join('/tmp', 'uploads', 'social')
+try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }) } catch { /* /tmp should always be writable */ }
 
 // Save image buffer or base64 to disk, return public URL
 function saveImageToDisk(data: Buffer | string, filename?: string): string {

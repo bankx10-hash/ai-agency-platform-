@@ -671,8 +671,8 @@ app.use(express.urlencoded({ extended: true }))
 // Serve uploaded images (social post images, ad composites)
 import path from 'path'
 import fs from 'fs'
-const uploadsDir = path.resolve(process.cwd(), 'uploads', 'social')
-fs.mkdirSync(uploadsDir, { recursive: true })
+const uploadsDir = path.join('/tmp', 'uploads', 'social')
+try { fs.mkdirSync(uploadsDir, { recursive: true }) } catch { /* /tmp always writable */ }
 app.use('/uploads/social', express.static(uploadsDir))
 
 app.use(apiRateLimit)
