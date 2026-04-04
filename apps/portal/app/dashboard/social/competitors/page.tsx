@@ -157,12 +157,29 @@ export default function CompetitorsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Competitor Tracker</h1>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition"
-        >
-          Add Competitor
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              try {
+                await axios.post(`${API_URL}/social/competitors/refresh-all`, {}, { headers: authHeaders() })
+                // Wait a few seconds for the queue to process, then refetch
+                setTimeout(() => fetchCompetitors(), 5000)
+                alert('Refreshing competitor data... This may take a moment.')
+              } catch {
+                alert('Failed to refresh')
+              }
+            }}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          >
+            Refresh All
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition"
+          >
+            Add Competitor
+          </button>
+        </div>
       </div>
 
       {/* Add Competitor Modal */}
@@ -297,7 +314,21 @@ export default function CompetitorsPage() {
                   )}
 
                   {!latest && (
-                    <p className="mt-4 text-xs text-gray-400 dark:text-gray-500">No snapshot data yet</p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <p className="text-xs text-gray-400 dark:text-gray-500">No snapshot data yet</p>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          try {
+                            await axios.post(`${API_URL}/social/competitors/${c.id}/refresh`, {}, { headers: authHeaders() })
+                            setTimeout(() => fetchCompetitors(), 5000)
+                          } catch { /* ignore */ }
+                        }}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                      >
+                        Fetch now
+                      </button>
+                    </div>
                   )}
                 </div>
 

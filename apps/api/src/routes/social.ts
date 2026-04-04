@@ -8,6 +8,7 @@ import { SocialMediaAgent, SocialMediaAgentConfig } from '../agents/social-media
 import { decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
 import { socialPublishQueue } from '../queue/social-publish.queue'
+import { socialCompetitorQueue } from '../queue/social-competitor.queue'
 import { generateAdImage, ctaToDisplayText } from '../services/ad-image.service'
 
 const router = Router()
@@ -991,7 +992,43 @@ router.get('/competitors/:id/snapshots', async (req: AuthRequest, res: Response)
   }
 })
 
-// ── News ─────────���──────────────────────────────────���─────────────────────────
+// Refresh competitor data now
+router.post('/competitors/:id/refresh', async (req: AuthRequest, res: Response) => {
+  try {
+    const competitor = await prisma.competitor.findFirst({
+      where: { id: req.params.id, clientId: req.clientId! }
+    })
+    if (!competitor) { res.status(404).json({ error: 'Competitor not found' }); return }
+
+    // Queue immediate refresh
+    await socialCompetitorQueue.add({ competitorId: competitor.id }, { priority: 1 })
+
+    res.json({ message: 'Refresh queued', competitorId: competitor.id })
+  } catch (err) {
+    logger.error('Failed to queue competitor refresh', { err })
+    res.status(500).json({ error: 'Failed to refresh competitor' })
+  }
+})
+
+// Refresh all competitors now
+router.post('/competitors/refresh-all', async (req: AuthRequest, res: Response) => {
+  try {
+    const competitors = await prisma.competitor.findMany({
+      where: { clientId: req.clientId!, isActive: true }
+    })
+
+    for (const c of competitors) {
+      await socialCompetitorQueue.add({ competitorId: c.id }, { priority: 1 })
+    }
+
+    res.json({ message: `Refresh queued for ${competitors.length} competitors` })
+  } catch (err) {
+    logger.error('Failed to queue competitor refresh', { err })
+    res.status(500).json({ error: 'Failed to refresh competitors' })
+  }
+})
+
+// ── News ──────────────────────────────────────────────────────────────────────
 
 router.get('/news', async (req: AuthRequest, res: Response) => {
   try {
