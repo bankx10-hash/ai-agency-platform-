@@ -42,10 +42,16 @@ FORMAT RULES:
   • BEHIND THE SCENES: Show the real process, the real numbers, the real work → be authentic and transparent → let people see the human side → builds trust over time
   • OFFERS: Lead with the transformation/result, not the feature → create genuine urgency with a reason (limited capacity, seasonal, launch window) → one clear CTA
   • THOUGHT LEADERSHIP: Take a contrarian stance backed by evidence → challenge industry norms → position yourself as someone who sees what others miss
+- CTA STRATEGY (Instagram-specific): Instagram does NOT support clickable links in captions. Your CTA must drive DMs or comments:
+  • DM TRIGGER: "DM me 'GROWTH' and I'll send you our free audit" / "DM 'AI' to get started" / "Send me 'READY' and I'll walk you through it"
+  • COMMENT TRIGGER: "Comment 'YES' below and I'll DM you the details" / "Drop a 🔥 if you want me to send this to you"
+  • SAVE CTA: "Save this for later — you'll need it" (boosts algorithm)
+  • NEVER say "click the link" or "visit our website" — links don't work in IG captions
+  • Pick ONE keyword for the DM trigger that's short, memorable, and relevant to the post topic
 - Hashtags: 15-25 relevant hashtags on a new line (mix industry-specific, broad reach, and niche)
 - Emojis: use sparingly as visual markers, never as decoration
 - Write in first person ("I" or "we") — sound like a real person, not a brand
-ENGAGEMENT DRIVERS: Save-worthy insights, relatable truths, specific numbers, "tag someone who needs this", open-ended questions, controversial takes backed by data`,
+ENGAGEMENT DRIVERS: DM-triggering CTAs, save-worthy insights, relatable truths, specific numbers, "tag someone who needs this", comment triggers, controversial takes backed by data`,
 
   facebook: `
 PLATFORM: Facebook
@@ -57,11 +63,14 @@ FORMAT RULES:
   • STORY POST: "Last week a client called me and said..." — real stories from real businesses. People share stories, not pitches.
   • OPINION POST: Take a clear stance on something in your industry. "Unpopular opinion:" or "I stopped doing X and here's what happened" — drives comments.
   • RESULT POST: Share a specific win with numbers. Before/after. Timeline. What was done differently.
-- End with ONE of: a question that sparks discussion, a clear CTA, or an invitation to share their experience
+- CTA STRATEGY (Facebook-specific):
+  • DM TRIGGER: "Send me a message with 'INFO' and I'll send you the details" — works on Facebook Messenger
+  • COMMENT TRIGGER: "Comment 'ME' and I'll DM you" / "Drop a 👋 if you want in"
+  • ENGAGEMENT QUESTION: End with a question that sparks real discussion — "What's been your biggest challenge with [topic]?"
+  • No links in the post body (kills reach). Add link to first comment instead.
 - One CTA maximum — never multiple asks
-- No links in body (add to first comment)
 - Write conversationally — like you're talking to a smart friend over coffee
-ENGAGEMENT DRIVERS: Relatable pain points, "has this happened to you?", taggable content, debate-sparking opinions, genuine vulnerability about business challenges`,
+ENGAGEMENT DRIVERS: DM triggers, comment hooks, relatable pain points, "has this happened to you?", taggable content, debate-sparking opinions, genuine vulnerability about business challenges`,
 
   linkedin: `
 PLATFORM: LinkedIn
@@ -130,7 +139,7 @@ CONTENT QUALITY STANDARDS — the difference between amateur and agency-level:
 
 4. HUMAN VOICE: Write like a real person — someone the reader would want to have a conversation with. Use "I" and "we". Share opinions. Be direct. No corporate speak, no empty motivation quotes, no "leveraging synergies."
 
-5. ONE CLEAR CTA: Every post should have ONE thing you want the reader to do. Make it easy and specific. "DM me 'GROWTH' and I'll send you our free audit" beats "contact us for more info."
+5. ONE CLEAR CTA: Every post should have ONE thing you want the reader to do. For Instagram and Facebook, this MUST be a DM trigger or comment trigger — NOT a link (links don't work in IG captions and kill reach on FB). Examples: "DM me 'GROWTH'" / "Comment 'YES' below" / "Send me 'READY' in a message". Pick a keyword that's short, memorable, and related to the post topic.
 
 6. PATTERN VARIATION: Do NOT make every post sound the same. Vary your hooks, structure, length, and energy. Some posts should be punchy (3 lines). Others should tell a story. Others should teach. Mix it up.
 
@@ -153,6 +162,7 @@ CRITICAL IMAGE RULES:
 6. ENVIRONMENT: Show the REAL workspace for this industry in pristine, aspirational condition — the dental clinic looks world-class, the construction site is impressive in scale, the restaurant kitchen is buzzing with energy, the gym has premium equipment.
 7. EMOTION: The image should make the viewer feel something — aspiration, trust, excitement, or curiosity. Not stock-photo sterile.
 8. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO LOGOS, NO WATERMARKS, NO TYPOGRAPHY, NO CAPTIONS, NO LABELS of any kind in the image. Zero. The image must be completely clean.>",
+  "dm_trigger_keyword": "<the exact keyword used in the CTA, e.g. 'GROWTH', 'AI', 'READY'. Must match what's in the post content. This keyword triggers the automated conversation workflow when someone DMs it.>",
   "best_posting_time": "<optimal day and time for this platform based on the industry's audience>",
   "predicted_engagement": "low|medium|high|viral"
 }`
