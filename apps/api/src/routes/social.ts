@@ -484,30 +484,8 @@ Return valid JSON only:
       }
     }
 
-    // Composite text overlay onto the ad image (viral ad style)
-    let finalAdImageUrl = adImageUrl || post.imageUrl || undefined
-    if (finalAdImageUrl && parsed.headline) {
-      try {
-        const adStyle = req.body.adStyle || 'bold'
-        const composited = await generateAdImage({
-          backgroundImageUrl: finalAdImageUrl,
-          headline: parsed.headline,
-          primaryText: parsed.primary_text,
-          ctaText: ctaToDisplayText(parsed.cta_type || 'LEARN_MORE'),
-          businessName: client.businessName,
-          platform: platform.toUpperCase() as 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN',
-          style: adStyle
-        })
-
-        // Save composited image to disk and get a public URL
-        finalAdImageUrl = saveImageToDisk(composited)
-
-        logger.info('Ad image composited with text overlay', { platform, style: adStyle })
-      } catch (compErr) {
-        logger.warn('Ad image compositing failed, using plain image', { error: compErr })
-        // Fall back to the plain image without text overlay
-      }
-    }
+    // Use the clean AI-generated image (no text overlay — client can add text via the editor if needed)
+    const finalAdImageUrl = adImageUrl || post.imageUrl || undefined
 
     // Create the advert as a new ScheduledPost
     const adPost = await prisma.scheduledPost.create({
