@@ -467,12 +467,41 @@ async function runStartupMigrations() {
     await prisma.$executeRaw`DO $$ BEGIN CREATE TYPE "SocialPlatform" AS ENUM ('FACEBOOK','INSTAGRAM','LINKEDIN'); EXCEPTION WHEN duplicate_object THEN null; END $$`
     await prisma.$executeRaw`DO $$ BEGIN CREATE TYPE "PostSource" AS ENUM ('MANUAL','AI_GENERATED','NEWS_INSPIRED'); EXCEPTION WHEN duplicate_object THEN null; END $$`
 
-    // If tables already exist with TEXT columns, cast them to the proper enum types
-    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "ScheduledPost" ALTER COLUMN "status" TYPE "PostStatus" USING "status"::"PostStatus"; EXCEPTION WHEN others THEN null; END $$`
-    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "ScheduledPost" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform"; EXCEPTION WHEN others THEN null; END $$`
-    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "ScheduledPost" ALTER COLUMN "source" TYPE "PostSource" USING "source"::"PostSource"; EXCEPTION WHEN others THEN null; END $$`
-    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "PlatformInsight" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform"; EXCEPTION WHEN others THEN null; END $$`
-    await prisma.$executeRaw`DO $$ BEGIN ALTER TABLE "Competitor" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform"; EXCEPTION WHEN others THEN null; END $$`
+    // If tables already exist with TEXT columns, drop defaults → cast to enum → re-add defaults
+    // ScheduledPost.status
+    await prisma.$executeRaw`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ScheduledPost' AND column_name='status' AND data_type='text') THEN
+        ALTER TABLE "ScheduledPost" ALTER COLUMN "status" DROP DEFAULT;
+        ALTER TABLE "ScheduledPost" ALTER COLUMN "status" TYPE "PostStatus" USING "status"::"PostStatus";
+        ALTER TABLE "ScheduledPost" ALTER COLUMN "status" SET DEFAULT 'DRAFT'::"PostStatus";
+      END IF;
+    END $$`
+    // ScheduledPost.platform
+    await prisma.$executeRaw`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ScheduledPost' AND column_name='platform' AND data_type='text') THEN
+        ALTER TABLE "ScheduledPost" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform";
+      END IF;
+    END $$`
+    // ScheduledPost.source
+    await prisma.$executeRaw`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ScheduledPost' AND column_name='source' AND data_type='text') THEN
+        ALTER TABLE "ScheduledPost" ALTER COLUMN "source" DROP DEFAULT;
+        ALTER TABLE "ScheduledPost" ALTER COLUMN "source" TYPE "PostSource" USING "source"::"PostSource";
+        ALTER TABLE "ScheduledPost" ALTER COLUMN "source" SET DEFAULT 'MANUAL'::"PostSource";
+      END IF;
+    END $$`
+    // PlatformInsight.platform
+    await prisma.$executeRaw`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PlatformInsight' AND column_name='platform' AND data_type='text') THEN
+        ALTER TABLE "PlatformInsight" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform";
+      END IF;
+    END $$`
+    // Competitor.platform
+    await prisma.$executeRaw`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Competitor' AND column_name='platform' AND data_type='text') THEN
+        ALTER TABLE "Competitor" ALTER COLUMN "platform" TYPE "SocialPlatform" USING "platform"::"SocialPlatform";
+      END IF;
+    END $$`
 
     await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "ScheduledPost" (
