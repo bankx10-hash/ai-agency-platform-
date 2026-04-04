@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Canvas, Textbox, Rect, Circle, FabricImage } from 'fabric'
+import { Canvas, Textbox, Rect, Circle, FabricImage, Shadow, filters } from 'fabric'
 import type { FabricObject } from 'fabric'
 import { TEMPLATES, TEMPLATE_COLORS, type Template, type TemplateObject } from './templates'
 
@@ -21,7 +21,7 @@ interface ImageEditorProps {
   businessName?: string
 }
 
-type SelectedObjectType = 'textbox' | 'rect' | 'circle' | null
+type SelectedObjectType = 'textbox' | 'rect' | 'circle' | 'image' | null
 
 interface SelectedObjectProps {
   type: SelectedObjectType
@@ -35,6 +35,10 @@ interface SelectedObjectProps {
   opacity?: number
   stroke?: string
   strokeWidth?: number
+  hasShadow?: boolean
+  brightness?: number
+  contrast?: number
+  saturation?: number
 }
 
 /* ------------------------------------------------------------------ */
@@ -159,6 +163,46 @@ function IconChevron() {
   )
 }
 
+function IconDuplicate() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" /><rect x="2" y="2" width="13" height="13" rx="2" />
+    </svg>
+  )
+}
+
+function IconAlignLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="4" x2="4" y2="20" /><rect x="8" y="6" width="12" height="4" rx="1" /><rect x="8" y="14" width="8" height="4" rx="1" />
+    </svg>
+  )
+}
+
+function IconAlignCenterH() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="2" x2="12" y2="22" /><rect x="5" y="6" width="14" height="4" rx="1" /><rect x="7" y="14" width="10" height="4" rx="1" />
+    </svg>
+  )
+}
+
+function IconAlignCenterV() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="2" y1="12" x2="22" y2="12" /><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="7" width="4" height="10" rx="1" />
+    </svg>
+  )
+}
+
+function IconAlignRight() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="20" y1="4" x2="20" y2="20" /><rect x="4" y="6" width="12" height="4" rx="1" /><rect x="8" y="14" width="8" height="4" rx="1" />
+    </svg>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -224,6 +268,7 @@ export default function ImageEditor({
         opacity: (tb.opacity ?? 1) * 100,
         stroke: typeof tb.stroke === 'string' ? tb.stroke : '',
         strokeWidth: tb.strokeWidth ?? 0,
+        hasShadow: !!tb.shadow,
       })
     } else if (t === 'rect') {
       const r = obj as Rect
@@ -242,6 +287,22 @@ export default function ImageEditor({
         opacity: (c.opacity ?? 1) * 100,
         stroke: typeof c.stroke === 'string' ? c.stroke : '',
         strokeWidth: c.strokeWidth ?? 0,
+      })
+    } else if (t === 'image') {
+      const img = obj as FabricImage
+      const imgFilters = (img.filters ?? []) as any[]
+      let brightness = 0, contrast = 0, saturation = 0
+      for (const f of imgFilters) {
+        if (f && f.type === 'Brightness') brightness = Math.round((f.brightness ?? 0) * 100)
+        if (f && f.type === 'Contrast') contrast = Math.round((f.contrast ?? 0) * 100)
+        if (f && f.type === 'Saturation') saturation = Math.round((f.saturation ?? 0) * 100)
+      }
+      setSelectedObj({
+        type: 'image',
+        opacity: (img.opacity ?? 1) * 100,
+        brightness,
+        contrast,
+        saturation,
       })
     } else {
       setSelectedObj({ type: null })
@@ -591,6 +652,110 @@ export default function ImageEditor({
     }
   }
 
+  /* ---- duplicate object ---- */
+
+  function duplicateSelected() {
+    const c = fabricRef.current
+    if (!c) return
+    const obj = c.getActiveObject()
+    if (!obj) return
+    obj.clone().then((cloned: FabricObject) => {
+      cloned.set({ left: (obj.left ?? 0) + 20, top: (obj.top ?? 0) + 20 })
+      c.add(cloned)
+      c.setActiveObject(cloned)
+      c.renderAll()
+      pushHistory(c)
+    })
+  }
+
+  /* ---- alignment helpers ---- */
+
+  function alignCenterH() {
+    const c = fabricRef.current
+    if (!c) return
+    const obj = c.getActiveObject()
+    if (!obj) return
+    obj.set({ left: canvasWidth / 2 - (obj.width ?? 0) * (obj.scaleX ?? 1) / 2 })
+    c.renderAll()
+    pushHistory(c)
+  }
+
+  function alignCenterV() {
+    const c = fabricRef.current
+    if (!c) return
+    const obj = c.getActiveObject()
+    if (!obj) return
+    obj.set({ top: canvasHeight / 2 - (obj.height ?? 0) * (obj.scaleY ?? 1) / 2 })
+    c.renderAll()
+    pushHistory(c)
+  }
+
+  function alignLeft() {
+    const c = fabricRef.current
+    if (!c) return
+    const obj = c.getActiveObject()
+    if (!obj) return
+    obj.set({ left: 20 })
+    c.renderAll()
+    pushHistory(c)
+  }
+
+  function alignRight() {
+    const c = fabricRef.current
+    if (!c) return
+    const obj = c.getActiveObject()
+    if (!obj) return
+    obj.set({ left: canvasWidth - (obj.width ?? 0) * (obj.scaleX ?? 1) - 20 })
+    c.renderAll()
+    pushHistory(c)
+  }
+
+  /* ---- image filter helpers ---- */
+
+  function updateImageFilter(filterType: 'Brightness' | 'Contrast' | 'Saturation', value: number) {
+    const c = fabricRef.current
+    if (!c) return
+    const obj = c.getActiveObject()
+    if (!obj || obj.type !== 'image') return
+    const img = obj as FabricImage
+    const currentFilters = (img.filters ?? []) as any[]
+
+    // Remove existing filter of this type
+    const newFilters = currentFilters.filter((f: any) => f && f.type !== filterType)
+
+    // Add new filter
+    const normalised = value / 100
+    if (filterType === 'Brightness') {
+      newFilters.push(new filters.Brightness({ brightness: normalised }))
+    } else if (filterType === 'Contrast') {
+      newFilters.push(new filters.Contrast({ contrast: normalised }))
+    } else if (filterType === 'Saturation') {
+      newFilters.push(new filters.Saturation({ saturation: normalised }))
+    }
+
+    img.filters = newFilters
+    img.applyFilters()
+    c.renderAll()
+    readSelectedObject(obj)
+  }
+
+  /* ---- text shadow toggle ---- */
+
+  function toggleTextShadow() {
+    const c = fabricRef.current
+    if (!c) return
+    const obj = c.getActiveObject()
+    if (!obj || obj.type !== 'textbox') return
+    if (obj.shadow) {
+      obj.set('shadow', null)
+    } else {
+      obj.set('shadow', new Shadow({ color: 'rgba(0,0,0,0.5)', blur: 4, offsetX: 2, offsetY: 2 }))
+    }
+    c.renderAll()
+    readSelectedObject(obj)
+    pushHistory(c)
+  }
+
   /* ---- template application ---- */
 
   function applyTemplate(template: Template) {
@@ -765,6 +930,15 @@ export default function ImageEditor({
         <div className="w-px h-6 bg-gray-700 mx-2" />
 
         <ToolbarBtn label="Delete Selected" onClick={deleteSelected}><IconTrash /></ToolbarBtn>
+        <ToolbarBtn label="Duplicate Selected" onClick={duplicateSelected}><IconDuplicate /></ToolbarBtn>
+
+        <div className="w-px h-6 bg-gray-700 mx-2" />
+
+        {/* Alignment tools */}
+        <ToolbarBtn label="Align Left" onClick={alignLeft}><IconAlignLeft /></ToolbarBtn>
+        <ToolbarBtn label="Align Center Horizontal" onClick={alignCenterH}><IconAlignCenterH /></ToolbarBtn>
+        <ToolbarBtn label="Align Center Vertical" onClick={alignCenterV}><IconAlignCenterV /></ToolbarBtn>
+        <ToolbarBtn label="Align Right" onClick={alignRight}><IconAlignRight /></ToolbarBtn>
 
         {/* Platform badge */}
         <div className="ml-auto flex items-center gap-3">
@@ -893,6 +1067,53 @@ export default function ImageEditor({
                     className="w-full accent-indigo-500"
                   />
                 </div>
+
+                {/* Opacity */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Opacity: {Math.round(selectedObj.opacity ?? 100)}%</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={selectedObj.opacity ?? 100}
+                    onChange={(e) => updateActiveObject({ opacity: Number(e.target.value) / 100 })}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
+
+                {/* Text Shadow */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Text Shadow</label>
+                  <button
+                    onClick={toggleTextShadow}
+                    className={`px-3 py-1.5 text-xs rounded border ${selectedObj.hasShadow ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    {selectedObj.hasShadow ? 'Shadow ON' : 'Shadow OFF'}
+                  </button>
+                </div>
+
+                {/* Text Outline */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Text Outline</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={selectedObj.stroke || '#000000'}
+                      onChange={(e) => updateActiveObject({ stroke: e.target.value })}
+                      className="w-8 h-7 bg-transparent border border-gray-700 rounded cursor-pointer"
+                    />
+                    <input
+                      type="range"
+                      min={0}
+                      max={5}
+                      step={0.5}
+                      value={selectedObj.strokeWidth ?? 0}
+                      onChange={(e) => updateActiveObject({ strokeWidth: Number(e.target.value) })}
+                      className="flex-1 accent-indigo-500"
+                    />
+                    <span className="text-xs text-gray-500 w-8">{selectedObj.strokeWidth ?? 0}px</span>
+                  </div>
+                </div>
               </>
             )}
 
@@ -943,6 +1164,63 @@ export default function ImageEditor({
                     max={20}
                     value={selectedObj.strokeWidth ?? 0}
                     onChange={(e) => updateActiveObject({ strokeWidth: Number(e.target.value) })}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ---- Image properties ---- */}
+            {selectedObj.type === 'image' && (
+              <>
+                {/* Opacity */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Opacity: {Math.round(selectedObj.opacity ?? 100)}%</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={selectedObj.opacity ?? 100}
+                    onChange={(e) => updateActiveObject({ opacity: Number(e.target.value) / 100 })}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
+
+                {/* Brightness */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Brightness: {selectedObj.brightness ?? 0}</label>
+                  <input
+                    type="range"
+                    min={-100}
+                    max={100}
+                    value={selectedObj.brightness ?? 0}
+                    onChange={(e) => updateImageFilter('Brightness', Number(e.target.value))}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
+
+                {/* Contrast */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Contrast: {selectedObj.contrast ?? 0}</label>
+                  <input
+                    type="range"
+                    min={-100}
+                    max={100}
+                    value={selectedObj.contrast ?? 0}
+                    onChange={(e) => updateImageFilter('Contrast', Number(e.target.value))}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
+
+                {/* Saturation */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Saturation: {selectedObj.saturation ?? 0}</label>
+                  <input
+                    type="range"
+                    min={-100}
+                    max={100}
+                    value={selectedObj.saturation ?? 0}
+                    onChange={(e) => updateImageFilter('Saturation', Number(e.target.value))}
                     className="w-full accent-indigo-500"
                   />
                 </div>
