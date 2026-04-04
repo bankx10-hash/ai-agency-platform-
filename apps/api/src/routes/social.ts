@@ -341,42 +341,83 @@ router.post('/posts/:id/generate-advert', async (req: AuthRequest, res: Response
 
     const { platform = post.platform.toLowerCase(), objective = 'conversions' } = req.body
 
-    // Generate ad copy from the post content using Claude
-    const adPrompt = `You are an expert Meta/Facebook Ads copywriter. Create a high-converting paid advertisement based on this organic social media post.
+    // Generate ad copy from the post content using Claude — agency-level ad creative
+    const adPrompt = `You are a senior creative director at a top-tier performance marketing agency. You've managed $50M+ in Meta ad spend. Your job is to transform an organic social post into a PAID ADVERTISEMENT that looks, feels, and performs like it was created by a world-class agency — NOT like a boosted post.
 
 BUSINESS: ${client.businessName}
-${client.businessDescription ? `DESCRIPTION: ${client.businessDescription}` : ''}
+${client.businessDescription ? `INDUSTRY/DESCRIPTION: ${client.businessDescription}` : ''}
 
-ORIGINAL POST CONTENT:
+ORIGINAL ORGANIC POST (use as source material ONLY — do NOT copy it):
 ${post.content}
 
 PLATFORM: ${platform}
 AD OBJECTIVE: ${objective}
 
-Create an ad with these components:
-1. HEADLINE (max 40 chars) — attention-grabbing, creates urgency
-2. PRIMARY TEXT (max 125 chars) — the main ad copy that appears above the image. Hook + value prop + CTA. Short, punchy, scroll-stopping.
-3. DESCRIPTION (max 30 chars) — appears below headline in some placements
-4. CTA_TYPE — one of: LEARN_MORE, SIGN_UP, BOOK_NOW, CONTACT_US, GET_OFFER, SHOP_NOW
-5. AD_CONTENT — the full ad body text (can be longer, 2-3 short paragraphs). Transform the organic post into direct-response ad copy. Remove hashtags. Add urgency, scarcity, social proof. End with a clear call to action.
-6. IMAGE_PROMPT — a prompt for AI image generation. The ad image should be bold, eye-catching, with high contrast. Show the transformation/result the customer gets. Style: cinematic, professional, aspirational. NO TEXT IN THE IMAGE.
+═══════════════════════════════════════════
+AGENCY AD CREATIVE RULES (FOLLOW ALL):
+═══════════════════════════════════════════
+
+RULE 1 — THIS IS AN AD, NOT A POST
+- Organic posts educate. Ads SELL. Every word must drive toward one action.
+- NO hashtags. NO emoji spam. NO "engagement bait". Those are organic tactics.
+- The tone should be polished, direct, and authoritative — like a premium brand speaking to qualified buyers.
+
+RULE 2 — HEADLINE (max 40 chars)
+- Pattern-interrupt the scroll. Use a number, a provocative claim, or a direct benefit.
+- Good: "47 Leads While You Slept" / "Cut Follow-Up Time by 90%" / "Your Competitors Know This"
+- Bad: "Check This Out!" / "Amazing Opportunity" / generic curiosity bait
+
+RULE 3 — PRIMARY TEXT (max 125 chars)
+- This appears ABOVE the image. It's the first thing people read.
+- One single, specific, measurable benefit + implied urgency.
+- Good: "Businesses using AI follow-up close 3x more deals. Yours isn't one of them — yet."
+- Bad: "We offer great services for your business needs."
+
+RULE 4 — AD BODY COPY (ad_content)
+- Structure: HOOK (1 line) → PROBLEM (2-3 lines) → SOLUTION with PROOF (2-3 lines) → OFFER + CTA (1-2 lines)
+- Use the PAS framework (Problem-Agitate-Solve) or AIDA (Attention-Interest-Desire-Action)
+- Include at least ONE specific number/stat (real or realistic for this industry)
+- Include ONE element of social proof ("Join 200+ businesses" / "Rated 4.9/5" / "Used by leading [industry]")
+- Include scarcity or urgency ("Limited spots" / "Offer ends Friday" / "Only accepting 5 new clients this month")
+- End with ONE clear CTA. Not "learn more and also sign up and also call us". ONE action.
+- MAX 4-5 short paragraphs. White space between each. Mobile-optimized.
+- NO hashtags. NO emojis as bullet points. Clean, professional copy.
+
+RULE 5 — CTA TYPE
+- Must match the objective. Conversions → BOOK_NOW or GET_OFFER. Traffic → LEARN_MORE. Lead gen → SIGN_UP.
+
+RULE 6 — IMAGE PROMPT (for AI image generation)
+- Agency ads do NOT use stock photos. They use HERO IMAGERY — one powerful visual that tells a story.
+- The image should show THE RESULT, not the process. Show the transformation the customer experiences.
+- Composition: Single strong focal point. Clean negative space. Professional color grading.
+- MATCH THE INDUSTRY — if dentist, show a confident patient with a perfect smile in a modern clinic. If trades, show a completed premium job. If agency, show a sleek dashboard with impressive metrics.
+- Style: Shot by a $10,000/day commercial photographer. Hasselblad medium format feel. Controlled studio or on-location lighting. Editorial grade.
+- Color: Bold, high-contrast. Deep shadows. One dominant brand-aligned color accent. NOT flat or bright.
+- ABSOLUTELY NO TEXT, WORDS, LETTERS, NUMBERS, LOGOS, WATERMARKS, OR TYPOGRAPHY IN THE IMAGE. Zero. None. The ad platform adds text overlays — the image must be clean.
+
+RULE 7 — TARGET AUDIENCE
+- Define a specific Meta Ads audience. Include: demographics, interests, behaviors, lookalike suggestions.
+- Be specific: "Business owners 30-55, interested in CRM software, digital marketing, with 2-50 employees" NOT "people who like business"
+
+═══════════════════════════════════════════
 
 Return valid JSON only:
 {
   "headline": "...",
   "primary_text": "...",
-  "description": "...",
-  "cta_type": "...",
-  "ad_content": "...",
-  "image_prompt": "...",
-  "target_audience": "brief description of ideal audience for targeting"
+  "description": "max 30 chars — appears below headline",
+  "cta_type": "LEARN_MORE | SIGN_UP | BOOK_NOW | CONTACT_US | GET_OFFER | SHOP_NOW",
+  "ad_content": "the full ad body copy following Rule 4",
+  "image_prompt": "detailed image prompt following Rule 6",
+  "target_audience": "specific Meta Ads targeting following Rule 7",
+  "ad_format_notes": "brief note on recommended placement (Feed, Stories, Reels) and why"
 }`
 
-    const raw = await socialAgent.callClaude(adPrompt, 'You are an expert paid advertising copywriter. Return only valid JSON.')
+    const raw = await socialAgent.callClaude(adPrompt, 'You are a senior creative director at a performance marketing agency with $50M+ in managed ad spend. Return only valid JSON. No markdown, no explanation.')
 
     let parsed: {
       headline?: string; primary_text?: string; description?: string
-      cta_type?: string; ad_content?: string; image_prompt?: string; target_audience?: string
+      cta_type?: string; ad_content?: string; image_prompt?: string; target_audience?: string; ad_format_notes?: string
     } = {}
     try {
       parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
@@ -389,7 +430,7 @@ Return valid JSON only:
     let adImageUrl: string | undefined
     if (parsed.image_prompt && process.env.FAL_API_KEY) {
       try {
-        const styleGuide = ', high-contrast commercial advertising photography, bold dramatic lighting, aspirational lifestyle, premium product showcase, cinematic color grading, shallow depth-of-field, magazine-quality, NO TEXT, NO WORDS, NO LETTERS, NO WRITING, NO LOGOS, NO WATERMARKS'
+        const styleGuide = ', shot on Hasselblad X2D medium format, commercial advertising campaign photography, $10000 production value, single powerful hero subject, bold dramatic lighting with deep shadows, high-contrast editorial color grading, one dominant color accent against dark moody tones, controlled studio or premium on-location lighting, shallow depth-of-field with creamy bokeh, clean negative space for ad copy overlay, magazine cover quality, premium brand aesthetic, ABSOLUTELY NO TEXT NO WORDS NO LETTERS NO NUMBERS NO LOGOS NO WATERMARKS NO TYPOGRAPHY'
         const styledPrompt = (parsed.image_prompt.substring(0, 800) + styleGuide).substring(0, 1000)
         const falResponse = await axios.post(
           'https://fal.run/fal-ai/flux/dev',
@@ -432,6 +473,7 @@ Return valid JSON only:
           description: parsed.description,
           ctaType: parsed.cta_type,
           targetAudience: parsed.target_audience,
+          adFormatNotes: parsed.ad_format_notes,
           objective,
           sourcePostId: post.id,
         },
