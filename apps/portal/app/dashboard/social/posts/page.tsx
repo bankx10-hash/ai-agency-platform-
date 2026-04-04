@@ -812,6 +812,60 @@ export default function SocialPostsPage() {
               />
             </div>
 
+            {/* Image section */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Image
+              </label>
+              {selectedPost?.imageUrl || (modalMode === 'edit' && selectedPost?.imageUrl) ? (
+                <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-2">
+                  <img
+                    src={selectedPost?.imageUrl}
+                    alt="Post image"
+                    className="w-full h-48 object-cover"
+                  />
+                </div>
+              ) : null}
+              {selectedPost?.status !== 'PUBLISHED' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!selectedPost?.id) return
+                      setGenerating(true)
+                      try {
+                        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+                        const res = await axios.post(
+                          `${API_URL}/social/posts/${selectedPost.id}/generate-image`,
+                          { imagePrompt: selectedPost.imagePrompt },
+                          { headers: { Authorization: `Bearer ${token}` } }
+                        )
+                        setSelectedPost({ ...selectedPost, imageUrl: res.data.imageUrl })
+                        fetchPosts()
+                      } catch {
+                        alert('Failed to generate image')
+                      } finally {
+                        setGenerating(false)
+                      }
+                    }}
+                    disabled={generating || !selectedPost?.imagePrompt}
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generating ? (
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    )}
+                    {selectedPost?.imageUrl ? 'Regenerate Image' : 'Generate Image'}
+                  </button>
+                  {selectedPost?.imagePrompt && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[200px]" title={selectedPost.imagePrompt}>
+                      Prompt: {selectedPost.imagePrompt.substring(0, 50)}...
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Schedule date/time */}
             {selectedPost?.status !== 'PUBLISHED' && (
               <div className="mb-6">

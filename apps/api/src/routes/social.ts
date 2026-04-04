@@ -1,6 +1,7 @@
 import { Router, Response } from 'express'
 import { prisma } from '../lib/prisma'
 import { randomUUID } from 'crypto'
+import axios from 'axios'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 import { socialService } from '../services/social.service'
 import { SocialMediaAgent, SocialMediaAgentConfig } from '../agents/social-media.agent'
@@ -162,6 +163,33 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
       scheduledAt.setHours(10, 0, 0, 0)
     }
 
+    // Auto-generate image via fal.ai if image_prompt exists
+    let imageUrl: string | undefined
+    if (parsed.image_prompt && process.env.FAL_API_KEY) {
+      try {
+        const aspectRatio = platform.toUpperCase() === 'INSTAGRAM' ? '1:1' : '16:9'
+        const styleGuide = ', hyper-realistic cinematic DSLR photography, professionals in smart business attire as main subject, dark moody lighting with soft shadows and cool undertones, dramatic contrast, depth-of-field bokeh, crisp lens reflections, slightly darker tone, premium editorial aesthetic, modern sleek workplace, shot on 85mm f/1.4 lens, NO TEXT, NO WORDS, NO LETTERS, NO WRITING, NO LOGOS, NO WATERMARKS, NO OVERLAYS, no illustrations, no cartoons, no bright airy aesthetics'
+        const styledPrompt = (parsed.image_prompt.substring(0, 800) + styleGuide).substring(0, 1000)
+        const falResponse = await axios.post(
+          'https://fal.run/fal-ai/flux/dev',
+          {
+            prompt: styledPrompt,
+            image_size: aspectRatio === '1:1' ? 'square_hd' : 'landscape_16_9',
+            num_images: 1,
+            enable_safety_checker: true
+          },
+          {
+            headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, 'Content-Type': 'application/json' },
+            timeout: 60000
+          }
+        )
+        imageUrl = falResponse.data.images[0].url
+        logger.info('Auto-generated image for AI post', { platform, imageUrl: imageUrl.substring(0, 80) })
+      } catch (imgErr) {
+        logger.warn('Image auto-generation failed, creating post without image', { error: imgErr })
+      }
+    }
+
     const post = await prisma.scheduledPost.create({
       data: {
         id: randomUUID(),
@@ -170,6 +198,7 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
         status: status as never,
         source: 'AI_GENERATED' as never,
         content: parsed.content,
+        imageUrl,
         imagePrompt: parsed.image_prompt,
         hashtags: parsed.hashtags || [],
         contentPillar,
@@ -290,6 +319,67 @@ router.post('/posts/:id/regenerate', async (req: AuthRequest, res: Response) => 
   } catch (err) {
     logger.error('Failed to regenerate post', { err })
     res.status(500).json({ error: 'Failed to regenerate post' })
+  }
+})
+
+// Generate image for a post using fal.ai Flux
+router.post('/posts/:id/generate-image', async (req: AuthRequest, res: Response) => {
+  try {
+    const post = await prisma.scheduledPost.findFirst({
+      where: { id: req.params.id, clientId: req.clientId! }
+    })
+    if (!post) { res.status(404).json({ error: 'Post not found' }); return }
+
+    const imagePrompt = req.body.imagePrompt || post.imagePrompt
+    if (!imagePrompt) {
+      res.status(400).json({ error: 'No image prompt available. Generate content first or provide an imagePrompt.' })
+      return
+    }
+
+    const falApiKey = process.env.FAL_API_KEY
+    if (!falApiKey) {
+      res.status(500).json({ error: 'FAL_API_KEY not configured' })
+      return
+    }
+
+    // Match platform aspect ratio (same logic as n8n-callbacks)
+    const aspectRatio = post.platform === 'INSTAGRAM' ? '1:1' : '16:9'
+    const styleGuide = ', hyper-realistic cinematic DSLR photography, professionals in smart business attire as main subject, dark moody lighting with soft shadows and cool undertones, dramatic contrast, depth-of-field bokeh, crisp lens reflections, slightly darker tone, premium editorial aesthetic, modern sleek workplace, shot on 85mm f/1.4 lens, NO TEXT, NO WORDS, NO LETTERS, NO WRITING, NO LOGOS, NO WATERMARKS, NO OVERLAYS, no illustrations, no cartoons, no bright airy aesthetics'
+    const styledPrompt = (imagePrompt.substring(0, 800) + styleGuide).substring(0, 1000)
+
+    const falResponse = await axios.post(
+      'https://fal.run/fal-ai/flux/dev',
+      {
+        prompt: styledPrompt,
+        image_size: aspectRatio === '1:1' ? 'square_hd' : 'landscape_16_9',
+        num_images: 1,
+        enable_safety_checker: true
+      },
+      {
+        headers: {
+          Authorization: `Key ${falApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000
+      }
+    )
+
+    const imageUrl = falResponse.data.images[0].url
+
+    // Save image URL to the post
+    const updated = await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: { imageUrl, imagePrompt }
+    })
+
+    logger.info('Image generated for social post', { postId: post.id, platform: post.platform })
+    res.json({ imageUrl, post: updated })
+  } catch (err) {
+    const detail = axios.isAxiosError(err)
+      ? `${err.response?.status} ${JSON.stringify(err.response?.data)}`
+      : String(err)
+    logger.error('Failed to generate image', { postId: req.params.id, error: detail })
+    res.status(500).json({ error: 'Image generation failed', detail })
   }
 })
 
