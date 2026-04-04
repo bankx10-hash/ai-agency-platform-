@@ -947,6 +947,32 @@ export default function SocialPostsPage() {
                   {!!(selectedPost.metadata as Record<string, unknown>).adFormatNotes && (
                     <p><span className="font-medium text-gray-600 dark:text-gray-400">Placement:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).adFormatNotes)}</span></p>
                   )}
+                  {!!(selectedPost.metadata as Record<string, unknown>).leadFormUrl && (
+                    <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">Lead Capture Pipeline</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">CTA links to your lead form. When a lead submits:</p>
+                      <ol className="text-xs text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-0.5">
+                        <li>Form captures name, email, phone</li>
+                        <li>Lead added to CRM automatically</li>
+                        <li>Lead Generation agent scores the lead</li>
+                        <li>High-score leads routed to Appointment Setter</li>
+                      </ol>
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={String((selectedPost.metadata as Record<string, unknown>).leadFormUrl)}
+                          className="flex-1 rounded border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 text-xs text-gray-700 dark:text-gray-300"
+                        />
+                        <button
+                          onClick={() => navigator.clipboard.writeText(String((selectedPost.metadata as Record<string, unknown>).leadFormUrl))}
+                          className="text-xs text-amber-700 dark:text-amber-400 hover:underline"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

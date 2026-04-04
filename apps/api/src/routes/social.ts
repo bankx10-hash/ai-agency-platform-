@@ -510,6 +510,9 @@ Return valid JSON only:
           adFormatNotes: parsed.ad_format_notes,
           objective,
           sourcePostId: post.id,
+          ctaLink: `${process.env.API_URL || 'https://api.nodusaisystems.com'}/leads/${clientId}`,
+          leadFormUrl: `${process.env.API_URL || 'https://api.nodusaisystems.com'}/leads/${clientId}`,
+          leadFormEmbed: `<script src="${process.env.API_URL || 'https://api.nodusaisystems.com'}/leads/${clientId}/embed.js"></script>`,
         },
       }
     })

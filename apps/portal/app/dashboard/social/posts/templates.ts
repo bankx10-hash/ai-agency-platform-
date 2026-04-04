@@ -190,6 +190,120 @@ export const TEMPLATES: Template[] = [
       { type: 'textbox', left: 7, top: 81.5, width: 24, text: 'BOOK A DEMO', fontSize: 14, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
     ]
   },
+  // ── Lead Capture Templates (CTA → form) ──────────────────────────────────
+  {
+    id: 'lead-magnet',
+    name: 'Lead Magnet',
+    category: 'Lead Capture',
+    description: 'Free resource offer — drives form signups',
+    platform: 'ALL',
+    objects: [
+      { type: 'rect', left: 0, top: 0, width: 100, height: 100, fill: 'rgba(0,0,0,0.60)', opacity: 1 },
+      { type: 'textbox', left: 8, top: 8, width: 30, text: 'FREE', fontSize: 18, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FF4D00', letterSpacing: 300 },
+      { type: 'textbox', left: 8, top: 22, width: 84, text: 'THE ULTIMATE GUIDE\nTO AI AUTOMATION', fontSize: 48, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', lineHeight: 1.15, letterSpacing: 30 },
+      { type: 'textbox', left: 8, top: 52, width: 70, text: 'Download our free guide and learn how businesses are generating 3x more leads with AI agents.', fontSize: 20, fontFamily: 'Arial', fontWeight: 'normal', fill: '#C0C0C0', lineHeight: 1.4 },
+      { type: 'rect', left: 8, top: 75, width: 45, height: 8, fill: '#FF4D00', rx: 30, ry: 30 },
+      { type: 'textbox', left: 10, top: 77, width: 41, text: 'DOWNLOAD FREE GUIDE', fontSize: 18, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'textbox', left: 8, top: 88, width: 60, text: 'No credit card required • Instant access', fontSize: 14, fontFamily: 'Arial', fontWeight: 'normal', fill: 'rgba(255,255,255,0.5)' },
+    ]
+  },
+  {
+    id: 'book-call',
+    name: 'Book a Call',
+    category: 'Lead Capture',
+    description: 'Calendar booking CTA — appointment setter',
+    platform: 'ALL',
+    objects: [
+      { type: 'rect', left: 0, top: 0, width: 100, height: 100, fill: 'rgba(5,5,25,0.70)', opacity: 1 },
+      { type: 'rect', left: 6, top: 25, width: 12, height: 0.4, fill: '#10B981' },
+      { type: 'textbox', left: 6, top: 30, width: 88, text: 'BOOK YOUR FREE\nSTRATEGY CALL', fontSize: 52, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', lineHeight: 1.15 },
+      { type: 'textbox', left: 6, top: 58, width: 65, text: "In 15 minutes, we'll show you exactly how AI can automate your lead follow-up and book appointments 24/7.", fontSize: 20, fontFamily: 'Arial', fontWeight: 'normal', fill: '#A0B0A0', lineHeight: 1.4 },
+      { type: 'rect', left: 6, top: 78, width: 40, height: 8, fill: '#10B981', rx: 6, ry: 6 },
+      { type: 'textbox', left: 8, top: 80, width: 36, text: 'BOOK NOW — FREE', fontSize: 18, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'textbox', left: 52, top: 80, width: 40, text: 'Only 5 spots left this week', fontSize: 16, fontFamily: 'Arial', fontWeight: 'normal', fill: '#FF6B6B' },
+    ]
+  },
+  {
+    id: 'quiz-funnel',
+    name: 'Quiz/Assessment',
+    category: 'Lead Capture',
+    description: 'Interactive quiz CTA — high conversion',
+    platform: 'INSTAGRAM',
+    objects: [
+      { type: 'rect', left: 0, top: 0, width: 100, height: 100, fill: 'rgba(15,10,40,0.70)', opacity: 1 },
+      { type: 'textbox', left: 10, top: 15, width: 80, text: 'IS YOUR BUSINESS\nREADY FOR AI?', fontSize: 52, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center', lineHeight: 1.15 },
+      { type: 'rect', left: 20, top: 48, width: 60, height: 0.3, fill: '#8B5CF6' },
+      { type: 'textbox', left: 12, top: 53, width: 76, text: 'Take our 60-second assessment and get\na personalised AI automation roadmap.', fontSize: 22, fontFamily: 'Arial', fontWeight: 'normal', fill: '#C0B0E0', textAlign: 'center', lineHeight: 1.4 },
+      { type: 'rect', left: 22, top: 74, width: 56, height: 8, fill: '#8B5CF6', rx: 30, ry: 30 },
+      { type: 'textbox', left: 24, top: 76, width: 52, text: 'TAKE THE FREE QUIZ', fontSize: 20, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'textbox', left: 20, top: 88, width: 60, text: '2,847 businesses already assessed', fontSize: 14, fontFamily: 'Arial', fontWeight: 'normal', fill: 'rgba(255,255,255,0.4)', textAlign: 'center' },
+    ]
+  },
+  {
+    id: 'webinar-register',
+    name: 'Webinar/Event',
+    category: 'Lead Capture',
+    description: 'Event registration CTA with date',
+    platform: 'ALL',
+    objects: [
+      { type: 'rect', left: 0, top: 0, width: 100, height: 100, fill: 'rgba(0,0,0,0.55)', opacity: 1 },
+      { type: 'rect', left: 8, top: 8, width: 25, height: 5, fill: '#EF4444', rx: 3, ry: 3 },
+      { type: 'textbox', left: 10, top: 9, width: 21, text: 'LIVE EVENT', fontSize: 16, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'textbox', left: 8, top: 22, width: 84, text: 'HOW TO 10X YOUR\nLEADS WITH AI', fontSize: 54, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', lineHeight: 1.1 },
+      { type: 'textbox', left: 8, top: 52, width: 60, text: 'Free live masterclass showing the exact AI system that generated $2.4M in pipeline for our clients.', fontSize: 19, fontFamily: 'Arial', fontWeight: 'normal', fill: '#D0D0D0', lineHeight: 1.4 },
+      { type: 'textbox', left: 8, top: 72, width: 50, text: 'Thursday, 7:00 PM AEST', fontSize: 20, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFD700' },
+      { type: 'rect', left: 8, top: 82, width: 40, height: 7, fill: '#EF4444', rx: 25, ry: 25 },
+      { type: 'textbox', left: 10, top: 83.5, width: 36, text: 'REGISTER FREE', fontSize: 18, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+    ]
+  },
+  {
+    id: 'before-after',
+    name: 'Before / After',
+    category: 'Social Proof',
+    description: 'Transformation results — great for case studies',
+    platform: 'ALL',
+    objects: [
+      { type: 'rect', left: 0, top: 0, width: 100, height: 100, fill: 'rgba(0,0,0,0.65)', opacity: 1 },
+      // Before side
+      { type: 'rect', left: 5, top: 15, width: 42, height: 30, fill: 'rgba(239,68,68,0.15)', rx: 8, ry: 8, stroke: '#EF4444', strokeWidth: 1 },
+      { type: 'textbox', left: 8, top: 17, width: 36, text: 'BEFORE', fontSize: 14, fontFamily: 'Arial', fontWeight: 'bold', fill: '#EF4444', letterSpacing: 200 },
+      { type: 'textbox', left: 8, top: 24, width: 36, text: '3 leads/week\n80% lost\nManual follow-up', fontSize: 20, fontFamily: 'Arial', fontWeight: 'normal', fill: '#F0A0A0', lineHeight: 1.5 },
+      // After side
+      { type: 'rect', left: 53, top: 15, width: 42, height: 30, fill: 'rgba(16,185,129,0.15)', rx: 8, ry: 8, stroke: '#10B981', strokeWidth: 1 },
+      { type: 'textbox', left: 56, top: 17, width: 36, text: 'AFTER', fontSize: 14, fontFamily: 'Arial', fontWeight: 'bold', fill: '#10B981', letterSpacing: 200 },
+      { type: 'textbox', left: 56, top: 24, width: 36, text: '47 leads/week\n60% converted\nAI handles it all', fontSize: 20, fontFamily: 'Arial', fontWeight: 'normal', fill: '#A0F0C0', lineHeight: 1.5 },
+      // Bottom CTA
+      { type: 'textbox', left: 10, top: 55, width: 80, text: 'GET THESE RESULTS FOR YOUR BUSINESS', fontSize: 28, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'rect', left: 25, top: 72, width: 50, height: 7, fill: '#10B981', rx: 25, ry: 25 },
+      { type: 'textbox', left: 27, top: 73.5, width: 46, text: 'GET STARTED FREE', fontSize: 18, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+    ]
+  },
+  {
+    id: 'countdown-urgency',
+    name: 'Countdown/Urgency',
+    category: 'Ad',
+    description: 'Time-sensitive offer with urgency',
+    platform: 'ALL',
+    objects: [
+      { type: 'rect', left: 0, top: 0, width: 100, height: 100, fill: 'rgba(10,0,0,0.70)', opacity: 1 },
+      { type: 'textbox', left: 10, top: 12, width: 80, text: 'OFFER ENDS IN', fontSize: 18, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FF6B6B', textAlign: 'center', letterSpacing: 300 },
+      // Timer boxes
+      { type: 'rect', left: 15, top: 22, width: 15, height: 12, fill: 'rgba(255,68,68,0.2)', rx: 6, ry: 6, stroke: '#FF4444', strokeWidth: 1 },
+      { type: 'textbox', left: 15, top: 23, width: 15, text: '02', fontSize: 40, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FF4444', textAlign: 'center' },
+      { type: 'textbox', left: 15, top: 32, width: 15, text: 'DAYS', fontSize: 10, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FF8888', textAlign: 'center' },
+      { type: 'rect', left: 35, top: 22, width: 15, height: 12, fill: 'rgba(255,68,68,0.2)', rx: 6, ry: 6, stroke: '#FF4444', strokeWidth: 1 },
+      { type: 'textbox', left: 35, top: 23, width: 15, text: '14', fontSize: 40, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FF4444', textAlign: 'center' },
+      { type: 'textbox', left: 35, top: 32, width: 15, text: 'HOURS', fontSize: 10, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FF8888', textAlign: 'center' },
+      { type: 'rect', left: 55, top: 22, width: 15, height: 12, fill: 'rgba(255,68,68,0.2)', rx: 6, ry: 6, stroke: '#FF4444', strokeWidth: 1 },
+      { type: 'textbox', left: 55, top: 23, width: 15, text: '37', fontSize: 40, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FF4444', textAlign: 'center' },
+      { type: 'textbox', left: 55, top: 32, width: 15, text: 'MINS', fontSize: 10, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FF8888', textAlign: 'center' },
+      // Offer
+      { type: 'textbox', left: 8, top: 44, width: 84, text: 'FIRST MONTH FREE', fontSize: 46, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'textbox', left: 15, top: 60, width: 70, text: 'AI lead generation + appointment setting\nfor your business. No commitment.', fontSize: 20, fontFamily: 'Arial', fontWeight: 'normal', fill: '#C0C0C0', textAlign: 'center', lineHeight: 1.4 },
+      { type: 'rect', left: 22, top: 78, width: 56, height: 8, fill: '#FF4444', rx: 30, ry: 30 },
+      { type: 'textbox', left: 24, top: 80, width: 52, text: 'CLAIM BEFORE IT EXPIRES', fontSize: 17, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+    ]
+  },
 ]
 
 // Template thumbnail colors for preview
@@ -202,4 +316,10 @@ export const TEMPLATE_COLORS: Record<string, { bg: string; accent: string }> = {
   'offer-promo': { bg: '#1a1a1a', accent: '#FF4D00' },
   'dark-premium': { bg: '#050514', accent: '#3B82F6' },
   'split-panel': { bg: '#0F172A', accent: '#3B82F6' },
+  'lead-magnet': { bg: '#1a1a1a', accent: '#FF4D00' },
+  'book-call': { bg: '#051019', accent: '#10B981' },
+  'quiz-funnel': { bg: '#0F0A28', accent: '#8B5CF6' },
+  'webinar-register': { bg: '#1a1a1a', accent: '#EF4444' },
+  'before-after': { bg: '#0a0a0a', accent: '#10B981' },
+  'countdown-urgency': { bg: '#0a0000', accent: '#FF4444' },
 }
