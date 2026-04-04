@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Canvas, Textbox, Rect, Circle, FabricImage, Shadow, filters } from 'fabric'
 import type { FabricObject } from 'fabric'
+import axios from 'axios'
 import { TEMPLATES, TEMPLATE_COLORS, type Template, type TemplateObject } from './templates'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -758,7 +761,9 @@ export default function ImageEditor({
 
   /* ---- template application ---- */
 
-  function applyTemplate(template: Template) {
+  const [customising, setCustomising] = useState(false)
+
+  async function applyTemplate(template: Template) {
     const c = fabricRef.current
     if (!c) return
 
@@ -769,8 +774,42 @@ export default function ImageEditor({
       c.remove(obj)
     }
 
-    // Add template objects
-    for (const tObj of template.objects) {
+    // Collect all text placeholders from the template
+    const textObjects = template.objects.filter(o => o.type === 'textbox' && o.text)
+    const placeholderTexts = textObjects.map(o => o.text || '')
+
+    // Call API to customise text for this client's industry
+    let customisedTexts: string[] = placeholderTexts
+    try {
+      setCustomising(true)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const res = await axios.post(
+        `${API_URL}/social/templates/customise`,
+        { templateTexts: placeholderTexts, templateName: template.name },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
+      )
+      if (res.data.texts?.length === placeholderTexts.length) {
+        customisedTexts = res.data.texts
+      }
+    } catch {
+      // Fall back to original placeholder text if API fails
+    } finally {
+      setCustomising(false)
+    }
+
+    // Map customised texts back to template objects
+    let textIndex = 0
+    const customisedObjects = template.objects.map(tObj => {
+      if (tObj.type === 'textbox' && tObj.text) {
+        const customised = { ...tObj, text: customisedTexts[textIndex] || tObj.text }
+        textIndex++
+        return customised
+      }
+      return tObj
+    })
+
+    // Add template objects with customised text
+    for (const tObj of customisedObjects) {
       const absLeft = (tObj.left / 100) * canvasWidth
       const absTop = (tObj.top / 100) * canvasHeight
       const absWidth = tObj.width != null ? (tObj.width / 100) * canvasWidth : undefined
@@ -1255,6 +1294,12 @@ export default function ImageEditor({
       <div className="shrink-0 bg-gray-900 border-t border-gray-800 px-4 py-3">
         <div className="flex items-center gap-4">
           {/* Template selector */}
+          {customising && (
+            <div className="flex items-center gap-2 text-xs text-indigo-400 shrink-0">
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
+              Customising for your business...
+            </div>
+          )}
           <div className="flex-1 overflow-x-auto">
             <div className="flex gap-3">
               {TEMPLATES.map((tpl) => {
@@ -1263,7 +1308,8 @@ export default function ImageEditor({
                   <button
                     key={tpl.id}
                     onClick={() => applyTemplate(tpl)}
-                    className="shrink-0 flex flex-col items-center gap-1 group"
+                    disabled={customising}
+                    className="shrink-0 flex flex-col items-center gap-1 group disabled:opacity-50"
                     title={tpl.description}
                   >
                     <div

@@ -259,6 +259,63 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Customise template text for a client's industry
+router.post('/templates/customise', async (req: AuthRequest, res: Response) => {
+  try {
+    const clientId = req.clientId!
+    const client = await prisma.client.findUnique({ where: { id: clientId } })
+    if (!client) { res.status(404).json({ error: 'Client not found' }); return }
+
+    const { templateTexts, templateName } = req.body as {
+      templateTexts: string[]  // array of placeholder texts from the template
+      templateName: string
+    }
+
+    if (!templateTexts?.length) {
+      res.status(400).json({ error: 'templateTexts array required' })
+      return
+    }
+
+    const prompt = `You are a marketing copywriter customising a social media template for a specific business.
+
+BUSINESS: ${client.businessName}
+INDUSTRY: ${client.businessDescription || 'a business'}
+TEMPLATE: ${templateName}
+
+Below are the placeholder texts from a "${templateName}" template. Rewrite EACH one to be specific to this business and industry. Keep the same tone, length, and purpose of each text — just make it relevant to THIS business.
+
+RULES:
+- Match the industry language (dental terms for dentists, trade terms for tradies, etc.)
+- Keep roughly the same character count as the original
+- Keep CTA button text short (2-4 words)
+- Keep headlines punchy and specific
+- Use realistic numbers that make sense for this industry
+- Brand name text should use: ${client.businessName}
+
+PLACEHOLDER TEXTS TO REWRITE:
+${templateTexts.map((t, i) => `${i + 1}. "${t}"`).join('\n')}
+
+Return a JSON array of rewritten texts in the same order:
+["rewritten text 1", "rewritten text 2", ...]`
+
+    const raw = await socialAgent.callClaude(prompt, 'Return only a valid JSON array of strings. No explanation.')
+
+    let customised: string[]
+    try {
+      customised = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
+    } catch {
+      // If parsing fails, return originals
+      res.json({ texts: templateTexts })
+      return
+    }
+
+    res.json({ texts: customised })
+  } catch (err) {
+    logger.error('Failed to customise template', { err })
+    res.status(500).json({ error: 'Failed to customise template' })
+  }
+})
+
 // Batch generate a week of drafts
 router.post('/posts/generate-batch', async (req: AuthRequest, res: Response) => {
   try {
