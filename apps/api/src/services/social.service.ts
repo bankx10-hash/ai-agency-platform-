@@ -101,6 +101,21 @@ export class SocialService {
     const containerId: string = containerResponse.data.id
     logger.info('Instagram media container created', { igUserId: options.igUserId, containerId })
 
+    // Wait for container to be ready — Instagram needs time to process the image
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 3000)) // 3 second intervals
+      try {
+        const statusCheck = await metaClient.get(`/${containerId}`, { params: { fields: 'status_code' } })
+        const status = statusCheck.data.status_code
+        if (status === 'FINISHED') break
+        if (status === 'ERROR') throw new Error('Instagram media processing failed')
+        logger.info('Waiting for Instagram media container', { containerId, status, attempt })
+      } catch (err) {
+        // If status check fails, just wait and try publishing
+        if (attempt >= 5) break
+      }
+    }
+
     const publishResponse = await metaClient.post(`/${options.igUserId}/media_publish`, {
       creation_id: containerId
     })
