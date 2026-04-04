@@ -1,4 +1,5 @@
 import Bull from 'bull'
+import axios from 'axios'
 import { prisma } from '../lib/prisma'
 import { socialService } from '../services/social.service'
 import { decryptJSON } from '../utils/encrypt'
@@ -72,6 +73,15 @@ async function publishPost(postId: string): Promise<void> {
 
     const fullText = buildPostText(post.content, post.hashtags as string[])
 
+    logger.info('Publishing post', {
+      postId,
+      platform: post.platform,
+      hasMetaCred: !!metaCred,
+      hasLinkedinCred: !!linkedinCred,
+      metaService: metaCred?.service,
+      hasImage: !!post.imageUrl
+    })
+
     switch (post.platform) {
       case 'FACEBOOK': {
         if (!metaCred) throw new Error('No Meta credentials found')
@@ -123,13 +133,21 @@ async function publishPost(postId: string): Promise<void> {
     })
 
     logger.info('Post published successfully', { postId, platform: post.platform, externalPostId })
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+  } catch (err: unknown) {
+    // Capture detailed error from Meta/platform API
+    let errorMessage = 'Unknown error'
+    let errorDetail: unknown = undefined
+    if (axios.isAxiosError(err)) {
+      errorMessage = `${err.response?.status || 'network'}: ${JSON.stringify(err.response?.data) || err.message}`
+      errorDetail = err.response?.data
+    } else if (err instanceof Error) {
+      errorMessage = err.message
+    }
     await prisma.scheduledPost.update({
       where: { id: postId },
-      data: { status: 'FAILED', errorMessage }
+      data: { status: 'FAILED', errorMessage: errorMessage.substring(0, 500) }
     })
-    logger.error('Failed to publish post', { postId, error: errorMessage })
+    logger.error('Failed to publish post', { postId, platform: post.platform, error: errorMessage, detail: errorDetail })
   }
 }
 
