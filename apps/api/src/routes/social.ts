@@ -8,6 +8,7 @@ import { SocialMediaAgent, SocialMediaAgentConfig } from '../agents/social-media
 import { decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
 import { socialPublishQueue } from '../queue/social-publish.queue'
+import { generateAdImage, ctaToDisplayText } from '../services/ad-image.service'
 
 const router = Router()
 router.use(authMiddleware)
@@ -447,8 +448,35 @@ Return valid JSON only:
         )
         adImageUrl = falResponse.data.images[0].url
       } catch (imgErr) {
-        logger.warn('Ad image generation failed, using original post image', { error: imgErr })
+        logger.warn('Ad background image generation failed, using original post image', { error: imgErr })
         adImageUrl = post.imageUrl || undefined
+      }
+    }
+
+    // Composite text overlay onto the ad image (viral ad style)
+    let finalAdImageUrl = adImageUrl || post.imageUrl || undefined
+    if (finalAdImageUrl && parsed.headline) {
+      try {
+        const adStyle = req.body.adStyle || 'bold'
+        const composited = await generateAdImage({
+          backgroundImageUrl: finalAdImageUrl,
+          headline: parsed.headline,
+          primaryText: parsed.primary_text,
+          ctaText: ctaToDisplayText(parsed.cta_type || 'LEARN_MORE'),
+          businessName: client.businessName,
+          platform: platform.toUpperCase() as 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN',
+          style: adStyle
+        })
+
+        // Upload composited image to fal.ai storage for a URL
+        // For now, serve it as a data URL (base64) -- in production, upload to S3/Cloudinary
+        const base64 = composited.toString('base64')
+        finalAdImageUrl = `data:image/jpeg;base64,${base64}`
+
+        logger.info('Ad image composited with text overlay', { platform, style: adStyle })
+      } catch (compErr) {
+        logger.warn('Ad image compositing failed, using plain image', { error: compErr })
+        // Fall back to the plain image without text overlay
       }
     }
 
@@ -461,7 +489,7 @@ Return valid JSON only:
         status: 'DRAFT' as never,
         source: 'AI_GENERATED' as never,
         content: parsed.ad_content || post.content,
-        imageUrl: adImageUrl || post.imageUrl || null,
+        imageUrl: finalAdImageUrl || null,
         imagePrompt: parsed.image_prompt,
         hashtags: [],
         contentPillar: 'offer',

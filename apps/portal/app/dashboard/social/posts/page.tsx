@@ -894,42 +894,57 @@ export default function SocialPostsPage() {
 
             {/* Generate Advert button */}
             {selectedPost?.id && !((selectedPost.metadata as Record<string, unknown>)?.isAdvert) && (
-              <div className="mb-4">
-                <button
-                  onClick={async () => {
-                    if (!selectedPost?.id) return
-                    setGenerating(true)
-                    try {
-                      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-                      const res = await axios.post(
-                        `${API_URL}/social/posts/${selectedPost.id}/generate-advert`,
-                        { platform: selectedPost.platform.toLowerCase() },
-                        { headers: { Authorization: `Bearer ${token}` } }
-                      )
-                      // Close current modal and open the new ad post
-                      setSelectedPost(res.data)
-                      setModalMode('edit')
-                      setFormContent(res.data.content)
-                      setFormPlatform(res.data.platform)
-                      setFormScheduledAt('')
-                      fetchPosts()
-                    } catch (err) {
-                      alert('Failed to generate advert')
-                    } finally {
-                      setGenerating(false)
-                    }
-                  }}
-                  disabled={generating}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-4 py-2 text-sm font-medium text-white hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                >
-                  {generating ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  )}
-                  Generate Advert from This Post
-                </button>
-                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Creates a paid ad with headline, CTA, and ad-optimized image</p>
+              <div className="mb-4 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
+                  <svg className="h-4 w-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Generate Viral Ad
+                </h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {[
+                    { key: 'bold', label: 'Bold', desc: 'Orange accent, high impact' },
+                    { key: 'dark', label: 'Dark', desc: 'Blue accent, premium feel' },
+                    { key: 'gradient', label: 'Gradient', desc: 'Bottom fade, cinematic' },
+                    { key: 'minimal', label: 'Minimal', desc: 'White accent, clean' },
+                  ].map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={async () => {
+                        if (!selectedPost?.id) return
+                        setGenerating(true)
+                        try {
+                          const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+                          const res = await axios.post(
+                            `${API_URL}/social/posts/${selectedPost.id}/generate-advert`,
+                            { platform: selectedPost.platform.toLowerCase(), adStyle: s.key },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          )
+                          setSelectedPost(res.data)
+                          setModalMode('edit')
+                          setFormContent(res.data.content)
+                          setFormPlatform(res.data.platform)
+                          setFormScheduledAt('')
+                          fetchPosts()
+                        } catch {
+                          alert('Failed to generate advert')
+                        } finally {
+                          setGenerating(false)
+                        }
+                      }}
+                      disabled={generating}
+                      className="flex flex-col items-start rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-left hover:border-orange-400 hover:bg-orange-50 dark:hover:border-orange-600 dark:hover:bg-orange-900/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{s.label}</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{s.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                {generating && (
+                  <div className="flex items-center gap-2 text-sm text-orange-600 dark:text-orange-400">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+                    Generating ad creative with text overlay...
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 dark:text-gray-500">AI generates ad copy + hero image with bold text overlay, headline, and CTA</p>
               </div>
             )}
 
