@@ -184,7 +184,7 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
           }
         )
         imageUrl = falResponse.data.images[0].url
-        logger.info('Auto-generated image for AI post', { platform, imageUrl: imageUrl.substring(0, 80) })
+        logger.info('Auto-generated image for AI post', { platform, imageUrl: imageUrl?.substring(0, 80) })
       } catch (imgErr) {
         logger.warn('Image auto-generation failed, creating post without image', { error: imgErr })
       }
@@ -198,7 +198,7 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
         status: status as never,
         source: 'AI_GENERATED' as never,
         content: parsed.content,
-        imageUrl,
+        imageUrl: imageUrl || null,
         imagePrompt: parsed.image_prompt,
         hashtags: parsed.hashtags || [],
         contentPillar,
