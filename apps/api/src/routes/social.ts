@@ -327,6 +327,125 @@ router.post('/posts/:id/regenerate', async (req: AuthRequest, res: Response) => 
   }
 })
 
+// Generate advert from an existing post
+router.post('/posts/:id/generate-advert', async (req: AuthRequest, res: Response) => {
+  try {
+    const clientId = req.clientId!
+    const post = await prisma.scheduledPost.findFirst({
+      where: { id: req.params.id, clientId }
+    })
+    if (!post) { res.status(404).json({ error: 'Post not found' }); return }
+
+    const client = await prisma.client.findUnique({ where: { id: clientId } })
+    if (!client) { res.status(404).json({ error: 'Client not found' }); return }
+
+    const { platform = post.platform.toLowerCase(), objective = 'conversions' } = req.body
+
+    // Generate ad copy from the post content using Claude
+    const adPrompt = `You are an expert Meta/Facebook Ads copywriter. Create a high-converting paid advertisement based on this organic social media post.
+
+BUSINESS: ${client.businessName}
+${client.businessDescription ? `DESCRIPTION: ${client.businessDescription}` : ''}
+
+ORIGINAL POST CONTENT:
+${post.content}
+
+PLATFORM: ${platform}
+AD OBJECTIVE: ${objective}
+
+Create an ad with these components:
+1. HEADLINE (max 40 chars) — attention-grabbing, creates urgency
+2. PRIMARY TEXT (max 125 chars) — the main ad copy that appears above the image. Hook + value prop + CTA. Short, punchy, scroll-stopping.
+3. DESCRIPTION (max 30 chars) — appears below headline in some placements
+4. CTA_TYPE — one of: LEARN_MORE, SIGN_UP, BOOK_NOW, CONTACT_US, GET_OFFER, SHOP_NOW
+5. AD_CONTENT — the full ad body text (can be longer, 2-3 short paragraphs). Transform the organic post into direct-response ad copy. Remove hashtags. Add urgency, scarcity, social proof. End with a clear call to action.
+6. IMAGE_PROMPT — a prompt for AI image generation. The ad image should be bold, eye-catching, with high contrast. Show the transformation/result the customer gets. Style: cinematic, professional, aspirational. NO TEXT IN THE IMAGE.
+
+Return valid JSON only:
+{
+  "headline": "...",
+  "primary_text": "...",
+  "description": "...",
+  "cta_type": "...",
+  "ad_content": "...",
+  "image_prompt": "...",
+  "target_audience": "brief description of ideal audience for targeting"
+}`
+
+    const raw = await socialAgent.callClaude(adPrompt, 'You are an expert paid advertising copywriter. Return only valid JSON.')
+
+    let parsed: {
+      headline?: string; primary_text?: string; description?: string
+      cta_type?: string; ad_content?: string; image_prompt?: string; target_audience?: string
+    } = {}
+    try {
+      parsed = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
+    } catch {
+      res.status(500).json({ error: 'Failed to parse ad content from AI' })
+      return
+    }
+
+    // Generate ad image via fal.ai
+    let adImageUrl: string | undefined
+    if (parsed.image_prompt && process.env.FAL_API_KEY) {
+      try {
+        const styleGuide = ', high-contrast commercial advertising photography, bold dramatic lighting, aspirational lifestyle, premium product showcase, cinematic color grading, shallow depth-of-field, magazine-quality, NO TEXT, NO WORDS, NO LETTERS, NO WRITING, NO LOGOS, NO WATERMARKS'
+        const styledPrompt = (parsed.image_prompt.substring(0, 800) + styleGuide).substring(0, 1000)
+        const falResponse = await axios.post(
+          'https://fal.run/fal-ai/flux/dev',
+          {
+            prompt: styledPrompt,
+            image_size: platform === 'instagram' ? 'square_hd' : 'landscape_16_9',
+            num_images: 1,
+            enable_safety_checker: true
+          },
+          {
+            headers: { Authorization: `Key ${process.env.FAL_API_KEY}`, 'Content-Type': 'application/json' },
+            timeout: 60000
+          }
+        )
+        adImageUrl = falResponse.data.images[0].url
+      } catch (imgErr) {
+        logger.warn('Ad image generation failed, using original post image', { error: imgErr })
+        adImageUrl = post.imageUrl || undefined
+      }
+    }
+
+    // Create the advert as a new ScheduledPost
+    const adPost = await prisma.scheduledPost.create({
+      data: {
+        id: randomUUID(),
+        clientId,
+        platform: platform.toUpperCase() as never,
+        status: 'DRAFT' as never,
+        source: 'AI_GENERATED' as never,
+        content: parsed.ad_content || post.content,
+        imageUrl: adImageUrl || post.imageUrl || null,
+        imagePrompt: parsed.image_prompt,
+        hashtags: [],
+        contentPillar: 'offer',
+        autoApproved: false,
+        metadata: {
+          isAdvert: true,
+          headline: parsed.headline,
+          primaryText: parsed.primary_text,
+          description: parsed.description,
+          ctaType: parsed.cta_type,
+          targetAudience: parsed.target_audience,
+          objective,
+          sourcePostId: post.id,
+        },
+      }
+    })
+
+    logger.info('Advert generated from post', { postId: post.id, adPostId: adPost.id, platform })
+    res.status(201).json(adPost)
+  } catch (err) {
+    logger.error('Failed to generate advert', { err })
+    res.status(500).json({ error: 'Failed to generate advert' })
+  }
+})
+
 // Generate image for a post using fal.ai Flux
 router.post('/posts/:id/generate-image', async (req: AuthRequest, res: Response) => {
   try {

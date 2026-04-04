@@ -585,6 +585,12 @@ export default function SocialPostsPage() {
                         News
                       </span>
                     )}
+                    {(post.metadata as Record<string, unknown>)?.isAdvert && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-orange-100 to-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:from-orange-900/30 dark:to-red-900/30 dark:text-red-400">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        AD
+                      </span>
+                    )}
 
                     {/* Auto-approved indicator */}
                     {post.autoApproved && (
@@ -822,7 +828,7 @@ export default function SocialPostsPage() {
                   <img
                     src={selectedPost?.imageUrl}
                     alt="Post image"
-                    className="w-full h-48 object-cover"
+                    className="w-full max-h-[400px] object-contain bg-gray-50 dark:bg-gray-900"
                   />
                 </div>
               ) : null}
@@ -865,6 +871,64 @@ export default function SocialPostsPage() {
                 </div>
               )}
             </div>
+
+            {/* Ad details (if this post is an advert) */}
+            {selectedPost?.metadata && (selectedPost.metadata as Record<string, unknown>).isAdvert && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4">
+                <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Ad Creative
+                </h4>
+                <div className="space-y-1.5 text-sm">
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Headline:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).headline as string}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Primary Text:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).primaryText as string}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Description:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).description as string}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">CTA:</span> <span className="inline-block rounded bg-amber-200 dark:bg-amber-800 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">{(selectedPost.metadata as Record<string, unknown>).ctaType as string}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Target Audience:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).targetAudience as string}</span></p>
+                </div>
+              </div>
+            )}
+
+            {/* Generate Advert button */}
+            {selectedPost?.id && !(selectedPost.metadata as Record<string, unknown>)?.isAdvert && (
+              <div className="mb-4">
+                <button
+                  onClick={async () => {
+                    if (!selectedPost?.id) return
+                    setGenerating(true)
+                    try {
+                      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+                      const res = await axios.post(
+                        `${API_URL}/social/posts/${selectedPost.id}/generate-advert`,
+                        { platform: selectedPost.platform.toLowerCase() },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                      )
+                      // Close current modal and open the new ad post
+                      setSelectedPost(res.data)
+                      setModalMode('edit')
+                      setFormContent(res.data.content)
+                      setFormPlatform(res.data.platform)
+                      setFormScheduledAt('')
+                      fetchPosts()
+                    } catch (err) {
+                      alert('Failed to generate advert')
+                    } finally {
+                      setGenerating(false)
+                    }
+                  }}
+                  disabled={generating}
+                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-4 py-2 text-sm font-medium text-white hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  {generating ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  )}
+                  Generate Advert from This Post
+                </button>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Creates a paid ad with headline, CTA, and ad-optimized image</p>
+              </div>
+            )}
 
             {/* Schedule date/time */}
             {selectedPost?.status !== 'PUBLISHED' && (
