@@ -21,13 +21,18 @@ async function getSocialConfig(clientId: string): Promise<Partial<SocialMediaAge
 
   const creds = await prisma.clientCredential.findMany({ where: { clientId } })
   const metaCred = creds.find(c => c.service === 'meta' || c.service === 'facebook')
+  const instagramCred = creds.find(c => c.service === 'instagram')
   const linkedinCred = creds.find(c => c.service === 'linkedin')
 
   let metaConfig: Record<string, string> = {}
+  let igConfig: Record<string, string> = {}
   let linkedinConfig: Record<string, string> = {}
 
   if (metaCred) {
     try { metaConfig = decryptJSON(metaCred.credentials) } catch { /* skip */ }
+  }
+  if (instagramCred) {
+    try { igConfig = decryptJSON(instagramCred.credentials) } catch { /* skip */ }
   }
   if (linkedinCred) {
     try { linkedinConfig = decryptJSON(linkedinCred.credentials) } catch { /* skip */ }
@@ -43,7 +48,7 @@ async function getSocialConfig(clientId: string): Promise<Partial<SocialMediaAge
     locationId: '',
     meta_page_id: metaConfig.pageId || metaConfig.meta_page_id,
     meta_access_token: metaConfig.accessToken || metaConfig.meta_access_token,
-    instagram_user_id: metaConfig.instagramUserId || metaConfig.instagram_user_id,
+    instagram_user_id: igConfig.igUserId || igConfig.instagramUserId || metaConfig.instagramUserId || metaConfig.instagram_user_id,
     linkedin_access_token: linkedinConfig.accessToken || linkedinConfig.linkedin_access_token,
     linkedin_person_id: linkedinConfig.personId || linkedinConfig.linkedin_person_id,
     linkedin_organization_id: linkedinConfig.organizationId || linkedinConfig.linkedin_organization_id,

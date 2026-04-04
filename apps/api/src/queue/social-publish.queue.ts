@@ -67,6 +67,7 @@ async function publishPost(postId: string): Promise<void> {
       where: { clientId: post.clientId }
     })
     const metaCred = creds.find(c => c.service === 'meta' || c.service === 'facebook')
+    const instagramCred = creds.find(c => c.service === 'instagram')
     const linkedinCred = creds.find(c => c.service === 'linkedin')
 
     let externalPostId: string | undefined
@@ -77,6 +78,7 @@ async function publishPost(postId: string): Promise<void> {
       postId,
       platform: post.platform,
       hasMetaCred: !!metaCred,
+      hasInstagramCred: !!instagramCred,
       hasLinkedinCred: !!linkedinCred,
       metaService: metaCred?.service,
       hasImage: !!post.imageUrl
@@ -96,11 +98,13 @@ async function publishPost(postId: string): Promise<void> {
         break
       }
       case 'INSTAGRAM': {
-        if (!metaCred) throw new Error('No Meta credentials found')
-        const metaConfig = decryptJSON<Record<string, string>>(metaCred.credentials)
+        // Instagram credentials are stored separately (service: 'instagram')
+        const igCred = instagramCred || metaCred
+        if (!igCred) throw new Error('No Instagram credentials found')
+        const igConfig = decryptJSON<Record<string, string>>(igCred.credentials)
         const result = await socialService.postToInstagram({
-          igUserId: metaConfig.instagramUserId || metaConfig.instagram_user_id,
-          accessToken: metaConfig.accessToken || metaConfig.meta_access_token,
+          igUserId: igConfig.igUserId || igConfig.instagramUserId || igConfig.instagram_user_id,
+          accessToken: igConfig.accessToken || igConfig.meta_access_token,
           caption: fullText,
           imageUrl: post.imageUrl || undefined
         })

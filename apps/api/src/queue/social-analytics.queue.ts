@@ -42,13 +42,15 @@ socialAnalyticsQueue.process(async () => {
 async function refreshClientAnalytics(clientId: string): Promise<void> {
   const creds = await prisma.clientCredential.findMany({ where: { clientId } })
   const metaCred = creds.find(c => c.service === 'meta' || c.service === 'facebook')
+  const instagramCred = creds.find(c => c.service === 'instagram')
 
   if (metaCred) {
     try {
       const config = decryptJSON<Record<string, string>>(metaCred.credentials)
+      const igConfig = instagramCred ? decryptJSON<Record<string, string>>(instagramCred.credentials) : config
       const pageId = config.pageId || config.meta_page_id
       const accessToken = config.accessToken || config.meta_access_token
-      const igUserId = config.instagramUserId || config.instagram_user_id
+      const igUserId = igConfig.igUserId || igConfig.instagramUserId || config.instagram_user_id
 
       if (pageId && accessToken) {
         // Facebook page insights
