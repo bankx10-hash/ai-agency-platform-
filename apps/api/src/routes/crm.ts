@@ -139,7 +139,7 @@ router.get('/contacts', async (req: AuthRequest, res: Response): Promise<void> =
 
     params.push(take)
 
-    const contacts = await prisma.$queryRawUnsafe<Contact[]>(
+    const contacts = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
       `SELECT "id", "clientId", "name", "email", "phone", "source", "score",
               "pipelineStage", "dealValue", "dealCurrency", "lastContactedAt",
               "createdAt", "updatedAt"
@@ -151,7 +151,7 @@ router.get('/contacts', async (req: AuthRequest, res: Response): Promise<void> =
     )
 
     // Fetch activity counts and last activity for each contact
-    const contactIds = contacts.map(c => c.id)
+    const contactIds = contacts.map(c => c.id as string)
     const activities = contactIds.length > 0 ? await prisma.contactActivity.findMany({
       where: { contactId: { in: contactIds } },
       orderBy: { createdAt: 'desc' },
@@ -167,7 +167,7 @@ router.get('/contacts', async (req: AuthRequest, res: Response): Promise<void> =
       }
     })
 
-    const nextCursor = contacts.length === take ? contacts[contacts.length - 1].id : null
+    const nextCursor = contacts.length === take ? (contacts[contacts.length - 1].id as string) : null
     res.json({ contacts: result, nextCursor })
   } catch (err) {
     logger.error('CRM get contacts error', { err })
