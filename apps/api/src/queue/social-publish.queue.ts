@@ -102,11 +102,20 @@ async function publishPost(postId: string): Promise<void> {
         const igCred = instagramCred || metaCred
         if (!igCred) throw new Error('No Instagram credentials found')
         const igConfig = decryptJSON<Record<string, string>>(igCred.credentials)
+
+        // Instagram REQUIRES an image — reject data URLs and empty URLs
+        let igImageUrl = post.imageUrl || undefined
+        if (!igImageUrl || igImageUrl.startsWith('data:')) {
+          throw new Error('Instagram requires a publicly accessible image URL. The current image is either missing or a data URL. Please regenerate the image.')
+        }
+
+        logger.info('Publishing to Instagram', { postId, igUserId: igConfig.igUserId, imageUrl: igImageUrl.substring(0, 100) })
+
         const result = await socialService.postToInstagram({
           igUserId: igConfig.igUserId || igConfig.instagramUserId || igConfig.instagram_user_id,
           accessToken: igConfig.accessToken || igConfig.meta_access_token,
           caption: fullText,
-          imageUrl: post.imageUrl || undefined
+          imageUrl: igImageUrl
         })
         externalPostId = result.id
         break

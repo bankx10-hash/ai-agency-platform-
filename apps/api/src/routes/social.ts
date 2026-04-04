@@ -220,7 +220,10 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
             timeout: 60000
           }
         )
-        imageUrl = falResponse.data.images[0].url
+        const falUrl = falResponse.data.images[0].url
+        // Download and save locally (fal URLs are temporary)
+        const dlResponse = await axios.get(falUrl, { responseType: 'arraybuffer', timeout: 30000 })
+        imageUrl = saveImageToDisk(Buffer.from(dlResponse.data))
         logger.info('Auto-generated image for AI post', { platform, imageUrl: imageUrl?.substring(0, 80) })
       } catch (imgErr) {
         logger.warn('Image auto-generation failed, creating post without image', { error: imgErr })
@@ -477,7 +480,9 @@ Return valid JSON only:
             timeout: 60000
           }
         )
-        adImageUrl = falResponse.data.images[0].url
+        const adFalUrl = falResponse.data.images[0].url
+        const adDlResponse = await axios.get(adFalUrl, { responseType: 'arraybuffer', timeout: 30000 })
+        adImageUrl = saveImageToDisk(Buffer.from(adDlResponse.data))
       } catch (imgErr) {
         logger.warn('Ad background image generation failed, using original post image', { error: imgErr })
         adImageUrl = post.imageUrl || undefined
@@ -568,15 +573,19 @@ router.post('/posts/:id/generate-image', async (req: AuthRequest, res: Response)
       }
     )
 
-    const imageUrl = falResponse.data.images[0].url
+    const falImageUrl = falResponse.data.images[0].url
 
-    // Save image URL to the post
+    // Download fal.ai image and save locally (fal URLs are temporary)
+    const imgResponse = await axios.get(falImageUrl, { responseType: 'arraybuffer', timeout: 30000 })
+    const imageUrl = saveImageToDisk(Buffer.from(imgResponse.data))
+
+    // Save permanent URL to the post
     const updated = await prisma.scheduledPost.update({
       where: { id: post.id },
       data: { imageUrl, imagePrompt }
     })
 
-    logger.info('Image generated for social post', { postId: post.id, platform: post.platform })
+    logger.info('Image generated for social post', { postId: post.id, platform: post.platform, imageUrl })
     res.json({ imageUrl, post: updated })
   } catch (err) {
     const detail = axios.isAxiosError(err)
