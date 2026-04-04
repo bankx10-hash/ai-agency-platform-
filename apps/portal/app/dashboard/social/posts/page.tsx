@@ -885,7 +885,7 @@ export default function SocialPostsPage() {
                   <p><span className="font-medium text-gray-600 dark:text-gray-400">Description:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).description || '')}</span></p>
                   <p><span className="font-medium text-gray-600 dark:text-gray-400">CTA:</span> <span className="inline-block rounded bg-amber-200 dark:bg-amber-800 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">{String((selectedPost.metadata as Record<string, unknown>).ctaType || '')}</span></p>
                   <p><span className="font-medium text-gray-600 dark:text-gray-400">Target Audience:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).targetAudience || '')}</span></p>
-                  {(selectedPost.metadata as Record<string, unknown>).adFormatNotes && (
+                  {!!(selectedPost.metadata as Record<string, unknown>).adFormatNotes && (
                     <p><span className="font-medium text-gray-600 dark:text-gray-400">Placement:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).adFormatNotes)}</span></p>
                   )}
                 </div>
