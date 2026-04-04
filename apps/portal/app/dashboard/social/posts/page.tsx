@@ -585,7 +585,7 @@ export default function SocialPostsPage() {
                         News
                       </span>
                     )}
-                    {(post.metadata as Record<string, unknown>)?.isAdvert && (
+                    {!!(post.metadata as Record<string, unknown>)?.isAdvert && (
                       <span className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-orange-100 to-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:from-orange-900/30 dark:to-red-900/30 dark:text-red-400">
                         <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         AD
@@ -873,24 +873,24 @@ export default function SocialPostsPage() {
             </div>
 
             {/* Ad details (if this post is an advert) */}
-            {selectedPost?.metadata && (selectedPost.metadata as Record<string, unknown>).isAdvert && (
+            {!!(selectedPost?.metadata && (selectedPost.metadata as Record<string, unknown>).isAdvert) && (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4">
                 <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                   Ad Creative
                 </h4>
                 <div className="space-y-1.5 text-sm">
-                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Headline:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).headline as string}</span></p>
-                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Primary Text:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).primaryText as string}</span></p>
-                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Description:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).description as string}</span></p>
-                  <p><span className="font-medium text-gray-600 dark:text-gray-400">CTA:</span> <span className="inline-block rounded bg-amber-200 dark:bg-amber-800 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">{(selectedPost.metadata as Record<string, unknown>).ctaType as string}</span></p>
-                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Target Audience:</span> <span className="text-gray-800 dark:text-gray-200">{(selectedPost.metadata as Record<string, unknown>).targetAudience as string}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Headline:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).headline || '')}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Primary Text:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).primaryText || '')}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Description:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).description || '')}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">CTA:</span> <span className="inline-block rounded bg-amber-200 dark:bg-amber-800 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">{String((selectedPost.metadata as Record<string, unknown>).ctaType || '')}</span></p>
+                  <p><span className="font-medium text-gray-600 dark:text-gray-400">Target Audience:</span> <span className="text-gray-800 dark:text-gray-200">{String((selectedPost.metadata as Record<string, unknown>).targetAudience || '')}</span></p>
                 </div>
               </div>
             )}
 
             {/* Generate Advert button */}
-            {selectedPost?.id && !(selectedPost.metadata as Record<string, unknown>)?.isAdvert && (
+            {selectedPost?.id && !((selectedPost.metadata as Record<string, unknown>)?.isAdvert) && (
               <div className="mb-4">
                 <button
                   onClick={async () => {
