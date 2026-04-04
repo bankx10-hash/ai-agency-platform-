@@ -201,4 +201,42 @@ router.get('/:deploymentId/metrics', authMiddleware, async (req: AuthRequest, re
   }
 })
 
+// Delete an agent deployment
+router.delete('/:deploymentId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { deploymentId } = req.params
+
+    const deployment = await prisma.agentDeployment.findUnique({
+      where: { id: deploymentId }
+    })
+
+    if (!deployment) {
+      res.status(404).json({ error: 'Agent deployment not found' })
+      return
+    }
+
+    if (deployment.clientId !== req.clientId) {
+      res.status(403).json({ error: 'Forbidden' })
+      return
+    }
+
+    // Pause N8N workflow if exists
+    if (deployment.n8nWorkflowId) {
+      try {
+        await n8nService.pauseWorkflow(deployment.n8nWorkflowId)
+      } catch {
+        logger.warn('Could not pause N8N workflow before deletion', { deploymentId })
+      }
+    }
+
+    await prisma.agentDeployment.delete({ where: { id: deploymentId } })
+
+    logger.info('Agent deployment deleted', { deploymentId, agentType: deployment.agentType, clientId: req.clientId })
+    res.json({ success: true })
+  } catch (error) {
+    logger.error('Error deleting agent deployment', { error, deploymentId: req.params.deploymentId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 export default router

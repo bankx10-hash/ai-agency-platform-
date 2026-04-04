@@ -16,6 +16,7 @@ interface AgentDeployment {
 interface AgentCardProps {
   agent: AgentDeployment
   onStatusChange?: (agentId: string, newStatus: string) => void
+  onDelete?: (agentId: string) => void
   showConfigure?: boolean
 }
 
@@ -39,7 +40,7 @@ const AGENTS: Record<string, { label: string; metricLabel: string; metricKey: st
   CLIENT_SERVICES:    { label: 'Client Services',    metricLabel: 'Clients helped', metricKey: 'clientsHelped',     color: '#0d9488', iconPath: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
 }
 
-export default function AgentCard({ agent, onStatusChange, showConfigure }: AgentCardProps) {
+export default function AgentCard({ agent, onStatusChange, onDelete, showConfigure }: AgentCardProps) {
   const [toggling, setToggling] = useState(false)
   const cfg = AGENTS[agent.agentType] ?? { label: agent.agentType.replace(/_/g, ' '), metricLabel: 'Actions', metricKey: 'totalLeads', color: '#2563eb', iconPath: 'M12 12m-9 0a9 9 0 1018 0 9 9 0 01-18 0' }
   const metricValue = (agent.metrics as Record<string, number | undefined> | undefined)?.[cfg.metricKey] ?? 0
@@ -96,6 +97,22 @@ export default function AgentCard({ agent, onStatusChange, showConfigure }: Agen
           </Link>
         )}
       </div>
+
+      {/* Delete button */}
+      {onDelete && (
+        <button
+          onClick={() => {
+            if (confirm(`Delete "${cfg.label}" agent? This cannot be undone.`)) {
+              onDelete(agent.id)
+            }
+          }}
+          className="w-full mt-3 pt-3 flex items-center justify-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors"
+          style={{ borderTop: '1px solid var(--border-card)' }}
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          Delete
+        </button>
+      )}
     </div>
   )
 }

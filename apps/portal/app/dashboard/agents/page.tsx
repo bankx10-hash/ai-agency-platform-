@@ -41,7 +41,11 @@ export default function AgentsPage() {
           headers: { Authorization: `Bearer ${token}` }
         })
 
-        setAgents(response.data.agents)
+        // Filter out CONVERSATIONAL_WORKFLOW — those are managed in the Workflows section
+        const filtered = (response.data.agents || []).filter(
+          (a: AgentDeployment) => a.agentType !== 'CONVERSATIONAL_WORKFLOW'
+        )
+        setAgents(filtered)
       } catch (err) {
         console.error('Failed to fetch agents:', err)
       } finally {
@@ -105,6 +109,17 @@ export default function AgentsPage() {
               key={agent.id}
               agent={agent}
               onStatusChange={handleStatusChange}
+              onDelete={async (agentId) => {
+                try {
+                  const token = localStorage.getItem('token') || ''
+                  await axios.delete(`${API_URL}/agents/${agentId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  })
+                  setAgents(prev => prev.filter(a => a.id !== agentId))
+                } catch {
+                  alert('Failed to delete agent')
+                }
+              }}
               showConfigure
             />
           ))}
