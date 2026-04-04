@@ -1,6 +1,8 @@
 import { Router, Response } from 'express'
 import { prisma } from '../lib/prisma'
 import { randomUUID } from 'crypto'
+import path from 'path'
+import fs from 'fs'
 import axios from 'axios'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 import { socialService } from '../services/social.service'
@@ -13,6 +15,29 @@ import { generateAdImage, ctaToDisplayText } from '../services/ad-image.service'
 
 const router = Router()
 router.use(authMiddleware)
+
+// Ensure uploads directory exists
+const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads', 'social')
+fs.mkdirSync(UPLOADS_DIR, { recursive: true })
+
+// Save image buffer or base64 to disk, return public URL
+function saveImageToDisk(data: Buffer | string, filename?: string): string {
+  const fname = filename || `${randomUUID()}.jpg`
+  const filePath = path.join(UPLOADS_DIR, fname)
+
+  if (typeof data === 'string' && data.startsWith('data:image/')) {
+    // Base64 data URL
+    const base64Data = data.replace(/^data:image\/\w+;base64,/, '')
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'))
+  } else if (Buffer.isBuffer(data)) {
+    fs.writeFileSync(filePath, data)
+  } else {
+    throw new Error('Invalid image data')
+  }
+
+  const apiUrl = process.env.API_URL || 'https://api.nodusaisystems.com'
+  return `${apiUrl}/uploads/social/${fname}`
+}
 
 const socialAgent = new SocialMediaAgent()
 
@@ -474,10 +499,8 @@ Return valid JSON only:
           style: adStyle
         })
 
-        // Upload composited image to fal.ai storage for a URL
-        // For now, serve it as a data URL (base64) -- in production, upload to S3/Cloudinary
-        const base64 = composited.toString('base64')
-        finalAdImageUrl = `data:image/jpeg;base64,${base64}`
+        // Save composited image to disk and get a public URL
+        finalAdImageUrl = saveImageToDisk(composited)
 
         logger.info('Ad image composited with text overlay', { platform, style: adStyle })
       } catch (compErr) {
@@ -635,12 +658,15 @@ router.post('/posts/:id/upload-image', async (req: AuthRequest, res: Response) =
       return
     }
 
+    // Save to disk and get a public URL (Instagram requires a fetchable URL, not base64)
+    const imageUrl = saveImageToDisk(imageDataUrl)
+
     const updated = await prisma.scheduledPost.update({
       where: { id: post.id },
-      data: { imageUrl: imageDataUrl }
+      data: { imageUrl }
     })
 
-    logger.info('Post image uploaded from editor', { postId: post.id })
+    logger.info('Post image uploaded from editor', { postId: post.id, imageUrl })
     res.json({ imageUrl: updated.imageUrl })
   } catch (err) {
     logger.error('Failed to upload image', { err })

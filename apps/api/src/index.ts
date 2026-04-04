@@ -665,8 +665,15 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }))
 app.use('/webhooks/meta', metaWebhooksRouter)
 app.use('/webhooks/whatsapp', whatsappWebhooksRouter)
 
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '20mb' }))
 app.use(express.urlencoded({ extended: true }))
+
+// Serve uploaded images (social post images, ad composites)
+import path from 'path'
+import fs from 'fs'
+const uploadsDir = path.resolve(process.cwd(), 'uploads', 'social')
+fs.mkdirSync(uploadsDir, { recursive: true })
+app.use('/uploads/social', express.static(uploadsDir))
 
 app.use(apiRateLimit)
 
