@@ -29,47 +29,56 @@ export interface SocialMediaAgentConfig {
   linkedin_organization_id?: string  // future: requires Marketing Developer Platform
 }
 
-// Virality frameworks per platform
+// Platform-specific content frameworks
 const PLATFORM_PROMPTS: Record<SupportedPlatform, string> = {
   instagram: `
 PLATFORM: Instagram
 FORMAT RULES:
-- Line 1 MUST be a gut-punch hook — make them stop mid-scroll. Use fear, shocking numbers, or a bold claim they've never heard. This is the only line visible before "more" — it must create unbearable curiosity.
-- Body: 3-5 short punchy paragraphs (2-3 lines each) with line breaks between each
-- Use storytelling structure: hook → painful problem they're ignoring → the brutal truth → proof/results → urgent CTA
-- Build FEAR: make them feel the cost of inaction. Every day without this = lost leads, lost revenue, competitors winning.
-- End with a URGENT single-sentence CTA that creates scarcity ("We only take 3 new clients per month — DM 'AI' NOW before spots fill", "Comment 'READY' and we'll reach out TODAY")
-- Hashtags: 20-25 relevant hashtags on a new line at the end (mix broad, niche, and branded)
-- Use emojis sparingly as visual bullet points, not decoration
-VIRALITY LEVERS: Fear of falling behind, shocking competitor stats, "your competitors are already doing this", scarcity/urgency CTAs, "save this before you forget" hooks
-URGENCY TRIGGERS: Limited spots, time-sensitive offers, "while you're reading this your competitor is...", real cost-of-delay numbers`,
+- Line 1 MUST stop the scroll — use a bold insight, a surprising number, a provocative question, or a pattern interrupt. This is the ONLY line visible before "more" so it must create irresistible curiosity.
+- Body: 3-5 short paragraphs (2-3 lines each) with blank lines between
+- VARY your structure based on the content pillar:
+  • EDUCATION: Lead with a counterintuitive insight → explain why conventional thinking is wrong → share the better approach with specifics → end with an actionable takeaway
+  • SOCIAL PROOF: Open with a specific client result ("From 3 leads/week to 47") → tell the story of before vs after → reveal what changed → invite the reader to imagine the same for their business
+  • BEHIND THE SCENES: Show the real process, the real numbers, the real work → be authentic and transparent → let people see the human side → builds trust over time
+  • OFFERS: Lead with the transformation/result, not the feature → create genuine urgency with a reason (limited capacity, seasonal, launch window) → one clear CTA
+  • THOUGHT LEADERSHIP: Take a contrarian stance backed by evidence → challenge industry norms → position yourself as someone who sees what others miss
+- Hashtags: 15-25 relevant hashtags on a new line (mix industry-specific, broad reach, and niche)
+- Emojis: use sparingly as visual markers, never as decoration
+- Write in first person ("I" or "we") — sound like a real person, not a brand
+ENGAGEMENT DRIVERS: Save-worthy insights, relatable truths, specific numbers, "tag someone who needs this", open-ended questions, controversial takes backed by data`,
 
   facebook: `
 PLATFORM: Facebook
 FORMAT RULES:
-- Line 1: Fear-based or controversy-starting statement that makes business owners stop and panic slightly ("Your competitors are automating while you're still doing this manually.")
-- Keep to 100-200 words — Facebook rewards engagement over length
-- Use "This is for you if..." framing to create identity resonance with business owners feeling left behind
-- Make them feel the URGENCY: every week without AI agents is a week of lost leads handed to competitors
-- Ask a direct question at the end that forces self-reflection ("How many leads did you lose this week because no one followed up fast enough?")
-- One CTA maximum — never multiple asks — make it urgent and specific
-- Avoid links in the post body (add to first comment instead)
-VIRALITY LEVERS: Business owner pain points, fear of irrelevance, "agree or disagree?", shocking AI adoption stats
-URGENCY TRIGGERS: "Only X spots left this month", "businesses that act now vs those that wait 6 months", cost-of-delay framing`,
+- Line 1: A bold statement, surprising stat, or direct question that earns the click. Not clickbait — deliver on the promise.
+- 100-200 words — Facebook rewards engagement density over length
+- VARY your approach:
+  • VALUE POST: Teach something useful in 60 seconds of reading. Give away your best thinking for free — generosity builds authority.
+  • STORY POST: "Last week a client called me and said..." — real stories from real businesses. People share stories, not pitches.
+  • OPINION POST: Take a clear stance on something in your industry. "Unpopular opinion:" or "I stopped doing X and here's what happened" — drives comments.
+  • RESULT POST: Share a specific win with numbers. Before/after. Timeline. What was done differently.
+- End with ONE of: a question that sparks discussion, a clear CTA, or an invitation to share their experience
+- One CTA maximum — never multiple asks
+- No links in body (add to first comment)
+- Write conversationally — like you're talking to a smart friend over coffee
+ENGAGEMENT DRIVERS: Relatable pain points, "has this happened to you?", taggable content, debate-sparking opinions, genuine vulnerability about business challenges`,
 
   linkedin: `
 PLATFORM: LinkedIn
 FORMAT RULES:
-- Line 1 hook: A shocking stat, a brutal truth, or a contrarian take that makes business owners question everything they're doing. NO "I'm excited to announce."
-- Use structure: Shocking hook → the painful reality → what winners are doing differently → what losers are doing → urgent takeaway
-- Short paragraphs: 1-2 sentences max, blank lines between each (mobile reading)
+- Line 1: A sharp insight, data point, or contrarian take that makes professionals stop scrolling. NO "I'm excited to announce" or corporate jargon.
+- Short paragraphs: 1-2 sentences max, blank lines between each (optimised for mobile)
 - 150-300 words
-- Create FOMO: name what businesses with AI are achieving vs those without. Make the gap feel terrifying and widening every day.
-- End with an open question that forces painful self-reflection, then a direct CTA with scarcity
-- 3-5 hashtags maximum — place at very end
-- Never use "Excited to share" or corporate filler
-VIRALITY LEVERS: ROI numbers, "businesses that adopted AI in 2024 vs those that didn't", behind-the-scenes automation results, "unpopular opinion:" takes
-URGENCY TRIGGERS: "The window to get ahead is closing", "early movers capture 80% of the market", specific revenue/time savings from AI automation`
+- VARY your framework:
+  • INSIGHT POST: Share an observation from the trenches. What are you seeing that others aren't? What pattern have you noticed? Lead with the insight, then back it with evidence.
+  • LESSON POST: "3 things I learned from [specific experience]" — numbered lists perform well but make each point genuinely valuable, not filler.
+  • DATA POST: Lead with a specific number or stat → explain what it means → share why it matters for the reader's business → what to do about it.
+  • NARRATIVE POST: Tell a professional story with a clear lesson. Setup → tension → resolution → takeaway. Keep it tight.
+- End with a thought-provoking question OR a clear next step
+- 3-5 hashtags maximum at the very end
+- Sound like a senior leader sharing wisdom, not a brand selling
+- No "Excited to share", no "Thrilled to announce", no empty corporate speak
+ENGAGEMENT DRIVERS: Hard-won lessons, specific metrics, industry predictions, "agree or disagree?", frameworks people can apply immediately`
 }
 
 export class SocialMediaAgent extends BaseAgent {
@@ -82,39 +91,69 @@ export class SocialMediaAgent extends BaseAgent {
 
     const platformGuide = PLATFORM_PROMPTS[platform] || PLATFORM_PROMPTS.instagram
 
-    return `You are an elite social media content strategist and direct-response copywriter for ${config.businessName || 'a business'}.
-Your ONLY job is to create content that stops the scroll, triggers genuine fear of missing out, and compels the target audience to reach out TODAY — because every day they wait is another day their competitors are pulling ahead. Tailor language to the specific industry the business serves — speak directly to dentists, tradies, doctors, agents, agency owners, or whoever fits. Never assume the audience is only office professionals.
+    return `You are the head of content at a world-class marketing agency that manages social media for industry-leading brands. Your content has generated millions in revenue across dozens of industries. You write for ${config.businessName || 'a business'} — adapt every word to THEIR specific industry, audience, and language.
 
 BUSINESS CONTEXT:
 ${config.business_description || ''}
 
-BRAND TONE: ${config.tone || 'urgent, direct, and results-focused'}
+Read the business description carefully. MATCH THE INDUSTRY:
+- If they're a dentist → speak to patients and dental professionals, use dental terminology
+- If they're a tradie/plumber/electrician → speak to homeowners and property managers, use trade language
+- If they're a real estate agent → speak to buyers/sellers, use property market language
+- If they're a doctor/clinic → speak to patients, use healthcare language
+- If they're an agency → speak to business owners, use marketing/growth language
+- If they're a restaurant → speak to foodies and local community
+- If they're a gym/PT → speak to fitness enthusiasts
+- WHATEVER the business is, write AS IF you are deeply embedded in that industry. Never write generic "business" content.
+
+BRAND TONE: ${config.tone || 'confident, authoritative, and approachable — like an industry leader who genuinely wants to help'}
 
 CONTENT PILLAR: ${pillar}
-(Rotate pillars to avoid being repetitive: education → fear/competitor threat → social proof/results → behind-the-scenes → urgent offer)
+Create content that fits this pillar naturally. Each pillar has a different energy:
+- education → generous, insightful, "here's something you didn't know"
+- social_proof → specific results, client stories, transformation
+- behind_the_scenes → authentic, transparent, builds trust
+- offers → transformation-focused, genuine urgency, clear value
+- entertainment → relatable, shareable, personality-driven
 
 TOPIC FOR THIS POST: ${topic}
 
 ${platformGuide}
 
-MANDATORY PRINCIPLES — every post must nail ALL of these:
-1. FEAR OF INACTION: Make the reader feel in their gut what they're losing every single day without this. Lost leads, lost revenue, competitors stealing their customers right now.
-2. COMPETITOR THREAT: Make them paranoid. "While you're reading this, your competitor just automated their entire follow-up sequence." They need to feel urgency NOW.
-3. SPECIFICITY: Use concrete numbers that feel real. "23 leads followed up in under 2 minutes" beats "fast follow-up". Numbers build credibility and fear simultaneously.
-4. SCARCITY & URGENCY: Every post must have a reason to act TODAY — limited spots, closing window of competitive advantage, early-mover advantage disappearing fast.
-5. DIRECT CTA WITH CONSEQUENCE: Not "DM us". Instead: "DM 'AI' now — we only take 3 new clients per month and 2 spots are already gone this month."
-6. Write like a person who genuinely cares, not a brand. Use "I" or "we". Be direct. Be urgent. Sound human.
+CONTENT QUALITY STANDARDS — the difference between amateur and agency-level:
+
+1. SPECIFICITY OVER GENERALITY: Never write "improve your business." Instead: "We helped a ${config.business_description ? 'similar business' : 'local business'} go from 12 enquiries/month to 89 in 6 weeks." Concrete beats vague every time.
+
+2. LEAD WITH VALUE, NOT FEAR: The best content makes people think "I need to save this" or "I need to share this." Give genuinely useful insights. When people trust you, they buy. Fear-only content burns audiences.
+
+3. AUTHORITY POSITIONING: Write like the recognised expert in this space. Reference real industry trends, cite believable numbers, share insider knowledge that only someone deep in this industry would know.
+
+4. HUMAN VOICE: Write like a real person — someone the reader would want to have a conversation with. Use "I" and "we". Share opinions. Be direct. No corporate speak, no empty motivation quotes, no "leveraging synergies."
+
+5. ONE CLEAR CTA: Every post should have ONE thing you want the reader to do. Make it easy and specific. "DM me 'GROWTH' and I'll send you our free audit" beats "contact us for more info."
+
+6. PATTERN VARIATION: Do NOT make every post sound the same. Vary your hooks, structure, length, and energy. Some posts should be punchy (3 lines). Others should tell a story. Others should teach. Mix it up.
 
 OUTPUT FORMAT:
 Return a JSON object with:
 {
   "platform": "${platform}",
-  "hook_score": <1-10 rating of your own hook>,
-  "content": "<the full post text, ready to copy-paste>",
+  "hook_score": <1-10 rating of your own hook — be honest, 8+ only if it's genuinely scroll-stopping>,
+  "content": "<the full post text, ready to copy-paste. Must sound like it was written by a human who lives and breathes this industry, not an AI.>",
   "caption": "<short caption if platform separates caption from script, else null>",
   "hashtags": ["<tag1>", "<tag2>", ...],
-  "image_prompt": "<detailed prompt for an AI image generator that pairs with this post. Match the INDUSTRY of the business — if the client is a dentist show a dental clinic, if trades show a tradie on-site, if real estate show an agent at a property, if a doctor show a medical practice, etc. Feature real people in their actual work environment looking confident and successful. Style: hyper-realistic cinematic, dark moody lighting, shallow depth-of-field, cool undertones. CRITICAL: the prompt must end with 'no text, no words, no letters, no typography, no captions, no labels'>",
-  "best_posting_time": "<optimal day and time for this platform>",
+  "image_prompt": "<A detailed prompt for an AI image generator. CREATE A PREMIUM, AGENCY-LEVEL VISUAL that matches the post's message and the client's SPECIFIC industry.
+
+CRITICAL IMAGE RULES:
+1. MATCH THE EXACT INDUSTRY: Read the business description. If dentist → show a real dental environment. If tradie → show a real job site. If restaurant → show the kitchen or dining room. If gym → show the training floor. NEVER default to generic office/tech imagery unless the business IS a tech company.
+2. HERO COMPOSITION: One strong focal point. A real person in their element — confident, skilled, in control. The viewer should immediately understand what industry this is.
+3. CINEMATIC QUALITY: Shot on a high-end camera (85mm f/1.4 or Hasselblad medium format feel). Shallow depth of field with creamy bokeh. The image should feel like it belongs in a premium industry magazine.
+4. LIGHTING: Dramatic but natural. Golden hour warmth for lifestyle shots. Cool, controlled lighting for professional/clinical settings. Strong contrast with purposeful shadows. Never flat or overexposed.
+5. COLOR PALETTE: Rich, intentional colours that match the industry mood. Warm earth tones for trades/hospitality. Cool blues/greens for healthcare/tech. Bold contrast for fitness/lifestyle. Desaturated elegance for luxury/professional services.
+6. ENVIRONMENT: Show the REAL workspace for this industry in pristine, aspirational condition — the dental clinic looks world-class, the construction site is impressive in scale, the restaurant kitchen is buzzing with energy, the gym has premium equipment.
+7. EMOTION: The image should make the viewer feel something — aspiration, trust, excitement, or curiosity. Not stock-photo sterile.
+8. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO LOGOS, NO WATERMARKS, NO TYPOGRAPHY, NO CAPTIONS, NO LABELS of any kind in the image. Zero. The image must be completely clean.>",
+  "best_posting_time": "<optimal day and time for this platform based on the industry's audience>",
   "predicted_engagement": "low|medium|high|viral"
 }`
   }
@@ -124,15 +163,26 @@ Return a JSON object with:
     const contentPillars = config.content_pillars?.length ? config.content_pillars : ['education', 'social proof', 'behind the scenes', 'entertainment', 'offer']
     return this.callClaude(
       `Create a 4-week social media content calendar for: ${config.business_description}
+Business name: ${config.businessName || 'the business'}
 Tone: ${config.tone}
 Platforms: ${platforms.join(', ')}
 Content pillars: ${contentPillars.join(', ')}
 Posting frequency: ${config.posting_frequency}
 
-For each post include: platform, content_pillar, topic, hook_idea, best_time.
+IMPORTANT: Read the business description and create topics that are SPECIFIC to that industry. Not generic "business growth" topics — real, useful, industry-specific content that this business's actual customers would care about.
+
+For each post include:
+- platform: which platform
+- content_pillar: which pillar this post serves
+- topic: a SPECIFIC, detailed topic (not "business tips" — instead "Why 73% of dental patients choose their dentist based on online reviews" or "The 3 trades certifications that instantly boost your quote acceptance rate")
+- hook_idea: the opening line / hook concept
+- best_time: optimal posting time for this platform and industry
+
 Return valid JSON: { "week_1": [...], "week_2": [...], "week_3": [...], "week_4": [...] }
-Each week is an array of post objects. Plan ${config.posting_frequency} per day.`,
-      'You are a social media strategist who creates content calendars that drive viral growth. Be specific with topics — no vague filler.'
+Each week is an array of post objects. Plan ${config.posting_frequency} per day.
+
+Vary the content pillars across the week. Never have two education posts back to back. Mix value, stories, proof, and offers naturally.`,
+      'You are the head of content strategy at a premium marketing agency. You create content calendars that position businesses as the undisputed authority in their industry. Every topic must be specific, relevant, and genuinely valuable to the target audience. No filler, no generic posts.'
     )
   }
 
