@@ -445,8 +445,8 @@ router.post('/posts/:id/approve', async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id, clientId: req.clientId! }
     })
     if (!post) { res.status(404).json({ error: 'Post not found' }); return }
-    if (post.status !== 'DRAFT') {
-      res.status(400).json({ error: 'Can only approve DRAFT posts' })
+    if (post.status !== 'DRAFT' && post.status !== 'FAILED') {
+      res.status(400).json({ error: 'Can only approve DRAFT or FAILED posts' })
       return
     }
 
@@ -486,8 +486,8 @@ router.post('/posts/:id/publish', async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id, clientId: req.clientId! }
     })
     if (!post) { res.status(404).json({ error: 'Post not found' }); return }
-    if (post.status !== 'DRAFT' && post.status !== 'SCHEDULED') {
-      res.status(400).json({ error: 'Can only publish DRAFT or SCHEDULED posts' })
+    if (post.status !== 'DRAFT' && post.status !== 'SCHEDULED' && post.status !== 'FAILED') {
+      res.status(400).json({ error: 'Can only publish DRAFT, SCHEDULED, or FAILED posts' })
       return
     }
 
