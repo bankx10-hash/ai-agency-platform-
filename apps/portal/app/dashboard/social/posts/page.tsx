@@ -80,6 +80,24 @@ function formatDateTime(iso: string) {
   })
 }
 
+// Convert a Date to a local datetime string for <input type="datetime-local">
+function toLocalDatetimeString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${d}T${h}:${min}`
+}
+
+// Convert a local datetime string from <input type="datetime-local"> to an ISO string with timezone
+function localDatetimeToISO(localStr: string): string {
+  // new Date(localStr) without timezone suffix interprets as local in the browser
+  // but the API may interpret it as UTC. Send as proper ISO with timezone offset.
+  const date = new Date(localStr)
+  return date.toISOString()
+}
+
 function truncate(str: string, len: number) {
   if (str.length <= len) return str
   return str.slice(0, len) + '...'
@@ -205,7 +223,7 @@ export default function SocialPostsPage() {
     setFormContentPillar(post.contentPillar || '')
     setFormTopic('')
     setFormScheduledAt(
-      post.scheduledAt ? new Date(post.scheduledAt).toISOString().slice(0, 16) : ''
+      post.scheduledAt ? toLocalDatetimeString(new Date(post.scheduledAt)) : ''
     )
     setModalOpen(true)
   }
@@ -229,7 +247,7 @@ export default function SocialPostsPage() {
           platform: formPlatform,
           content: formContent,
           contentPillar: formContentPillar || undefined,
-          scheduledAt: formScheduledAt || undefined,
+          scheduledAt: formScheduledAt ? localDatetimeToISO(formScheduledAt) : undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       )
@@ -252,7 +270,7 @@ export default function SocialPostsPage() {
           platform: formPlatform,
           content: formContent,
           contentPillar: formContentPillar || undefined,
-          scheduledAt: formScheduledAt || undefined,
+          scheduledAt: formScheduledAt ? localDatetimeToISO(formScheduledAt) : undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       )
@@ -323,7 +341,7 @@ export default function SocialPostsPage() {
       const token = getToken()
       const body = publishNow
         ? { publishNow: true }
-        : { scheduledAt: formScheduledAt || undefined }
+        : { scheduledAt: formScheduledAt ? localDatetimeToISO(formScheduledAt) : undefined }
       await axios.post(
         `${API_URL}/social/posts/${selectedPost.id}/approve`,
         body,

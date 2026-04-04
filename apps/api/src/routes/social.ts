@@ -167,7 +167,7 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
     if (autoApprove) {
       scheduledAt = new Date()
       scheduledAt.setDate(scheduledAt.getDate() + 1)
-      scheduledAt.setHours(10, 0, 0, 0)
+      scheduledAt.setUTCHours(2, 0, 0, 0) // 2 AM UTC = 10 AM AWST
     }
 
     // Use custom image prompt if provided, otherwise use AI-generated one
@@ -263,7 +263,7 @@ router.post('/posts/generate-batch', async (req: AuthRequest, res: Response) => 
 
         const scheduledAt = new Date()
         scheduledAt.setDate(scheduledAt.getDate() + dayOffset)
-        scheduledAt.setHours(10, 0, 0, 0)
+        scheduledAt.setUTCHours(2, 0, 0, 0) // 2 AM UTC = 10 AM AWST
 
         const post = await prisma.scheduledPost.create({
           data: {
