@@ -20,20 +20,30 @@ router.use(authMiddleware)
 const UPLOADS_DIR = path.join('/tmp', 'uploads', 'social')
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }) } catch { /* /tmp should always be writable */ }
 
-// Save image buffer or base64 to disk, return public URL
+// Save image buffer or base64 to disk + DB-backed serving, return public URL
 function saveImageToDisk(data: Buffer | string, filename?: string): string {
   const fname = filename || `${randomUUID()}.jpg`
   const filePath = path.join(UPLOADS_DIR, fname)
 
+  let buffer: Buffer
   if (typeof data === 'string' && data.startsWith('data:image/')) {
-    // Base64 data URL
     const base64Data = data.replace(/^data:image\/\w+;base64,/, '')
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'))
+    buffer = Buffer.from(base64Data, 'base64')
   } else if (Buffer.isBuffer(data)) {
-    fs.writeFileSync(filePath, data)
+    buffer = data
   } else {
     throw new Error('Invalid image data')
   }
+
+  // Save to disk (for immediate serving)
+  fs.writeFileSync(filePath, buffer)
+
+  // Also save to DB for persistence across redeploys
+  prisma.clientCredential.upsert({
+    where: { id: `img-${fname}` },
+    create: { id: `img-${fname}`, clientId: 'system', service: 'image-store', credentials: buffer.toString('base64') },
+    update: { credentials: buffer.toString('base64') }
+  }).catch(() => { /* best effort */ })
 
   const apiUrl = process.env.API_URL || 'https://api.nodusaisystems.com'
   return `${apiUrl}/uploads/social/${fname}`

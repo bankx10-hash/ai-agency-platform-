@@ -669,11 +669,27 @@ app.use(express.json({ limit: '20mb' }))
 app.use(express.urlencoded({ extended: true }))
 
 // Serve uploaded images (social post images, ad composites)
+// Primary: serve from /tmp disk. Fallback: restore from DB if file missing (after redeploy).
 import path from 'path'
 import fs from 'fs'
 const uploadsDir = path.join('/tmp', 'uploads', 'social')
 try { fs.mkdirSync(uploadsDir, { recursive: true }) } catch { /* /tmp always writable */ }
-app.use('/uploads/social', express.static(uploadsDir))
+app.use('/uploads/social', async (req, res, next) => {
+  const filePath = path.join(uploadsDir, req.path)
+  // If file exists on disk, serve it
+  if (fs.existsSync(filePath)) return next()
+  // Otherwise, try to restore from DB
+  try {
+    const fname = req.path.replace(/^\//, '')
+    const record = await prisma.clientCredential.findUnique({ where: { id: `img-${fname}` } })
+    if (record) {
+      const buffer = Buffer.from(record.credentials, 'base64')
+      fs.writeFileSync(filePath, buffer)
+      return next()
+    }
+  } catch { /* fall through to 404 */ }
+  next()
+}, express.static(uploadsDir))
 
 app.use(apiRateLimit)
 
