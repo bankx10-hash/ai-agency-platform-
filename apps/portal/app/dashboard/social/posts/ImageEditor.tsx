@@ -238,6 +238,23 @@ export default function ImageEditor({
 
   /* ---- helpers ---- */
 
+  // Convert any CSS color (rgba, rgb, hex, named) to #rrggbb for <input type="color">
+  function toHex(color: string | undefined): string {
+    if (!color) return '#000000'
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) return color
+    if (/^#[0-9a-fA-F]{3}$/.test(color)) {
+      return '#' + color[1]+color[1] + color[2]+color[2] + color[3]+color[3]
+    }
+    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+    if (match) {
+      const r = parseInt(match[1]).toString(16).padStart(2, '0')
+      const g = parseInt(match[2]).toString(16).padStart(2, '0')
+      const b = parseInt(match[3]).toString(16).padStart(2, '0')
+      return `#${r}${g}${b}`
+    }
+    return '#000000'
+  }
+
   const pushHistory = useCallback((canvas: Canvas) => {
     const json = JSON.stringify(canvas.toJSON())
     setHistory(prev => {
@@ -264,13 +281,13 @@ export default function ImageEditor({
         type: 'textbox',
         fontFamily: tb.fontFamily ?? 'Arial',
         fontSize: tb.fontSize ?? 24,
-        fill: (typeof tb.fill === 'string' ? tb.fill : '#FFFFFF'),
+        fill: toHex(typeof tb.fill === 'string' ? tb.fill : '#FFFFFF'),
         fontWeight: String(tb.fontWeight ?? 'normal'),
         fontStyle: String(tb.fontStyle ?? 'normal'),
         textAlign: tb.textAlign ?? 'left',
         charSpacing: tb.charSpacing ?? 0,
         opacity: (tb.opacity ?? 1) * 100,
-        stroke: typeof tb.stroke === 'string' ? tb.stroke : '',
+        stroke: toHex(typeof tb.stroke === 'string' ? tb.stroke : ''),
         strokeWidth: tb.strokeWidth ?? 0,
         hasShadow: !!tb.shadow,
       })
@@ -278,18 +295,18 @@ export default function ImageEditor({
       const r = obj as Rect
       setSelectedObj({
         type: 'rect',
-        fill: typeof r.fill === 'string' ? r.fill : '#000000',
+        fill: toHex(typeof r.fill === 'string' ? r.fill : '#000000'),
         opacity: (r.opacity ?? 1) * 100,
-        stroke: typeof r.stroke === 'string' ? r.stroke : '',
+        stroke: toHex(typeof r.stroke === 'string' ? r.stroke : ''),
         strokeWidth: r.strokeWidth ?? 0,
       })
     } else if (t === 'circle') {
       const c = obj as Circle
       setSelectedObj({
         type: 'circle',
-        fill: typeof c.fill === 'string' ? c.fill : '#000000',
+        fill: toHex(typeof c.fill === 'string' ? c.fill : '#000000'),
         opacity: (c.opacity ?? 1) * 100,
-        stroke: typeof c.stroke === 'string' ? c.stroke : '',
+        stroke: toHex(typeof c.stroke === 'string' ? c.stroke : ''),
         strokeWidth: c.strokeWidth ?? 0,
       })
     } else if (t === 'image') {
