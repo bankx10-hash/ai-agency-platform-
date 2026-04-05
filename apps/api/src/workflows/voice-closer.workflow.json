@@ -112,7 +112,7 @@
         "httpMethod": "POST",
         "path": "closer-result-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
+      }
     },
     {
       "id": "build-analysis-request",
