@@ -696,6 +696,10 @@ const uploadsDir = path.join('/tmp', 'uploads', 'social')
 try { fs.mkdirSync(uploadsDir, { recursive: true }) } catch { /* /tmp always writable */ }
 // Serve images: try disk first, then DB, then 404
 app.get('/uploads/social/:filename', async (req, res) => {
+  // CORS — allow any origin to fetch images (needed for portal + Meta + fabric.js)
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET')
+
   const fname = req.params.filename
   const filePath = path.join(uploadsDir, fname)
 
