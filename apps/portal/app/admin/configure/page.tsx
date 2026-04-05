@@ -88,9 +88,8 @@ const AGENT_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; ty
     { key: 'max_daily_calls', label: 'Max Daily Calls', type: 'number', placeholder: '50' }
   ],
   VOICE_CLOSER: [
-    { key: 'closing_script_template', label: 'Closing Script', type: 'textarea', placeholder: 'Hi {{firstName}}, calling to follow up...' },
-    { key: 'offer_details', label: 'Offer Details', type: 'textarea', placeholder: 'What you are selling...' },
-    { key: 'payment_link', label: 'Payment Link', type: 'url', placeholder: 'https://...' }
+    { key: 'offer_details', label: 'Knowledge Base', type: 'textarea', placeholder: 'Products/services, pricing, packages, key benefits, results, FAQs, objection handling...' },
+    { key: 'payment_link', label: 'Payment Link', type: 'url', placeholder: 'https://buy.stripe.com/...' }
   ],
   CLIENT_SERVICES: []
 }

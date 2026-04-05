@@ -38,8 +38,8 @@ const CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: 't
     { key: 'call_window_hours', label: 'Call Window Hours', type: 'text', placeholder: '9am-5pm AEST', help: 'Hours during which calls are allowed to be made.' },
   ],
   VOICE_CLOSER: [
-    { key: 'closing_script_template', label: 'Closing Script', type: 'textarea', placeholder: 'Hi {{firstName}}, this is [Agent] calling to follow up on your interest in...', help: 'Script used by the closer agent when calling warm leads ready to buy.' },
-    { key: 'offer_details', label: 'Offer Details', type: 'textarea', placeholder: 'Our premium package includes...', help: 'Details about what you are selling — the agent uses this to answer questions.' },
+    { key: 'offer_details', label: 'Knowledge Base', type: 'textarea', placeholder: 'Paste everything the closer needs to know: your products/services, pricing, packages, key benefits, results you get for clients, FAQs, common objections and how to handle them...', help: 'The AI closer uses this as its knowledge base to pitch, answer questions, and handle objections on calls.' },
+    { key: 'payment_link', label: 'Payment Link', type: 'text', placeholder: 'https://buy.stripe.com/...', help: 'Link sent to the prospect via SMS and email immediately after they agree to buy.' },
   ],
   SOCIAL_MEDIA: [
     { key: 'business_description', label: 'Business Description', type: 'textarea', placeholder: 'We are a Sydney-based electrical company specialising in residential and commercial...', help: 'Used by Claude to generate on-brand social media content.' },

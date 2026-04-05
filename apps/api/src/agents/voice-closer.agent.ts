@@ -14,6 +14,7 @@ export interface VoiceCloserConfig {
   commission_tracking: boolean
   locationId: string
   businessName: string
+  businessDescription?: string
 }
 
 export class VoiceCloserAgent extends BaseAgent {
@@ -173,11 +174,23 @@ GOLDEN RULES
     const typedConfig = config as unknown as VoiceCloserConfig
     logger.info('Deploying Voice Closer Agent', { clientId })
 
+    // Fetch business description from client record if not in config
+    let businessDesc = typedConfig.businessDescription || ''
+    if (!businessDesc) {
+      const clientRecord = await prisma.client.findUnique({ where: { id: clientId }, select: { businessDescription: true } }).catch(() => null)
+      businessDesc = (clientRecord as Record<string, unknown>)?.businessDescription as string || ''
+    }
+
+    const offerDetails = typedConfig.offer_details && typedConfig.offer_details !== `${typedConfig.businessName} subscription services`
+      ? typedConfig.offer_details
+      : businessDesc || `${typedConfig.businessName} services`
+
     const closingScript = await this.callClaude(
       `Create a personalised closing call script for ${typedConfig.businessName}.
 
 BUSINESS: ${typedConfig.businessName}
-OFFER: ${typedConfig.offer_details}
+BUSINESS DESCRIPTION: ${businessDesc}
+OFFER: ${offerDetails}
 PAYMENT LINK: ${typedConfig.payment_link}
 CONTRACT LINK: ${typedConfig.contract_link}
 
