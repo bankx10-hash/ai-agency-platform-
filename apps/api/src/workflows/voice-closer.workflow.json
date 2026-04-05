@@ -230,8 +230,8 @@
           "parameters": [
             { "name": "contactId", "value": "={{ $('Parse Close Outcome').first().json.contactId }}" },
             { "name": "to", "value": "={{ $('Get Prospect Data').first().json.contact?.email || '' }}" },
-            { "name": "subject", "value": "Welcome aboard — here's your payment link" },
-            { "name": "html", "value": "={{ '<p>Hi ' + ($('Get Prospect Data').first().json.contact?.name || 'there').split(' ')[0] + ',</p><p>Great chatting just now! As promised, here\\'s your link to get started:</p><p><a href=\"{{PAYMENT_LINK}}\" style=\"display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold\">Complete Your Purchase →</a></p><p>If you have any questions at all, just reply to this email — I\\'m here.</p><p>Talk soon,<br>The {{BUSINESS_NAME}} team</p>' }}" }
+            { "name": "subject", "value": "Welcome aboard — your confirmation details" },
+            { "name": "html", "value": "={{ '<p>Hi ' + ($('Get Prospect Data').first().json.contact?.name || 'there').split(' ')[0] + ',</p><p>Great chatting just now! Welcome to the {{BUSINESS_NAME}} family.</p><p>If you still need to complete your purchase, here\\'s your link:</p><p><a href=\"{{PAYMENT_LINK}}\" style=\"display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold\">Complete Your Purchase →</a></p><p>If you have any questions at all, just reply to this email — I\\'m here.</p><p>Talk soon,<br>The {{BUSINESS_NAME}} team</p>' }}" }
           ]
         }
       }
@@ -257,7 +257,7 @@
           "parameters": [
             { "name": "contactId", "value": "={{ $('Parse Close Outcome').first().json.contactId }}" },
             { "name": "to", "value": "={{ $('Get Prospect Data').first().json.contact?.phone || '' }}" },
-            { "name": "body", "value": "={{ 'Hey ' + ($('Get Prospect Data').first().json.contact?.name || '').split(' ')[0] + '! Great chatting just now 🎉 Here\\'s your link to get started: {{PAYMENT_LINK}} — Any questions, just text me back. Talk soon!' }}" }
+            { "name": "body", "value": "={{ 'Hey ' + ($('Get Prospect Data').first().json.contact?.name || '').split(' ')[0] + '! Great chatting just now. Welcome aboard! If you still need to complete your purchase, here\\'s the link: {{PAYMENT_LINK}} — Any questions, just text me back!' }}" }
           ]
         }
       }

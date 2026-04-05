@@ -81,7 +81,8 @@ PHASE 4 — VALUE STACK + PRICE REVEAL (2-3 minutes)
 - PAUSE. Say nothing. Let them process. The first person to speak after the price loses.
 
 PHASE 5 — THE CLOSE (the actual ask)
-- Use the ASSUMPTIVE CLOSE first: "So the way it works — I'll send you the link right now, you get set up today, and we can have everything running by [specific day]. Sound good?"
+- Use the ASSUMPTIVE CLOSE first: "So the way it works — let's get you set up right now while we're on the call together. Are you near a computer or phone where you can open a browser?"
+- Wait for confirmation, then: "Perfect. Go to [PAYMENT_LINK]. I'll stay on the line and walk you through it — takes about two minutes."
 - If they hesitate, use ALTERNATIVE CLOSE: "Would you prefer to start with [option A] or go straight to [option B]?"
 - If still hesitating: "What would need to be true for you to feel 100% confident saying yes right now?"
 - After ANY close attempt: STOP TALKING. Silence is your most powerful tool. Wait.
@@ -130,12 +131,20 @@ Handle every objection with the FEEL-FELT-FOUND method + a tactical layer:
 → If they can't specify: "Usually when someone asks for more info, there's a specific concern they're trying to answer. What's the one thing that, if I could answer it right now, would help you make your decision?"
 → Handle that concern, then: "Now that we've covered that — does anything else stand between you and getting started today?"
 
-PHASE 7 — POST-CLOSE
+PHASE 7 — POST-CLOSE (STAY ON THE LINE)
 If YES:
-→ "Amazing — you've made a great decision. Here's what happens next..."
-→ Send payment link via SMS IMMEDIATELY (don't wait — momentum matters)
-→ Set clear expectations: "You'll receive [X] within [timeframe]. I'll personally check in on [specific day]."
-→ "One more thing — who do you know that's dealing with the same challenge? I ask because our best clients come from referrals, and I'd love to help them too."
+→ "Amazing — you've made a great decision. Let's do this together right now so I can make sure everything goes smoothly."
+→ Walk them to the payment page: "Go ahead and open [PAYMENT_LINK] in your browser. Let me know when you see it."
+→ STAY ON THE LINE. Guide them step by step:
+  - "You should see [describe what the page looks like]. Go ahead and fill in your details."
+  - "Take your time — I'm right here if anything looks confusing."
+  - Keep the conversation warm while they type — ask about their business, what they're most excited about, etc. Don't let silence feel awkward.
+  - "Have you hit the confirm button? Perfect — you should see a confirmation page."
+→ Once payment is confirmed: "Brilliant, you're all set! Here's what happens next — [set clear expectations about onboarding, timeline, first results]."
+→ "I'll personally check in on [specific day] to make sure everything is running smoothly."
+→ THEN ask for the referral: "One more thing — who do you know dealing with the same challenge? Our best clients come from referrals, and I'd love to help them too."
+→ If they can't complete payment right now (not at computer, no card handy):
+  - "No worries at all. I'll text you the link right now so you have it. Can you do it in the next hour while it's fresh? I'll check in with you at [specific time] to make sure it went through."
 
 If FOLLOW-UP NEEDED:
 → Book a SPECIFIC callback: "Let's do [day] at [time]. I'll call you at this number. Sound good?"
@@ -213,7 +222,8 @@ Generate a complete, natural-sounding closing call script that includes:
 
 5. PRICE REVEAL — Reveal price after value stack. Immediately reframe as daily/weekly cost. Then go SILENT.
 
-6. ASSUMPTIVE CLOSE — "I'll send you the link now, you'll be set up by [day]. Sound good?"
+6. ASSUMPTIVE CLOSE — "Let's get you set up right now while we're on the call. Are you near a computer or phone? Perfect, go to [payment link] and I'll walk you through it — takes two minutes."
+   IMPORTANT: Always guide them through payment WHILE ON THE CALL. Stay on the line, walk them through the page step by step, keep conversation warm while they fill in details. Only send the link via SMS as a fallback if they can't do it right now.
 
 7. OBJECTION SCRIPTS — Write out EXACT word-for-word responses for:
    - "Too expensive" (use their own pain cost number against them)
@@ -224,7 +234,7 @@ Generate a complete, natural-sounding closing call script that includes:
    - "Can't afford it" (payment plan, smaller start)
    - "Send me info" (identify the real question, handle on call)
 
-8. POST-CLOSE FLOW — What to say after yes, how to send links, when to follow up, referral ask.
+8. POST-CLOSE FLOW — When they say yes, STAY ON THE LINE. Walk them to the payment page, guide them through each step while keeping the conversation warm. Only hang up AFTER payment is confirmed. Then set expectations on next steps, check-in date, and ask for a referral.
 
 9. CALLBACK SCRIPT — For when they said "let me think" and you're calling back.
 
