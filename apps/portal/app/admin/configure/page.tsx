@@ -89,7 +89,8 @@ const AGENT_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; ty
   ],
   VOICE_CLOSER: [
     { key: 'offer_details', label: 'Knowledge Base', type: 'textarea', placeholder: 'Products/services, pricing, packages, key benefits, results, FAQs, objection handling...' },
-    { key: 'payment_link', label: 'Payment Link', type: 'url', placeholder: 'https://buy.stripe.com/...' }
+    { key: 'payment_link', label: 'Payment / Sign-Up Link', type: 'url', placeholder: 'https://app.example.com/signup' },
+    { key: 'payment_walkthrough', label: 'Payment Walkthrough Instructions', type: 'textarea', placeholder: '1. Go to https://...\n2. Click Sign Up\n3. Choose your plan\n4. Enter card details\n5. Click Subscribe' }
   ],
   CLIENT_SERVICES: []
 }

@@ -39,7 +39,8 @@ const CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: 't
   ],
   VOICE_CLOSER: [
     { key: 'offer_details', label: 'Knowledge Base', type: 'textarea', placeholder: 'Paste everything the closer needs to know: your products/services, pricing, packages, key benefits, results you get for clients, FAQs, common objections and how to handle them...', help: 'The AI closer uses this as its knowledge base to pitch, answer questions, and handle objections on calls.' },
-    { key: 'payment_link', label: 'Payment Link', type: 'text', placeholder: 'https://buy.stripe.com/...', help: 'Link sent to the prospect via SMS and email immediately after they agree to buy.' },
+    { key: 'payment_link', label: 'Payment / Sign-Up Link', type: 'text', placeholder: 'https://app.example.com/signup', help: 'The URL the closer directs prospects to while on the call.' },
+    { key: 'payment_walkthrough', label: 'Payment Walkthrough Instructions', type: 'textarea', placeholder: 'Example:\n1. Go to https://app.nodusaisystems.com\n2. Click "Sign Up" in the top right\n3. Enter your name, email, and create a password\n4. Choose your plan (recommend the Growth plan)\n5. Enter your card details and click "Subscribe"\n6. You\'ll see a confirmation page — you\'re all set!', help: 'Step-by-step instructions the closer reads out to guide the prospect through payment while staying on the call. Be specific about what they will see on each page.' },
   ],
   SOCIAL_MEDIA: [
     { key: 'business_description', label: 'Business Description', type: 'textarea', placeholder: 'We are a Sydney-based electrical company specialising in residential and commercial...', help: 'Used by Claude to generate on-brand social media content.' },

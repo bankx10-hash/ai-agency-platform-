@@ -9,6 +9,7 @@ export interface VoiceCloserConfig {
   closing_script_template: string
   offer_details: string
   payment_link: string
+  payment_walkthrough: string
   contract_link: string
   objection_scripts: Record<string, string>
   commission_tracking: boolean
@@ -39,8 +40,12 @@ THE OFFER
 ═══════════════════════════════════════════
 ${config.offer_details || 'Our premium business solution'}
 
-Payment link: ${config.payment_link || '[PAYMENT_LINK]'}
-Contract link: ${config.contract_link || '[CONTRACT_LINK]'}
+Payment / Sign-up link: ${config.payment_link || '[PAYMENT_LINK]'}
+
+═══════════════════════════════════════════
+PAYMENT WALKTHROUGH (read these steps to the prospect while on the call)
+═══════════════════════════════════════════
+${config.payment_walkthrough || 'Guide the prospect to ' + (config.payment_link || 'the payment page') + ' and walk them through the sign-up process step by step while staying on the line.'}
 
 ═══════════════════════════════════════════
 PROSPECT INTEL (use this — it's gold)
@@ -201,7 +206,7 @@ BUSINESS: ${typedConfig.businessName}
 BUSINESS DESCRIPTION: ${businessDesc}
 OFFER: ${offerDetails}
 PAYMENT LINK: ${typedConfig.payment_link}
-CONTRACT LINK: ${typedConfig.contract_link}
+PAYMENT WALKTHROUGH STEPS: ${typedConfig.payment_walkthrough || 'Guide them to the payment link and walk through sign-up'}
 
 Generate a complete, natural-sounding closing call script that includes:
 
