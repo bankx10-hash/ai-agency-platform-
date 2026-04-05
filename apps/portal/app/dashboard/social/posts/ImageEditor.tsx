@@ -224,6 +224,7 @@ export default function ImageEditor({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const fabricRef = useRef<Canvas | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const bgFileInputRef = useRef<HTMLInputElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const backgroundRef = useRef<FabricImage | null>(null)
 
@@ -630,7 +631,28 @@ export default function ImageEditor({
       const url = reader.result as string
       FabricImage.fromURL(url).then((img) => {
         const c = fabricRef.current!
-        // Scale image to fit within 50% of canvas
+
+        // If no background image exists, set this as the background automatically
+        if (!backgroundRef.current) {
+          const imgW = img.width ?? 1
+          const imgH = img.height ?? 1
+          const scale = Math.max(canvasWidth / imgW, canvasHeight / imgH)
+          img.set({
+            scaleX: scale,
+            scaleY: scale,
+            left: (canvasWidth - imgW * scale) / 2,
+            top: (canvasHeight - imgH * scale) / 2,
+            selectable: false,
+            evented: false,
+          })
+          c.insertAt(0, img)
+          backgroundRef.current = img
+          c.renderAll()
+          pushHistory(c)
+          return
+        }
+
+        // Otherwise add as a foreground object
         const maxW = canvasWidth * 0.5
         const maxH = canvasHeight * 0.5
         const imgW = img.width ?? maxW
@@ -649,6 +671,45 @@ export default function ImageEditor({
     }
     reader.readAsDataURL(file)
     // Reset so the same file can be selected again
+    e.target.value = ''
+  }
+
+  function handleUploadBackground() {
+    bgFileInputRef.current?.click()
+  }
+
+  function onBgFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !fabricRef.current) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const url = reader.result as string
+      FabricImage.fromURL(url).then((img) => {
+        const c = fabricRef.current!
+        // Remove existing background if any
+        if (backgroundRef.current) {
+          c.remove(backgroundRef.current)
+          backgroundRef.current = null
+        }
+        // Scale to cover entire canvas
+        const imgW = img.width ?? 1
+        const imgH = img.height ?? 1
+        const scale = Math.max(canvasWidth / imgW, canvasHeight / imgH)
+        img.set({
+          scaleX: scale,
+          scaleY: scale,
+          left: (canvasWidth - imgW * scale) / 2,
+          top: (canvasHeight - imgH * scale) / 2,
+          selectable: false,
+          evented: false,
+        })
+        c.insertAt(0, img)
+        backgroundRef.current = img
+        c.renderAll()
+        pushHistory(c)
+      })
+    }
+    reader.readAsDataURL(file)
     e.target.value = ''
   }
 
@@ -988,7 +1049,11 @@ export default function ImageEditor({
           )}
         </div>
 
-        <ToolbarBtn label="Upload Image" onClick={handleUploadImage}><IconImage /></ToolbarBtn>
+        <ToolbarBtn label="Set Background" onClick={handleUploadBackground}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15l5-5 4 4 4-4 5 5"/></svg>
+        </ToolbarBtn>
+        <ToolbarBtn label="Add Image" onClick={handleUploadImage}><IconImage /></ToolbarBtn>
+        <input ref={bgFileInputRef} type="file" accept="image/*" className="hidden" onChange={onBgFileSelected} />
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileSelected} />
 
         <div className="w-px h-6 bg-gray-700 mx-2" />
