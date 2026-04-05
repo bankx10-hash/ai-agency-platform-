@@ -270,59 +270,117 @@ router.post('/posts/generate', async (req: AuthRequest, res: Response) => {
 })
 
 // Customise template text for a client's industry
-router.post('/templates/customise', async (req: AuthRequest, res: Response) => {
+// Get cached template texts for this client (generated once, stored in DB)
+router.get('/templates/texts', async (req: AuthRequest, res: Response) => {
+  try {
+    const clientId = req.clientId!
+    const cred = await prisma.clientCredential.findFirst({
+      where: { clientId, service: 'template-texts' }
+    })
+
+    if (cred) {
+      res.json(JSON.parse(cred.credentials))
+      return
+    }
+
+    // Not generated yet — return empty, frontend will trigger generation
+    res.json({ templates: {} })
+  } catch (err) {
+    logger.error('Failed to get template texts', { err })
+    res.status(500).json({ error: 'Failed to get template texts' })
+  }
+})
+
+// Generate all template texts for this client (called once, then cached)
+router.post('/templates/generate', async (req: AuthRequest, res: Response) => {
   try {
     const clientId = req.clientId!
     const client = await prisma.client.findUnique({ where: { id: clientId } })
     if (!client) { res.status(404).json({ error: 'Client not found' }); return }
 
-    const { templateTexts, templateName } = req.body as {
-      templateTexts: string[]  // array of placeholder texts from the template
-      templateName: string
-    }
-
-    if (!templateTexts?.length) {
-      res.status(400).json({ error: 'templateTexts array required' })
+    // Check if already generated
+    const existing = await prisma.clientCredential.findFirst({
+      where: { clientId, service: 'template-texts' }
+    })
+    if (existing) {
+      res.json(JSON.parse(existing.credentials))
       return
     }
 
-    const prompt = `You are a marketing copywriter customising a social media template for a specific business.
+    // Collect ALL template placeholder texts
+    const { allTemplates } = req.body as { allTemplates: Array<{ id: string; name: string; texts: string[] }> }
+
+    if (!allTemplates?.length) {
+      res.status(400).json({ error: 'allTemplates array required' })
+      return
+    }
+
+    // Single Claude call to customise ALL templates at once
+    const templateList = allTemplates.map(t =>
+      `TEMPLATE "${t.name}" (id: ${t.id}):\n${t.texts.map((text, i) => `  ${i + 1}. "${text}"`).join('\n')}`
+    ).join('\n\n')
+
+    const prompt = `You are a marketing copywriter. Customise ALL template placeholder texts below for this specific business.
 
 BUSINESS: ${client.businessName}
 INDUSTRY: ${client.businessDescription || 'a business'}
-TEMPLATE: ${templateName}
-
-Below are the placeholder texts from a "${templateName}" template. Rewrite EACH one to be specific to this business and industry. Keep the same tone, length, and purpose of each text — just make it relevant to THIS business.
 
 RULES:
 - Match the industry language (dental terms for dentists, trade terms for tradies, etc.)
-- Keep roughly the same character count as the original
+- Keep roughly the same character count as each original
 - Keep CTA button text short (2-4 words)
-- Keep headlines punchy and specific
+- Keep headlines punchy and specific to this industry
 - Use realistic numbers that make sense for this industry
 - Brand name text should use: ${client.businessName}
+- Each template serves a different purpose — adapt the tone accordingly
 
-PLACEHOLDER TEXTS TO REWRITE:
-${templateTexts.map((t, i) => `${i + 1}. "${t}"`).join('\n')}
+TEMPLATES TO CUSTOMISE:
+${templateList}
 
-Return a JSON array of rewritten texts in the same order:
-["rewritten text 1", "rewritten text 2", ...]`
+Return a JSON object where each key is the template id, and the value is an array of rewritten texts in order:
+{
+  "template-id-1": ["rewritten text 1", "rewritten text 2", ...],
+  "template-id-2": ["rewritten text 1", "rewritten text 2", ...],
+  ...
+}`
 
-    const raw = await socialAgent.callClaude(prompt, 'Return only a valid JSON array of strings. No explanation.')
+    const raw = await socialAgent.callClaude(prompt, 'Return only valid JSON. No explanation, no markdown.')
 
-    let customised: string[]
+    let result: Record<string, string[]>
     try {
-      customised = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
+      result = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim())
     } catch {
-      // If parsing fails, return originals
-      res.json({ texts: templateTexts })
+      res.status(500).json({ error: 'Failed to parse template texts from AI' })
       return
     }
 
-    res.json({ texts: customised })
+    // Save to DB — one call, cached forever (until regenerated)
+    const data = JSON.stringify({ templates: result, generatedAt: new Date().toISOString(), businessName: client.businessName })
+    await prisma.clientCredential.upsert({
+      where: { id: `template-texts-${clientId}` },
+      create: { id: `template-texts-${clientId}`, clientId, service: 'template-texts', credentials: data },
+      update: { credentials: data }
+    })
+
+    logger.info('Template texts generated and cached', { clientId, templateCount: Object.keys(result).length })
+    res.json({ templates: result, generatedAt: new Date().toISOString() })
   } catch (err) {
-    logger.error('Failed to customise template', { err })
-    res.status(500).json({ error: 'Failed to customise template' })
+    logger.error('Failed to generate template texts', { err })
+    res.status(500).json({ error: 'Failed to generate template texts' })
+  }
+})
+
+// Regenerate template texts (force refresh)
+router.post('/templates/regenerate', async (req: AuthRequest, res: Response) => {
+  try {
+    // Delete cached version so generate creates fresh
+    await prisma.clientCredential.deleteMany({
+      where: { clientId: req.clientId!, service: 'template-texts' }
+    })
+    res.json({ success: true, message: 'Cached templates cleared. Open the editor to regenerate.' })
+  } catch (err) {
+    logger.error('Failed to clear template cache', { err })
+    res.status(500).json({ error: 'Failed to clear cache' })
   }
 })
 

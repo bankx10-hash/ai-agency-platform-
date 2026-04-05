@@ -849,8 +849,45 @@ export default function ImageEditor({
   /* ---- template application ---- */
 
   const [customising, setCustomising] = useState(false)
+  const [cachedTemplateTexts, setCachedTemplateTexts] = useState<Record<string, string[]>>({})
+  const templateTextsLoaded = useRef(false)
 
-  async function applyTemplate(template: Template) {
+  // Load cached template texts on editor open (once)
+  useEffect(() => {
+    if (!isOpen || templateTextsLoaded.current) return
+    templateTextsLoaded.current = true
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) return
+
+    // Try to load cached texts
+    axios.get(`${API_URL}/social/templates/texts`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => {
+      if (res.data.templates && Object.keys(res.data.templates).length > 0) {
+        setCachedTemplateTexts(res.data.templates)
+      } else {
+        // Not generated yet — generate all templates in one call
+        setCustomising(true)
+        const allTemplates = TEMPLATES.map(t => ({
+          id: t.id,
+          name: t.name,
+          texts: t.objects.filter(o => o.type === 'textbox' && o.text).map(o => o.text || '')
+        }))
+        axios.post(`${API_URL}/social/templates/generate`, { allTemplates }, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 30000
+        }).then(genRes => {
+          if (genRes.data.templates) {
+            setCachedTemplateTexts(genRes.data.templates)
+          }
+        }).catch(() => { /* use defaults */ })
+        .finally(() => setCustomising(false))
+      }
+    }).catch(() => { /* use defaults */ })
+  }, [isOpen])
+
+  function applyTemplate(template: Template) {
     const c = fabricRef.current
     if (!c) return
 
@@ -861,36 +898,14 @@ export default function ImageEditor({
       c.remove(obj)
     }
 
-    // Collect all text placeholders from the template
-    const textObjects = template.objects.filter(o => o.type === 'textbox' && o.text)
-    const placeholderTexts = textObjects.map(o => o.text || '')
-
-    // Call API to customise text for this client's industry
-    let customisedTexts: string[] = placeholderTexts
-    try {
-      setCustomising(true)
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-      const res = await axios.post(
-        `${API_URL}/social/templates/customise`,
-        { templateTexts: placeholderTexts, templateName: template.name },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
-      )
-      if (res.data.texts?.length === placeholderTexts.length) {
-        customisedTexts = res.data.texts
-      }
-    } catch {
-      // Fall back to original placeholder text if API fails
-    } finally {
-      setCustomising(false)
-    }
-
-    // Map customised texts back to template objects
+    // Use cached customised texts if available, otherwise use placeholders
+    const cachedTexts = cachedTemplateTexts[template.id]
     let textIndex = 0
     const customisedObjects = template.objects.map(tObj => {
       if (tObj.type === 'textbox' && tObj.text) {
-        const customised = { ...tObj, text: customisedTexts[textIndex] || tObj.text }
+        const customText = cachedTexts?.[textIndex] || tObj.text
         textIndex++
-        return customised
+        return { ...tObj, text: customText }
       }
       return tObj
     })
