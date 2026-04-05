@@ -62,7 +62,7 @@ export default function CallsPage() {
     if (!session) return
     setLoading(true)
     try {
-      const token = localStorage.getItem('token') || ''
+      const token = localStorage.getItem('token') || (session as any)?.accessToken || ''
       const params: Record<string, string> = { page: String(pg), limit: '20' }
       if (direction !== 'all') params.direction = direction
       if (fromDate) params.from = fromDate
@@ -72,7 +72,7 @@ export default function CallsPage() {
 
       const res = await axios.get(`${API_URL}/calls`, {
         params,
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || (session as any)?.accessToken || ''}` }
       })
       setCalls(res.data.calls || [])
       setTotal(res.data.total || 0)
@@ -92,7 +92,7 @@ export default function CallsPage() {
     setSyncMsg('')
     try {
       const res = await axios.post(`${API_URL}/calls/sync`, {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || (session as any)?.accessToken || ''}` }
       })
       setSyncMsg(`Synced ${res.data.synced} calls`)
       fetchCalls(1)

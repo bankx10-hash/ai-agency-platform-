@@ -87,7 +87,7 @@ export default function CallDetailPage() {
 
   useEffect(() => {
     if (!session || !id) return
-    const token = localStorage.getItem('token') || ''
+    const token = localStorage.getItem('token') || (session as any)?.accessToken || ''
     axios.get(`${API_URL}/calls/${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setCall(res.data))
       .catch(() => setError('Call not found'))

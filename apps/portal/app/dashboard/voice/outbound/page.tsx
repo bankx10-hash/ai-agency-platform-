@@ -80,7 +80,7 @@ export default function OutboundCallsPage() {
 
       const res = await axios.get(`${API_URL}/calls`, {
         params,
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || (session as any)?.accessToken || ''}` }
       })
       const fetchedCalls: CallRow[] = res.data.calls || []
       setCalls(fetchedCalls)
@@ -111,7 +111,7 @@ export default function OutboundCallsPage() {
     setSyncMsg('')
     try {
       const res = await axios.post(`${API_URL}/calls/sync`, {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || (session as any)?.accessToken || ''}` }
       })
       setSyncMsg(`Synced ${res.data.synced} calls`)
       fetchCalls(1)
@@ -147,7 +147,7 @@ export default function OutboundCallsPage() {
     setDownloadingId(callId)
     try {
       const res = await axios.get(`${API_URL}/calls/${callId}/recording`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || (session as any)?.accessToken || ''}` },
         responseType: 'blob'
       })
       const blob = new Blob([res.data], { type: res.headers['content-type'] || 'audio/mpeg' })

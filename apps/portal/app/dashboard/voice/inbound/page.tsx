@@ -82,7 +82,7 @@ export default function InboundCallsPage() {
 
       const res = await axios.get(`${API_URL}/calls`, {
         params,
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || (session as any)?.accessToken || ''}` }
       })
       const fetchedCalls: CallRow[] = res.data.calls || []
       setCalls(fetchedCalls)
@@ -115,7 +115,7 @@ export default function InboundCallsPage() {
     setSyncMsg('')
     try {
       const res = await axios.post(`${API_URL}/calls/sync`, {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || (session as any)?.accessToken || ''}` }
       })
       setSyncMsg(`Synced ${res.data.synced} calls`)
       fetchCalls(1)
@@ -160,7 +160,7 @@ export default function InboundCallsPage() {
   async function downloadRecording(callId: string, e: React.MouseEvent) {
     e.stopPropagation()
     try {
-      const token = localStorage.getItem('token') || ''
+      const token = localStorage.getItem('token') || (session as any)?.accessToken || ''
       const res = await axios.get(`${API_URL}/calls/${callId}/recording`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'

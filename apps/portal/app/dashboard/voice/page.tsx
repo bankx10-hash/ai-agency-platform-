@@ -61,28 +61,42 @@ export default function VoiceDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
+  const getToken = useCallback(() => {
+    return localStorage.getItem('token') || (session as any)?.accessToken || ''
+  }, [session])
+
   const fetchData = useCallback(async () => {
     if (!session) return
-    const token = localStorage.getItem('token') || ''
+    const token = getToken()
+    if (!token) { setError('No auth token available'); setLoading(false); return }
     const headers = { Authorization: `Bearer ${token}` }
-    try {
-      const [statsRes, callsRes] = await Promise.all([
-        axios.get(`${API_URL}/calls/stats`, { headers }),
-        axios.get(`${API_URL}/calls?limit=10`, { headers })
-      ])
-      setStats(statsRes.data)
-      setRecentCalls(callsRes.data.calls || [])
-    } catch (err) {
-      console.error('Failed to load voice data:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [session])
+    const errors: string[] = []
+
+    // Fetch stats and calls independently so one failure doesn't block the other
+    const [statsRes, callsRes] = await Promise.all([
+      axios.get(`${API_URL}/calls/stats`, { headers }).catch((err: any) => {
+        console.error('Failed to load stats:', err?.response?.status, err?.response?.data)
+        errors.push(`Stats: ${err?.response?.status || 'network error'} — ${err?.response?.data?.error || err.message}`)
+        return null
+      }),
+      axios.get(`${API_URL}/calls?limit=10`, { headers }).catch((err: any) => {
+        console.error('Failed to load calls:', err?.response?.status, err?.response?.data)
+        errors.push(`Calls: ${err?.response?.status || 'network error'} — ${err?.response?.data?.error || err.message}`)
+        return null
+      })
+    ])
+
+    if (statsRes) setStats(statsRes.data)
+    if (callsRes) setRecentCalls(callsRes.data.calls || [])
+    setError(errors.length > 0 ? errors.join(' | ') : '')
+    setLoading(false)
+  }, [session, getToken])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -90,7 +104,7 @@ export default function VoiceDashboardPage() {
     setSyncing(true)
     setSyncMsg('')
     try {
-      const token = localStorage.getItem('token') || ''
+      const token = getToken()
       const res = await axios.post(`${API_URL}/calls/sync`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -224,6 +238,12 @@ export default function VoiceDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          {error}
+        </div>
+      )}
 
       {/* ── 6 Metric Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
