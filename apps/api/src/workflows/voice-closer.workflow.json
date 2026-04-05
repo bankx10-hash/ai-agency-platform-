@@ -227,7 +227,60 @@
             { "name": "contactId", "value": "={{ $('Parse Close Outcome').first().json.contactId }}" },
             { "name": "to", "value": "={{ $('Get Prospect Data').first().json.contact?.email || '' }}" },
             { "name": "subject", "value": "Welcome aboard — here's your payment link" },
-            { "name": "html", "value": "={{ '<p>Hi ' + ($('Get Prospect Data').first().json.contact?.name || 'there') + ',</p><p>Great speaking with you! Here is your payment link to get started:</p><p><a href=\"{{WEBHOOK_URL}}\">Complete Your Purchase</a></p><p>Looking forward to working with you!</p>' }}" }
+            { "name": "html", "value": "={{ '<p>Hi ' + ($('Get Prospect Data').first().json.contact?.name || 'there').split(' ')[0] + ',</p><p>Great chatting just now! As promised, here\\'s your link to get started:</p><p><a href=\"{{PAYMENT_LINK}}\" style=\"display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold\">Complete Your Purchase →</a></p><p>If you have any questions at all, just reply to this email — I\\'m here.</p><p>Talk soon,<br>The {{BUSINESS_NAME}} team</p>' }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "send-payment-sms",
+      "name": "Send Payment SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1750, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/sms",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "contactId", "value": "={{ $('Parse Close Outcome').first().json.contactId }}" },
+            { "name": "to", "value": "={{ $('Get Prospect Data').first().json.contact?.phone || '' }}" },
+            { "name": "body", "value": "={{ 'Hey ' + ($('Get Prospect Data').first().json.contact?.name || '').split(' ')[0] + '! Great chatting just now 🎉 Here\\'s your link to get started: {{PAYMENT_LINK}} — Any questions, just text me back. Talk soon!' }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "schedule-follow-up",
+      "name": "Schedule Follow-Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1750, 700],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/tasks",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "contactId", "value": "={{ $('Parse Close Outcome').first().json.contactId }}" },
+            { "name": "title", "value": "={{ 'Follow up closing call — ' + $('Parse Close Outcome').first().json.reason }}" },
+            { "name": "body", "value": "={{ 'Outcome: ' + $('Parse Close Outcome').first().json.outcome + '. Next action: ' + $('Parse Close Outcome').first().json.nextAction }}" },
+            { "name": "dueAt", "value": "={{ new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() }}" }
           ]
         }
       }
@@ -269,8 +322,8 @@
     },
     "IF CLOSED_WON": {
       "main": [
-        [{ "node": "Send Payment Link", "type": "main", "index": 0 }],
-        []
+        [{ "node": "Send Payment Link", "type": "main", "index": 0 }, { "node": "Send Payment SMS", "type": "main", "index": 0 }],
+        [{ "node": "Schedule Follow-Up", "type": "main", "index": 0 }]
       ]
     }
   },
