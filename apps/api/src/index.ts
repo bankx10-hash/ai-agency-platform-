@@ -127,16 +127,27 @@ async function runStartupMigrations() {
 
   // Fix: cast pipelineStage from TEXT to PipelineStage enum so Prisma queries work
   try {
-    // First, fix any invalid values that would prevent the cast
-    await prisma.$executeRaw`UPDATE "Contact" SET "pipelineStage" = 'NEW_LEAD' WHERE "pipelineStage" NOT IN ('NEW_LEAD','CONTACTED','QUALIFIED','PROPOSAL','CLOSED_WON','CLOSED_LOST')`
-    await prisma.$executeRaw`ALTER TABLE "Contact" ALTER COLUMN "pipelineStage" TYPE "PipelineStage" USING "pipelineStage"::"PipelineStage"`
+    await prisma.$executeRaw`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Contact' AND column_name='pipelineStage' AND data_type='text') THEN
+        UPDATE "Contact" SET "pipelineStage" = 'NEW_LEAD' WHERE "pipelineStage" NOT IN ('NEW_LEAD','CONTACTED','QUALIFIED','PROPOSAL','CLOSED_WON','CLOSED_LOST');
+        ALTER TABLE "Contact" ALTER COLUMN "pipelineStage" DROP DEFAULT;
+        ALTER TABLE "Contact" ALTER COLUMN "pipelineStage" TYPE "PipelineStage" USING "pipelineStage"::"PipelineStage";
+        ALTER TABLE "Contact" ALTER COLUMN "pipelineStage" SET DEFAULT 'NEW_LEAD'::"PipelineStage";
+      END IF;
+    END $$`
     logger.info('Startup migration: pipelineStage cast to PipelineStage enum')
   } catch { /* already enum type or enum doesn't exist yet, skip */ }
 
   // Also cast Deal.stage from TEXT to PipelineStage enum
   try {
-    await prisma.$executeRaw`UPDATE "Deal" SET "stage" = 'NEW_LEAD' WHERE "stage" NOT IN ('NEW_LEAD','CONTACTED','QUALIFIED','PROPOSAL','CLOSED_WON','CLOSED_LOST')`
-    await prisma.$executeRaw`ALTER TABLE "Deal" ALTER COLUMN "stage" TYPE "PipelineStage" USING "stage"::"PipelineStage"`
+    await prisma.$executeRaw`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Deal' AND column_name='stage' AND data_type='text') THEN
+        UPDATE "Deal" SET "stage" = 'NEW_LEAD' WHERE "stage" NOT IN ('NEW_LEAD','CONTACTED','QUALIFIED','PROPOSAL','CLOSED_WON','CLOSED_LOST');
+        ALTER TABLE "Deal" ALTER COLUMN "stage" DROP DEFAULT;
+        ALTER TABLE "Deal" ALTER COLUMN "stage" TYPE "PipelineStage" USING "stage"::"PipelineStage";
+        ALTER TABLE "Deal" ALTER COLUMN "stage" SET DEFAULT 'NEW_LEAD'::"PipelineStage";
+      END IF;
+    END $$`
     logger.info('Startup migration: Deal.stage cast to PipelineStage enum')
   } catch { /* already enum type, skip */ }
 
