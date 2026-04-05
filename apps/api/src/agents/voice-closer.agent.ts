@@ -237,20 +237,15 @@ Return the full script as flowing conversational text, not bullet points. It sho
       logger.warn('Failed to create Retell AI closer agent', { clientId, error })
     }
 
-    let workflowResult: { workflowId: string } | undefined
-
-    try {
-      workflowResult = await n8nService.deployWorkflow('voice-closer', {
-        clientId,
-        locationId: typedConfig.locationId,
-        agentPrompt: closingScript,
-        webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-closer-${clientId}`,
-        retellAgentId,
-        businessName: typedConfig.businessName
-      })
-    } catch (error) {
-      logger.warn('N8N workflow deployment failed', { clientId, error })
-    }
+    const workflowResult = await n8nService.deployWorkflow('voice-closer', {
+      clientId,
+      locationId: typedConfig.locationId,
+      agentPrompt: closingScript,
+      webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-closer-${clientId}`,
+      retellAgentId,
+      businessName: typedConfig.businessName,
+      paymentLink: typedConfig.payment_link || ''
+    })
 
     const deployment = await this.createDeploymentRecord(
       clientId,
@@ -259,7 +254,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
         generatedScript: closingScript,
         retell_agent_id: retellAgentId
       },
-      workflowResult?.workflowId
+      workflowResult.workflowId
     )
 
     if (retellAgentId) {
@@ -273,7 +268,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
 
     return {
       id: deployment.id,
-      n8nWorkflowId: workflowResult?.workflowId
+      n8nWorkflowId: workflowResult.workflowId
     }
   }
 }

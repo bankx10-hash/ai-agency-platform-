@@ -50,6 +50,7 @@ export interface WorkflowDeployConfig {
   retellApiKey?: string
   anthropicApiKey?: string
   apiBaseUrl?: string
+  paymentLink?: string
 }
 
 export interface WorkflowDeployResult {

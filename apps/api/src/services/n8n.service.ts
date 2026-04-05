@@ -78,7 +78,8 @@ export class N8NService {
       '{{PHANTOMBUSTER_LEADOUTREACH_ID}}': esc(process.env.PHANTOMBUSTER_LEADOUTREACH_ID || ''),
       '{{OWNER_EMAIL}}': esc(config.ownerEmail || ''),
       '{{CONNECTION_TEMPLATE}}': esc(config.connectionTemplate || 'Hi {{firstName}}, I came across your profile and thought it would be great to connect!'),
-      '{{PLATFORMS}}': esc(config.platforms || 'facebook,instagram,linkedin')
+      '{{PLATFORMS}}': esc(config.platforms || 'facebook,instagram,linkedin'),
+      '{{PAYMENT_LINK}}': esc(config.paymentLink || '')
     }
 
     for (const [placeholder, value] of Object.entries(replacements)) {
