@@ -81,7 +81,8 @@ async function publishPost(postId: string): Promise<void> {
       hasInstagramCred: !!instagramCred,
       hasLinkedinCred: !!linkedinCred,
       metaService: metaCred?.service,
-      hasImage: !!post.imageUrl
+      imageUrl: post.imageUrl ? post.imageUrl.substring(0, 120) : 'EMPTY/NULL',
+      imageUrlLength: post.imageUrl?.length ?? 0,
     })
 
     switch (post.platform) {
@@ -92,7 +93,7 @@ async function publishPost(postId: string): Promise<void> {
           pageId: metaConfig.pageId || metaConfig.meta_page_id,
           message: fullText,
           accessToken: metaConfig.accessToken || metaConfig.meta_access_token,
-          imageUrl: post.imageUrl || undefined
+          imageUrl: (post.imageUrl && post.imageUrl.trim() && !post.imageUrl.startsWith('data:')) ? post.imageUrl.trim() : undefined
         })
         externalPostId = result.id
         break
@@ -104,9 +105,11 @@ async function publishPost(postId: string): Promise<void> {
         const igConfig = decryptJSON<Record<string, string>>(igCred.credentials)
 
         // Instagram REQUIRES an image — reject data URLs and empty URLs
-        let igImageUrl = post.imageUrl || undefined
-        if (!igImageUrl || igImageUrl.startsWith('data:')) {
-          throw new Error('Instagram requires a publicly accessible image URL. The current image is either missing or a data URL. Please regenerate the image.')
+        const igImageUrl = (post.imageUrl && post.imageUrl.trim() && !post.imageUrl.startsWith('data:'))
+          ? post.imageUrl.trim()
+          : null
+        if (!igImageUrl) {
+          throw new Error('Instagram requires a publicly accessible image URL. The current image is either missing, empty, or a data URL. Please regenerate the image.')
         }
 
         logger.info('Publishing to Instagram', { postId, igUserId: igConfig.igUserId, imageUrl: igImageUrl.substring(0, 100) })
