@@ -345,9 +345,18 @@ export default function ImageEditor({
     if (backgroundImageUrl) {
       FabricImage.fromURL(backgroundImageUrl, { crossOrigin: 'anonymous' })
         .then((img: FabricImage) => {
-          img.scaleToWidth(canvasWidth)
-          img.scaleToHeight(canvasHeight)
-          img.set({ selectable: false, evented: false })
+          // Scale to cover the entire canvas (no gaps)
+          const imgW = img.width ?? 1
+          const imgH = img.height ?? 1
+          const scale = Math.max(canvasWidth / imgW, canvasHeight / imgH)
+          img.set({
+            scaleX: scale,
+            scaleY: scale,
+            left: (canvasWidth - imgW * scale) / 2,
+            top: (canvasHeight - imgH * scale) / 2,
+            selectable: false,
+            evented: false,
+          })
           c.insertAt(0, img)
           backgroundRef.current = img
           c.renderAll()
@@ -816,15 +825,36 @@ export default function ImageEditor({
       const absHeight = tObj.height != null ? (tObj.height / 100) * canvasHeight : undefined
 
       if (tObj.type === 'rect') {
+        // For full-canvas overlays (width=100%, height>=50%), ensure background stays visible
+        const isFullOverlay = (tObj.width ?? 0) >= 90 && (tObj.height ?? 0) >= 40
+        let fill = tObj.fill ?? '#000000'
+        let opacity = tObj.opacity ?? 1
+
+        if (isFullOverlay && backgroundRef.current) {
+          // If background image exists, cap overlay opacity so image shows through
+          // Parse rgba or apply max opacity
+          if (fill.startsWith('rgba(')) {
+            // Already has alpha — keep it but ensure it's not too opaque
+            const match = fill.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/)
+            if (match) {
+              const alpha = Math.min(parseFloat(match[4]), 0.6) // cap at 0.6
+              fill = `rgba(${match[1]},${match[2]},${match[3]},${alpha})`
+            }
+          } else {
+            // Solid color — make it semi-transparent
+            opacity = 0.5
+          }
+        }
+
         const r = new Rect({
           left: absLeft,
           top: absTop,
           width: absWidth ?? 100,
           height: absHeight ?? 100,
-          fill: tObj.fill ?? '#000000',
+          fill,
           rx: tObj.rx ?? 0,
           ry: tObj.ry ?? 0,
-          opacity: tObj.opacity ?? 1,
+          opacity,
           stroke: tObj.stroke ?? '',
           strokeWidth: tObj.strokeWidth ?? 0,
         })
