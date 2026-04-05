@@ -43,7 +43,7 @@ function saveImageToDisk(data: Buffer | string, filename?: string): string {
     where: { id: `img-${fname}` },
     create: { id: `img-${fname}`, clientId: 'system', service: 'image-store', credentials: buffer.toString('base64') },
     update: { credentials: buffer.toString('base64') }
-  }).catch(() => { /* best effort */ })
+  }).catch((err) => { logger.warn('Failed to persist image to DB', { fname, err: String(err).substring(0, 100) }) })
 
   const apiUrl = process.env.API_URL || 'https://api.nodusaisystems.com'
   return `${apiUrl}/uploads/social/${fname}`

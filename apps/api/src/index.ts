@@ -42,6 +42,15 @@ process.on('uncaughtException', (err) => {
 })
 
 async function runStartupMigrations() {
+  // Ensure system client exists for image storage FK references
+  try {
+    await prisma.$executeRaw`
+      INSERT INTO "Client" (id, "businessName", email, "passwordHash", "stripeCustomerId", "createdAt", "updatedAt")
+      VALUES ('system', 'System', 'system@internal', '', 'sys_internal', NOW(), NOW())
+      ON CONFLICT (id) DO NOTHING
+    `
+  } catch { /* already exists or constraint issue — skip */ }
+
   try {
     // Convert enum column to plain text so Prisma String? mapping works
     await prisma.$executeRaw`ALTER TABLE "Client" ALTER COLUMN "crmType" TYPE TEXT USING "crmType"::text`
@@ -685,22 +694,37 @@ import path from 'path'
 import fs from 'fs'
 const uploadsDir = path.join('/tmp', 'uploads', 'social')
 try { fs.mkdirSync(uploadsDir, { recursive: true }) } catch { /* /tmp always writable */ }
-app.use('/uploads/social', async (req, res, next) => {
-  const filePath = path.join(uploadsDir, req.path)
-  // If file exists on disk, serve it
-  if (fs.existsSync(filePath)) return next()
-  // Otherwise, try to restore from DB
+// Serve images: try disk first, then DB, then 404
+app.get('/uploads/social/:filename', async (req, res) => {
+  const fname = req.params.filename
+  const filePath = path.join(uploadsDir, fname)
+
+  // 1. Try disk
+  if (fs.existsSync(filePath)) {
+    res.setHeader('Content-Type', 'image/jpeg')
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+    res.sendFile(filePath)
+    return
+  }
+
+  // 2. Try DB
   try {
-    const fname = req.path.replace(/^\//, '')
     const record = await prisma.clientCredential.findUnique({ where: { id: `img-${fname}` } })
     if (record) {
       const buffer = Buffer.from(record.credentials, 'base64')
-      fs.writeFileSync(filePath, buffer)
-      return next()
+      // Save to disk for future requests
+      try { fs.writeFileSync(filePath, buffer) } catch { /* disk write failed, serve from memory */ }
+      res.setHeader('Content-Type', 'image/jpeg')
+      res.setHeader('Cache-Control', 'public, max-age=86400')
+      res.send(buffer)
+      return
     }
-  } catch { /* fall through to 404 */ }
-  next()
-}, express.static(uploadsDir))
+  } catch (err) {
+    logger.error('Failed to serve image from DB', { fname, err })
+  }
+
+  res.status(404).json({ error: 'Image not found' })
+})
 
 app.use(apiRateLimit)
 
