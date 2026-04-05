@@ -107,53 +107,54 @@ router.get('/threads', async (req: AuthRequest, res: Response): Promise<void> =>
     const listRes = await g.gmail.users.threads.list({
       userId: 'me',
       labelIds: [label],
-      maxResults: 30,
+      maxResults: 15, // Reduced from 30 to prevent timeouts
       q: q || undefined,
       pageToken: pageToken || undefined,
     })
 
     const threadItems = listRes.data.threads || []
 
-    // Fetch first message of each thread for preview
-    const threads = await Promise.all(
-      threadItems.map(async t => {
-        try {
-          const threadRes = await g.gmail.users.threads.get({
-            userId: 'me', id: t.id!, format: 'metadata',
-            metadataHeaders: ['From', 'To', 'Subject', 'Date'],
-          })
-          const msgs = threadRes.data.messages || []
-          const first = msgs[0]
-          const last = msgs[msgs.length - 1]
-          const firstHeaders = first?.payload?.headers || []
-          const lastHeaders = last?.payload?.headers || []
-          const isUnread = msgs.some(m => m.labelIds?.includes('UNREAD'))
+    // Fetch threads sequentially to avoid Gmail rate limits and memory spikes
+    const threads: Array<Record<string, unknown>> = []
+    for (const t of threadItems.slice(0, 15)) {
+      try {
+        const threadRes = await g.gmail.users.threads.get({
+          userId: 'me', id: t.id!, format: 'metadata',
+          metadataHeaders: ['From', 'To', 'Subject', 'Date'],
+        })
+        const msgs = threadRes.data.messages || []
+        const first = msgs[0]
+        const last = msgs[msgs.length - 1]
+        const firstHeaders = first?.payload?.headers || []
+        const lastHeaders = last?.payload?.headers || []
+        const isUnread = msgs.some(m => m.labelIds?.includes('UNREAD'))
 
-          // Try to match sender to a CRM contact
-          const fromEmail = extractEmail(getHeader(lastHeaders, 'from') || getHeader(firstHeaders, 'from'))
-          let contact = null
-          if (fromEmail && !fromEmail.includes(g.creds.email)) {
+        // Try to match sender to a CRM contact
+        const fromEmail = extractEmail(getHeader(lastHeaders, 'from') || getHeader(firstHeaders, 'from'))
+        let contact = null
+        if (fromEmail && !fromEmail.includes(g.creds.email)) {
+          try {
             contact = await prisma.contact.findFirst({
               where: { clientId, email: fromEmail },
               select: { id: true, name: true, email: true }
             })
-          }
-
-          return {
-            id: t.id,
-            snippet: threadRes.data.snippet,
-            messageCount: msgs.length,
-            isUnread,
-            from: getHeader(lastHeaders, 'from') || getHeader(firstHeaders, 'from'),
-            subject: getHeader(firstHeaders, 'subject'),
-            date: last?.internalDate ? new Date(parseInt(last.internalDate)).toISOString() : null,
-            contact,
-          }
-        } catch {
-          return { id: t.id, snippet: '', messageCount: 1, isUnread: false, from: '', subject: '', date: null, contact: null }
+          } catch { /* skip contact lookup failure */ }
         }
-      })
-    )
+
+        threads.push({
+          id: t.id,
+          snippet: threadRes.data.snippet,
+          messageCount: msgs.length,
+          isUnread,
+          from: getHeader(lastHeaders, 'from') || getHeader(firstHeaders, 'from'),
+          subject: getHeader(firstHeaders, 'subject'),
+          date: last?.internalDate ? new Date(parseInt(last.internalDate)).toISOString() : null,
+          contact,
+        })
+      } catch {
+        threads.push({ id: t.id, snippet: '', messageCount: 1, isUnread: false, from: '', subject: '', date: null, contact: null })
+      }
+    }
 
     res.json({ threads, nextPageToken: listRes.data.nextPageToken || null, connectedEmail: g.creds.email })
   } catch (err) {
