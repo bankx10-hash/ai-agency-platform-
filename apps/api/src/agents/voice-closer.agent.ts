@@ -56,10 +56,10 @@ ${JSON.stringify(prospect, null, 2)}
 THE CLOSING CALL FRAMEWORK (7 phases)
 ═══════════════════════════════════════════
 
-PHASE 1 — WARM RECONNECT (30 seconds)
-- Reference the SPECIFIC previous interaction: "Last time we spoke you mentioned [specific pain point from their notes]"
-- Ask ONE casual question to rebuild rapport: "How's the [thing they mentioned] going?"
-- Goal: Make them feel remembered, not sold to
+PHASE 1 — APPOINTMENT CONFIRMATION (30 seconds)
+- This is a SCHEDULED call — they booked this time. Confirm it warmly: "We had this chat booked in, glad we could connect! How are you going?"
+- Ask what made them book: "So tell me — what caught your eye about what we do?" or "What's going on in your business right now that made you want to have this chat?"
+- Goal: Let THEM tell you their pain. They booked the call, so they already have a reason — draw it out.
 
 PHASE 2 — PAIN AMPLIFICATION (2-3 minutes)
 - Ask: "Since we last spoke, has [their problem] gotten better or worse?"
@@ -210,16 +210,12 @@ PAYMENT WALKTHROUGH STEPS: ${typedConfig.payment_walkthrough || 'Guide them to t
 
 Generate a complete, natural-sounding closing call script that includes:
 
-1. OPENER — a warm, context-aware greeting. The call metadata will include a "leadSource" field telling you HOW they became a lead. Use it:
-   - "callback_request" → "Hey [name], you requested a callback from us — thanks for reaching out!"
-   - "form_submission" → "Hey [name], you filled out a form on our site and I wanted to personally follow up"
-   - "appointment_booked" → "Hey [name], we had that appointment scheduled — great to connect with you"
-   - "linkedin" → "Hey [name], we connected on LinkedIn and you showed interest — wanted to give you a quick call"
-   - "referral" → "Hey [name], you were referred to us and I wanted to reach out personally"
-   - If unknown, use a generic warm intro like "Hey [name], thanks for your interest in what we do"
-   NEVER say "we spoke earlier" or "following up from our conversation" unless they genuinely had a prior call.
+1. OPENER — This is a SCHEDULED APPOINTMENT. The prospect booked this call and is expecting it. Open warmly:
+   "Hey [name], it's [agent] from ${typedConfig.businessName} — we had this call booked in, glad we could connect! How are you going?"
+   Then ask what made them book: "So tell me — what caught your eye about what we do?" or "What's happening in your business that made you want to have this chat?"
+   Let THEM tell you their pain first. They booked the call so they already have a reason.
 
-2. DISCOVERY REFRESH — 2-3 questions to re-confirm their pain and quantify the cost of inaction. Get them to say a dollar amount of what the problem costs them.
+2. DISCOVERY — Ask 2-3 questions to understand their situation and quantify the cost of their problem. Get them to say a dollar amount of what inaction costs them.
 
 3. FUTURE VISION — Paint a specific 90-day picture of life after they sign up. Use real results from similar businesses.
 
@@ -261,7 +257,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: closingScript,
         voice: '11labs-Adrian',
-        firstSentence: `Hey {{firstName}}, it's {{agentName}} from ${typedConfig.businessName} — you recently showed interest in what we do and I wanted to personally reach out. Got a couple of minutes?`,
+        firstSentence: `Hey {{firstName}}, it's {{agentName}} from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
         clientId,
         businessName: typedConfig.businessName
       })

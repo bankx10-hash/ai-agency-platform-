@@ -25,11 +25,22 @@
       }
     },
     {
+      "id": "wait-for-appointment",
+      "name": "Wait Until Appointment Time",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [750, 300],
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{ $json.appointmentTime }}"
+      }
+    },
+    {
       "id": "get-prospect-data",
       "name": "Get Prospect Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [750, 300],
+      "position": [1000, 300],
       "parameters": {
         "method": "GET",
         "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.contactId }}",
@@ -46,9 +57,9 @@
       "name": "Build Claude Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1000, 300],
+      "position": [1250, 300],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst contact = data.contact || data;\nconst name = contact.name || 'the prospect';\nconst firstName = name.split(' ')[0];\nconst notes = (contact.notes || []).map(n => n.body || '').join(' ');\nconst handoff = $('Extract Handoff Data').first().json;\nconst leadSource = handoff.leadSource || contact.source || 'unknown';\nconst sourceContext = {\n  'callback_request': 'They requested a callback from our website',\n  'form_submission': 'They filled out a form on our website',\n  'appointment_booked': 'They booked an appointment with us',\n  'linkedin': 'They connected with us on LinkedIn',\n  'referral': 'They were referred to us',\n  'facebook': 'They engaged with us on Facebook',\n  'instagram': 'They engaged with us on Instagram',\n  'website': 'They came through our website'\n};\nconst sourceDesc = sourceContext[leadSource] || 'They expressed interest in our services';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 600,\n    system: 'You are a sales closer for {{BUSINESS_NAME}}. Write a short, personalized opening for a closing call (under 80 words). Sound natural and conversational. IMPORTANT: Reference how they became a lead — ' + sourceDesc + '. NEVER say we spoke before unless there are notes confirming a previous call.',\n    messages: [{ role: 'user', content: 'Write a closing call opener for ' + firstName + '. How they found us: ' + sourceDesc + '. Notes: ' + notes }],\n    contactId: contact.id,\n    phone: contact.phone,\n    leadSource: leadSource\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nconst contact = data.contact || data;\nconst name = contact.name || 'the prospect';\nconst firstName = name.split(' ')[0];\nconst notes = (contact.notes || []).map(n => n.body || '').join(' ');\nconst handoff = $('Extract Handoff Data').first().json;\nconst leadSource = handoff.leadSource || contact.source || 'unknown';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 600,\n    system: 'You are a sales closer for {{BUSINESS_NAME}}. Write a short, personalized opening for a SCHEDULED APPOINTMENT call (under 80 words). This person BOOKED this call — they are expecting it. Sound warm, confirm the appointment, and transition into the conversation naturally. Example: Hey [name], this is [agent] from {{BUSINESS_NAME}} — we had this time booked in for a chat, perfect timing! How are you going?',\n    messages: [{ role: 'user', content: 'Write an appointment call opener for ' + firstName + '. They booked this call themselves. Notes: ' + notes }],\n    contactId: contact.id,\n    phone: contact.phone,\n    leadSource: leadSource\n  }\n}];"
       }
     },
     {
@@ -295,6 +306,9 @@
       "main": [[{ "node": "Extract Handoff Data", "type": "main", "index": 0 }]]
     },
     "Extract Handoff Data": {
+      "main": [[{ "node": "Wait Until Appointment Time", "type": "main", "index": 0 }]]
+    },
+    "Wait Until Appointment Time": {
       "main": [[{ "node": "Get Prospect Data", "type": "main", "index": 0 }]]
     },
     "Get Prospect Data": {
