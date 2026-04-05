@@ -183,7 +183,14 @@ CONTRACT LINK: ${typedConfig.contract_link}
 
 Generate a complete, natural-sounding closing call script that includes:
 
-1. OPENER — a warm, specific reconnect. Reference their previous interaction. Sound like you remember them personally.
+1. OPENER — a warm, context-aware greeting. The call metadata will include a "leadSource" field telling you HOW they became a lead. Use it:
+   - "callback_request" → "Hey [name], you requested a callback from us — thanks for reaching out!"
+   - "form_submission" → "Hey [name], you filled out a form on our site and I wanted to personally follow up"
+   - "appointment_booked" → "Hey [name], we had that appointment scheduled — great to connect with you"
+   - "linkedin" → "Hey [name], we connected on LinkedIn and you showed interest — wanted to give you a quick call"
+   - "referral" → "Hey [name], you were referred to us and I wanted to reach out personally"
+   - If unknown, use a generic warm intro like "Hey [name], thanks for your interest in what we do"
+   NEVER say "we spoke earlier" or "following up from our conversation" unless they genuinely had a prior call.
 
 2. DISCOVERY REFRESH — 2-3 questions to re-confirm their pain and quantify the cost of inaction. Get them to say a dollar amount of what the problem costs them.
 
@@ -226,7 +233,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: closingScript,
         voice: '11labs-Adrian',
-        firstSentence: `Hey {{firstName}}, it's your specialist from ${typedConfig.businessName} — I'm following up from our conversation. Got a couple of minutes?`,
+        firstSentence: `Hey {{firstName}}, it's {{agentName}} from ${typedConfig.businessName} — you recently showed interest in what we do and I wanted to personally reach out. Got a couple of minutes?`,
         clientId,
         businessName: typedConfig.businessName
       })

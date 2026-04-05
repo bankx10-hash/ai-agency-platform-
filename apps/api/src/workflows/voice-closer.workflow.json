@@ -3,21 +3,25 @@
   "active": false,
   "nodes": [
     {
-      "id": "manual-trigger",
-      "name": "Manual Test Trigger",
-      "type": "n8n-nodes-base.manualTrigger",
+      "id": "closer-ready-webhook",
+      "name": "Closer Ready Webhook",
+      "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [250, 300],
-      "parameters": {}
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "closer-ready-{{CLIENT_ID}}",
+        "responseMode": "onReceived"
+      }
     },
     {
-      "id": "set-test-contact",
-      "name": "Set Test Contact",
+      "id": "extract-handoff",
+      "name": "Extract Handoff Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [500, 300],
       "parameters": {
-        "jsCode": "// Change contactId below to test with a different contact\nreturn [{ json: { contactId: 'REPLACE_WITH_CONTACT_ID' } }];"
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\nreturn [{ json: { contactId: body.contactId, leadSource: body.leadSource || 'unknown', appointmentTime: body.appointmentTime || '', notes: body.notes || '' } }];"
       }
     },
     {
@@ -44,7 +48,7 @@
       "typeVersion": 2,
       "position": [1000, 300],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst contact = data.contact || data;\nconst name = contact.name || 'the prospect';\nconst firstName = name.split(' ')[0];\nconst notes = (contact.notes || []).map(n => n.body || '').join(' ');\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 600,\n    system: 'You are a sales closer for {{BUSINESS_NAME}}. Write a short, personalized opening for a closing call (under 80 words). Sound natural and conversational. Reference any relevant context about the prospect.',\n    messages: [{ role: 'user', content: 'Write a closing call opener for ' + firstName + '. Context: ' + notes }],\n    contactId: contact.id,\n    phone: contact.phone\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nconst contact = data.contact || data;\nconst name = contact.name || 'the prospect';\nconst firstName = name.split(' ')[0];\nconst notes = (contact.notes || []).map(n => n.body || '').join(' ');\nconst handoff = $('Extract Handoff Data').first().json;\nconst leadSource = handoff.leadSource || contact.source || 'unknown';\nconst sourceContext = {\n  'callback_request': 'They requested a callback from our website',\n  'form_submission': 'They filled out a form on our website',\n  'appointment_booked': 'They booked an appointment with us',\n  'linkedin': 'They connected with us on LinkedIn',\n  'referral': 'They were referred to us',\n  'facebook': 'They engaged with us on Facebook',\n  'instagram': 'They engaged with us on Instagram',\n  'website': 'They came through our website'\n};\nconst sourceDesc = sourceContext[leadSource] || 'They expressed interest in our services';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 600,\n    system: 'You are a sales closer for {{BUSINESS_NAME}}. Write a short, personalized opening for a closing call (under 80 words). Sound natural and conversational. IMPORTANT: Reference how they became a lead — ' + sourceDesc + '. NEVER say we spoke before unless there are notes confirming a previous call.',\n    messages: [{ role: 'user', content: 'Write a closing call opener for ' + firstName + '. How they found us: ' + sourceDesc + '. Notes: ' + notes }],\n    contactId: contact.id,\n    phone: contact.phone,\n    leadSource: leadSource\n  }\n}];"
       }
     },
     {
@@ -287,10 +291,10 @@
     }
   ],
   "connections": {
-    "Manual Test Trigger": {
-      "main": [[{ "node": "Set Test Contact", "type": "main", "index": 0 }]]
+    "Closer Ready Webhook": {
+      "main": [[{ "node": "Extract Handoff Data", "type": "main", "index": 0 }]]
     },
-    "Set Test Contact": {
+    "Extract Handoff Data": {
       "main": [[{ "node": "Get Prospect Data", "type": "main", "index": 0 }]]
     },
     "Get Prospect Data": {
