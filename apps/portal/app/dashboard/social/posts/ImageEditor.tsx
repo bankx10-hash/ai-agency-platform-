@@ -233,6 +233,7 @@ export default function ImageEditor({
   const [historyIdx, setHistoryIdx] = useState(-1)
   const [scaleFactor, setScaleFactor] = useState(1)
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false)
+  const [textStyleMenuOpen, setTextStyleMenuOpen] = useState(false)
 
   const { width: canvasWidth, height: canvasHeight } = PLATFORM_SIZES[platform] ?? PLATFORM_SIZES.INSTAGRAM
 
@@ -566,6 +567,43 @@ export default function ImageEditor({
       fontWeight: 'bold',
       fill: '#FFFFFF',
     })
+    c.add(tb)
+    c.setActiveObject(tb)
+    c.renderAll()
+    pushHistory(c)
+  }
+
+  // Preset text styles
+  const TEXT_STYLES = [
+    { name: 'Bold Impact', fontFamily: 'Impact', fontSize: 52, fontWeight: 'bold' as const, fill: '#FFFFFF', charSpacing: 80 },
+    { name: 'Clean Sans', fontFamily: 'Helvetica', fontSize: 36, fontWeight: 'normal' as const, fill: '#FFFFFF', charSpacing: 0 },
+    { name: 'Elegant Serif', fontFamily: 'Georgia', fontSize: 40, fontWeight: 'normal' as const, fill: '#FFFFFF', charSpacing: 40 },
+    { name: 'Neon Pop', fontFamily: 'Arial Black', fontSize: 48, fontWeight: 'bold' as const, fill: '#00FF88', charSpacing: 0 },
+    { name: 'Luxury Gold', fontFamily: 'Georgia', fontSize: 44, fontWeight: 'bold' as const, fill: '#D4AF37', charSpacing: 120 },
+    { name: 'Minimal Light', fontFamily: 'Helvetica', fontSize: 28, fontWeight: '300' as const, fill: '#E0E0E0', charSpacing: 200 },
+    { name: 'Street Bold', fontFamily: 'Arial Black', fontSize: 60, fontWeight: 'bold' as const, fill: '#FF4D00', charSpacing: 0 },
+    { name: 'Soft Pastel', fontFamily: 'Georgia', fontSize: 38, fontWeight: 'normal' as const, fill: '#E8B4D8', charSpacing: 60 },
+    { name: 'Tech Mono', fontFamily: 'Courier New', fontSize: 32, fontWeight: 'bold' as const, fill: '#00D4FF', charSpacing: 40 },
+    { name: 'Classic Black', fontFamily: 'Times New Roman', fontSize: 42, fontWeight: 'bold' as const, fill: '#FFFFFF', charSpacing: 80 },
+  ]
+
+  function addStyledText(style: typeof TEXT_STYLES[0]) {
+    const c = fabricRef.current
+    if (!c) return
+    const tb = new Textbox('Your text here', {
+      left: canvasWidth * 0.1,
+      top: canvasHeight * 0.4,
+      width: canvasWidth * 0.8,
+      fontSize: style.fontSize,
+      fontFamily: style.fontFamily,
+      fontWeight: style.fontWeight,
+      fill: style.fill,
+      charSpacing: style.charSpacing,
+      textAlign: 'center',
+    })
+    if (style.name === 'Neon Pop' || style.name === 'Tech Mono') {
+      tb.set('shadow', new Shadow({ color: style.fill, blur: 15, offsetX: 0, offsetY: 0 }))
+    }
     c.add(tb)
     c.setActiveObject(tb)
     c.renderAll()
@@ -1056,6 +1094,27 @@ export default function ImageEditor({
         <ToolbarBtn label="Add Text" onClick={addText}><IconText /></ToolbarBtn>
         <ToolbarBtn label="Add Heading" onClick={addHeading}><IconHeading /></ToolbarBtn>
         <ToolbarBtn label="Add CTA Button" onClick={addCtaButton}><IconButton /></ToolbarBtn>
+
+        {/* Text Styles dropdown */}
+        <div className="relative">
+          <ToolbarBtn label="Text Styles" onClick={() => { setTextStyleMenuOpen(!textStyleMenuOpen); setShapeMenuOpen(false) }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+            <IconChevron />
+          </ToolbarBtn>
+          {textStyleMenuOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-2 w-48 max-h-64 overflow-y-auto">
+              {TEXT_STYLES.map((s) => (
+                <button
+                  key={s.name}
+                  onClick={() => { addStyledText(s); setTextStyleMenuOpen(false) }}
+                  className="w-full text-left px-3 py-2 rounded hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-sm font-medium" style={{ color: s.fill, fontFamily: s.fontFamily }}>{s.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Shape dropdown */}
         <div className="relative">
