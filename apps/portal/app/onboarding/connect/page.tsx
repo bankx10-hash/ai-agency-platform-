@@ -30,6 +30,10 @@ function ConnectPageInner() {
     calcomApiKey: ''
   })
   const [connected, setConnected] = useState<Record<string, boolean>>({})
+  const [clientPlan, setClientPlan] = useState('')
+  const [businessType, setBusinessType] = useState('other')
+
+  const isReceptionist = clientPlan === 'AI_RECEPTIONIST'
 
   // Dev rerun shortcut — visible when ?rerun=true
   const isRerun = searchParams.get('rerun') === 'true'
@@ -66,6 +70,14 @@ function ConnectPageInner() {
         headers: { Authorization: `Bearer ${token}` }
       }).then(res => {
         setConnected(res.data.connected || {})
+      }).catch(() => {})
+      // Load client plan
+      axios.get(`${API_URL}/clients/${clientId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
+        const plan = res.data?.client?.plan || res.data?.plan || ''
+        setClientPlan(plan)
+        if (plan) localStorage.setItem('clientPlan', plan)
       }).catch(() => {})
     }
   }, [])
@@ -127,8 +139,9 @@ function ConnectPageInner() {
       const token = getToken()
       await axios.patch(`${API_URL}/clients/${clientId}`, {
         businessDescription: form.businessDescription,
-        icpDescription: form.icpDescription,
-        crmType: crmType !== 'none' ? crmType : null
+        icpDescription: isReceptionist ? undefined : form.icpDescription,
+        crmType: crmType !== 'none' ? crmType : null,
+        businessType: isReceptionist ? businessType : undefined
       }, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
 
       const qualificationQuestions = [form.q1, form.q2, form.q3].filter(q => q.trim())
@@ -205,8 +218,8 @@ function ConnectPageInner() {
           <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
             Step 2 of 3
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Connect your tools</h1>
-          <p className="mt-2 text-gray-600">Connect your platforms so your AI agents can work across every channel.</p>
+          <h1 className="text-3xl font-bold text-gray-900">{isReceptionist ? 'Set up your AI Receptionist' : 'Connect your tools'}</h1>
+          <p className="mt-2 text-gray-600">{isReceptionist ? 'Connect your calendar and tell us about your business so your AI receptionist can start answering calls.' : 'Connect your platforms so your AI agents can work across every channel.'}</p>
         </div>
 
         {/* ── DEV: Re-run existing client (visible when ?rerun=true) ── */}
@@ -283,7 +296,8 @@ function ConnectPageInner() {
             } />
           </div>
 
-          {/* ── SECTION: Social Media ── */}
+          {/* ── SECTION: Social Media (hidden for AI Receptionist) ── */}
+          {!isReceptionist && (<>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4">Social Media</p>
 
           {/* Facebook */}
@@ -414,7 +428,6 @@ function ConnectPageInner() {
             } />
           </div>
 
-          {/* ── SECTION: CRM ── */}
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4">CRM Integration</p>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
@@ -475,6 +488,39 @@ function ConnectPageInner() {
               <p className="text-xs text-gray-400 mt-1">The more detail you provide, the better your AI agents will qualify leads.</p>
             </div>
           </div>
+          </>)}{/* end !isReceptionist */}
+
+          {/* ── SECTION: Business Type (AI Receptionist only) ── */}
+          {isReceptionist && (
+            <>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4">Business Type</p>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">What type of business are you?</label>
+                <select value={businessType} onChange={e => setBusinessType(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-gray-900 bg-white transition">
+                  <option value="dentist">Dentist / Dental Clinic</option>
+                  <option value="salon">Hair Salon / Beauty</option>
+                  <option value="mechanic">Mechanic / Auto</option>
+                  <option value="tradie">Tradie / Trades</option>
+                  <option value="clinic">Medical Clinic / GP</option>
+                  <option value="vet">Veterinary</option>
+                  <option value="physio">Physio / Allied Health</option>
+                  <option value="other">Other</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">This sets how often your AI follows up for rebooking reminders (e.g. 6 months for dentists, 6 weeks for salons).</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Business description</label>
+                <textarea value={form.businessDescription}
+                  onChange={e => setForm(f => ({ ...f, businessDescription: e.target.value }))}
+                  rows={3} placeholder="Describe your business, services you offer, hours, location..."
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-none"/>
+                <p className="text-xs text-gray-400 mt-1">Your AI receptionist uses this to answer caller questions.</p>
+              </div>
+            </div>
+            </>
+          )}
 
           {/* ── SECTION: Calendar ── */}
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4">Calendar & Booking</p>
