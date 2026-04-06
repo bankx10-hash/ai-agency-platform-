@@ -6,7 +6,7 @@
       "id": "call-completed-webhook",
       "name": "Call Completed Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 300],
       "parameters": {
         "httpMethod": "POST",
@@ -202,7 +202,7 @@
       "id": "calendar-webhook",
       "name": "Calendar Booking Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 600],
       "parameters": {
         "httpMethod": "POST",

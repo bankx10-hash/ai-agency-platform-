@@ -10,7 +10,7 @@
       "id": "engagement-webhook",
       "name": "Engagement Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [0, 0]
     },
     {

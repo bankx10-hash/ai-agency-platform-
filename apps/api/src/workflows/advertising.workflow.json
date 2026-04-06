@@ -96,7 +96,7 @@
       "id": "budget-alert-webhook",
       "name": "Budget Alert Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 500],
       "parameters": {
         "path": "ads-alert-{{CLIENT_ID}}",

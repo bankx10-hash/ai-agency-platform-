@@ -6,7 +6,7 @@
       "id": "followup-trigger",
       "name": "Follow-Up Trigger",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 300],
       "parameters": {
         "httpMethod": "POST",
@@ -88,7 +88,7 @@
       "id": "followup-result-webhook",
       "name": "Follow-Up Result Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 600],
       "parameters": {
         "httpMethod": "POST",

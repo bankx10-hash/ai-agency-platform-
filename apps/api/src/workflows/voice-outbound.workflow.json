@@ -63,7 +63,7 @@
       "id": "call-complete-webhook",
       "name": "Call Completed Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 500],
       "parameters": {
         "path": "voice-outbound-{{CLIENT_ID}}",

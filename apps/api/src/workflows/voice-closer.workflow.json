@@ -6,7 +6,7 @@
       "id": "closer-ready-webhook",
       "name": "Closer Ready Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 300],
       "parameters": {
         "httpMethod": "POST",
@@ -121,7 +121,7 @@
       "id": "closer-result-webhook",
       "name": "Closing Call Result Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 600],
       "parameters": {
         "httpMethod": "POST",

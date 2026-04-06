@@ -6,7 +6,7 @@
       "id": "new-lead-webhook",
       "name": "New Lead Webhook",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 200],
       "parameters": {
         "httpMethod": "POST",
@@ -102,7 +102,7 @@
       "id": "reply-handler-webhook",
       "name": "Handle Lead Reply",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [250, 500],
       "parameters": {
         "httpMethod": "POST",
