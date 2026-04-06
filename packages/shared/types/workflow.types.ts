@@ -51,6 +51,10 @@ export interface WorkflowDeployConfig {
   anthropicApiKey?: string
   apiBaseUrl?: string
   paymentLink?: string
+  personTitles?: string
+  personLocations?: string
+  keywords?: string
+  employeeRanges?: string
 }
 
 export interface WorkflowDeployResult {

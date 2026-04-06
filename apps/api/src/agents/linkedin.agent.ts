@@ -61,7 +61,11 @@ Return ONLY the message text.`,
       businessName: typedConfig.businessName,
       bookingLink: typedConfig.booking_link || '',
       ownerEmail: typedConfig.owner_email || '',
-      agentPrompt: outreachTemplate
+      agentPrompt: outreachTemplate,
+      personTitles: titles.join(','),
+      personLocations: locations.join(','),
+      keywords: keywords.join(','),
+      employeeRanges: ranges.join(',')
     })
 
     const deployment = await this.createDeploymentRecord(

@@ -15,11 +15,21 @@
       }
     },
     {
+      "id": "build-search-filters",
+      "name": "Build Apollo Search Filters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": {
+        "jsCode": "const titlesRaw = '{{PERSON_TITLES}}';\nconst locationsRaw = '{{PERSON_LOCATIONS}}';\nconst keywordsRaw = '{{KEYWORDS}}';\nconst rangesRaw = '{{EMPLOYEE_RANGES}}';\nconst toArr = (s) => s.split(',').map(v => v.trim()).filter(Boolean);\nconst body = { api_key: '{{APOLLO_API_KEY}}', per_page: 25, page: 1 };\nconst titles = toArr(titlesRaw);\nif (titles.length) body.person_titles = titles;\nconst locations = toArr(locationsRaw);\nif (locations.length) body.person_locations = locations;\nconst keywords = toArr(keywordsRaw);\nif (keywords.length) body.q_keywords = keywords.join(' ');\nconst ranges = toArr(rangesRaw);\nif (ranges.length) body.organization_num_employees_ranges = ranges;\nreturn [{ json: body }];"
+      }
+    },
+    {
       "id": "search-apollo",
       "name": "Apollo - Search Prospects",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 300],
+      "position": [750, 300],
       "parameters": {
         "method": "POST",
         "url": "https://api.apollo.io/api/v1/mixed_people/search",
@@ -31,8 +41,9 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ api_key: '{{APOLLO_API_KEY}}', per_page: 25, page: 1 }) }}"
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify($json) }}"
       }
     },
     {
@@ -40,7 +51,7 @@
       "name": "Filter New Prospects",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [750, 300],
+      "position": [1000, 300],
       "parameters": {
         "jsCode": "const data = $input.first().json;\nconst people = data.people || [];\nconst results = people.slice(0, 25).map(p => ({\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  linkedinUrl: p.linkedin_url || '',\n  city: p.city || '',\n  state: p.state || '',\n  country: p.country || '',\n  companyName: p.organization?.name || '',\n  companyWebsite: p.organization?.website_url || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n}));\nreturn results.map(r => ({ json: r }));"
       }
@@ -155,6 +166,9 @@
   ],
   "connections": {
     "Daily Prospecting Trigger": {
+      "main": [[{ "node": "Build Apollo Search Filters", "type": "main", "index": 0 }]]
+    },
+    "Build Apollo Search Filters": {
       "main": [[{ "node": "Apollo - Search Prospects", "type": "main", "index": 0 }]]
     },
     "Apollo - Search Prospects": {
