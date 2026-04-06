@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useTheme } from '../theme'
+import NotificationBell from '../../components/NotificationBell'
 // ── Icon helpers ──────────────────────────────────────────────────────────────
 function Icon({ d, d2 }: { d: string; d2?: string }) {
   return (
@@ -328,6 +329,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* ── Main ── */}
       <div className="flex flex-col flex-1 transition-all duration-200" style={{ marginLeft: sidebarW }}>
+
+        {/* Top bar with notification bell */}
+        <div className="flex items-center justify-end px-6 py-3" style={{ borderBottom: '1px solid var(--border-card, #e5e7eb)' }}>
+          <NotificationBell />
+        </div>
 
         <main className="flex-1 p-6">
           {children}
