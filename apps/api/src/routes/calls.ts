@@ -112,7 +112,10 @@ export async function handleCallWebhook(req: Request, res: Response): Promise<vo
       ? `voice-outbound-${clientId}`
       : `voice-inbound-${clientId}`
     const n8nUrl = `${process.env.N8N_BASE_URL}/webhook/${n8nPath}`
-    axios.post(n8nUrl, body, { timeout: 8000 }).catch(() => { /* non-fatal */ })
+    logger.info('Forwarding call to N8N', { n8nUrl, direction, clientId })
+    axios.post(n8nUrl, body, { timeout: 8000 })
+      .then(() => logger.info('N8N webhook triggered successfully', { n8nUrl }))
+      .catch((err) => logger.error('N8N webhook failed', { n8nUrl, status: err?.response?.status, message: err?.message }))
 
     res.json({ received: true })
   } catch (err) {

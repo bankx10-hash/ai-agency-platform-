@@ -848,8 +848,9 @@ export class N8NService {
    */
   async deleteAllClientWorkflowsByType(clientId: string, agentType: string): Promise<number> {
     const workflows = await this.listClientWorkflows(clientId)
-    // Convert agent type to a partial name fragment, e.g. LEAD_GENERATOR → "lead"
-    const keyword = agentType.toLowerCase().replace(/_/g, ' ').split(' ')[0]
+    // Convert agent type to match workflow names, e.g. VOICE_INBOUND → "voice inbound"
+    // Uses full type name (not just first word) to avoid "voice" matching all voice agents
+    const keyword = agentType.toLowerCase().replace(/_/g, ' ')
     const matching = workflows.filter(w => w.name.toLowerCase().includes(keyword))
     let deleted = 0
     for (const wf of matching) {
