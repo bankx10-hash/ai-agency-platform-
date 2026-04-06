@@ -12,6 +12,7 @@ datasource db {
 }
 
 enum Plan {
+  AI_RECEPTIONIST
   STARTER
   GROWTH
   AGENCY
@@ -49,6 +50,7 @@ enum AgentType {
   VOICE_CLOSER
   CLIENT_SERVICES
   CONVERSATIONAL_WORKFLOW
+  RECEPTIONIST_FOLLOWUP
 }
 
 enum WorkflowStatus {
@@ -80,12 +82,21 @@ enum MessageChannel {
 }
 
 enum PipelineStage {
+  // Sales pipeline
   NEW_LEAD
   CONTACTED
   QUALIFIED
   PROPOSAL
   CLOSED_WON
   CLOSED_LOST
+  // Service pipeline (AI Receptionist)
+  NEW_INQUIRY
+  APPOINTMENT_BOOKED
+  APPOINTMENT_COMPLETED
+  FOLLOW_UP_DUE
+  RECURRING_CLIENT
+  NO_SHOW
+  INACTIVE
 }
 
 enum ActivityType {
@@ -142,6 +153,8 @@ model Client {
   country             String?          @default("AU")
   businessDescription String?
   icpDescription      String?
+  businessType        String?          @default("other")
+  addons              Json             @default("[]")
   autoApprovePosts    Boolean          @default(false)
   postReviewLeadHours Int              @default(24)
   postReminderHours   Json             @default("[6, 2]")

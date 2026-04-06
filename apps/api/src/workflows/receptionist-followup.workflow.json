@@ -1,0 +1,204 @@
+{
+  "name": "Receptionist Follow-Up Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "followup-trigger",
+      "name": "Follow-Up Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "followup-{{CLIENT_ID}}",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "extract-data",
+      "name": "Extract Follow-Up Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\nreturn [{ json: { contactId: body.contactId, callType: body.callType || 'post_appointment', appointmentDate: body.appointmentDate || '', notes: body.notes || '' } }];"
+      }
+    },
+    {
+      "id": "wait-for-followup",
+      "name": "Wait for Follow-Up Time",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [750, 300],
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{ $json.callType === 'rebooking_reminder' ? $json.appointmentDate : (new Date(new Date($json.appointmentDate).getTime() + 2 * 24 * 60 * 60 * 1000)).toISOString() }}"
+      }
+    },
+    {
+      "id": "get-contact",
+      "name": "Get Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Extract Follow-Up Data').first().json.contactId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "build-opener",
+      "name": "Build Call Opener",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "parameters": {
+        "jsCode": "const contact = $input.first().json.contact || $input.first().json;\nconst followup = $('Extract Follow-Up Data').first().json;\nconst name = contact.name || 'there';\nconst firstName = name.split(' ')[0];\nconst phone = contact.phone || '';\nconst callType = followup.callType;\nlet opener = '';\nif (callType === 'rebooking_reminder') {\n  opener = 'Hi ' + firstName + ', it is your team from {{BUSINESS_NAME}}. It has been a while since your last visit and we wanted to check if you are due for your next appointment. Do you have a moment?';\n} else {\n  opener = 'Hi ' + firstName + ', it is your team from {{BUSINESS_NAME}}. I am just calling to check in after your recent visit — how did everything go?';\n}\nreturn [{ json: { contactId: contact.id, phone, firstName, callType, opener } }];"
+      }
+    },
+    {
+      "id": "launch-followup-call",
+      "name": "Launch Follow-Up Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1500, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retellai.com/create-call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{RETELL_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ agent_id: '{{RETELL_AGENT_ID}}', to_number: $json.phone, from_number: '{{PHONE_NUMBER}}', metadata: { contactId: $json.contactId, callType: $json.callType, firstName: $json.firstName } }) }}"
+      }
+    },
+    {
+      "id": "followup-result-webhook",
+      "name": "Follow-Up Result Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 600],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "followup-result-{{CLIENT_ID}}",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "analyse-result",
+      "name": "Analyse Follow-Up Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 600],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst call = data.body?.call || data.call || data;\nconst transcript = call.transcript || '';\nconst contactId = call.metadata?.contactId || '';\nconst callType = call.metadata?.callType || 'post_appointment';\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-6',\n    max_tokens: 400,\n    system: 'Analyse this follow-up call transcript. Return ONLY valid JSON: {\"outcome\":\"REBOOKED|DECLINED|CALLBACK_REQUESTED|NO_ANSWER|ISSUE_REPORTED\",\"reason\":\"brief summary\",\"nextAction\":\"what to do next\",\"callbackDate\":\"ISO date if callback requested, empty otherwise\"}',\n    messages: [{ role: 'user', content: 'Analyse this ' + callType + ' follow-up call:\\n' + transcript }],\n    contactId: contactId,\n    callType: callType\n  }\n}];"
+      }
+    },
+    {
+      "id": "claude-analyse-followup",
+      "name": "Claude - Analyse Follow-Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 600],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ model: $json.model, max_tokens: $json.max_tokens, system: $json.system, messages: $json.messages }) }}"
+      }
+    },
+    {
+      "id": "parse-followup-result",
+      "name": "Parse Follow-Up Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 600],
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst raw = resp.content?.[0]?.text?.trim() || '';\nconst clean = raw.replace(/```json\\n?|```/g, '').trim();\nlet result;\ntry { result = JSON.parse(clean); } catch { result = { outcome: 'NO_ANSWER', reason: 'Parse error', nextAction: 'Manual review', callbackDate: '' }; }\nconst prev = $('Analyse Follow-Up Result').first().json;\nreturn [{ json: { ...result, contactId: prev.contactId, callType: prev.callType } }];"
+      }
+    },
+    {
+      "id": "save-followup-outcome",
+      "name": "Save Follow-Up Outcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1250, 600],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/deal-outcomes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "contactId", "value": "={{ $json.contactId }}" },
+            { "name": "outcome", "value": "={{ $json.outcome }}" },
+            { "name": "reason", "value": "={{ $json.reason }}" },
+            { "name": "agentType", "value": "RECEPTIONIST_FOLLOWUP" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Follow-Up Trigger": {
+      "main": [[{ "node": "Extract Follow-Up Data", "type": "main", "index": 0 }]]
+    },
+    "Extract Follow-Up Data": {
+      "main": [[{ "node": "Wait for Follow-Up Time", "type": "main", "index": 0 }]]
+    },
+    "Wait for Follow-Up Time": {
+      "main": [[{ "node": "Get Contact", "type": "main", "index": 0 }]]
+    },
+    "Get Contact": {
+      "main": [[{ "node": "Build Call Opener", "type": "main", "index": 0 }]]
+    },
+    "Build Call Opener": {
+      "main": [[{ "node": "Launch Follow-Up Call", "type": "main", "index": 0 }]]
+    },
+    "Follow-Up Result Webhook": {
+      "main": [[{ "node": "Analyse Follow-Up Result", "type": "main", "index": 0 }]]
+    },
+    "Analyse Follow-Up Result": {
+      "main": [[{ "node": "Claude - Analyse Follow-Up", "type": "main", "index": 0 }]]
+    },
+    "Claude - Analyse Follow-Up": {
+      "main": [[{ "node": "Parse Follow-Up Result", "type": "main", "index": 0 }]]
+    },
+    "Parse Follow-Up Result": {
+      "main": [[{ "node": "Save Follow-Up Outcome", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  }
+}

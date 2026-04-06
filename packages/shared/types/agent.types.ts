@@ -9,7 +9,8 @@ export enum AgentType {
   VOICE_OUTBOUND = 'VOICE_OUTBOUND',
   VOICE_CLOSER = 'VOICE_CLOSER',
   CLIENT_SERVICES = 'CLIENT_SERVICES',
-  CONVERSATIONAL_WORKFLOW = 'CONVERSATIONAL_WORKFLOW'
+  CONVERSATIONAL_WORKFLOW = 'CONVERSATIONAL_WORKFLOW',
+  RECEPTIONIST_FOLLOWUP = 'RECEPTIONIST_FOLLOWUP'
 }
 
 export enum AgentStatus {
@@ -151,10 +152,63 @@ export interface AgentMetrics {
   errors?: number
 }
 
+export type PlanType = 'AI_RECEPTIONIST' | 'STARTER' | 'GROWTH' | 'AGENCY'
+
+export const ADDONS = {
+  SMART_CAPTURE: {
+    id: 'smart_capture',
+    name: 'Smart Capture',
+    price: 49,
+    description: 'Website lead form + AI outbound calls to new enquiries within 5 minutes',
+    agents: [
+      AgentType.LEAD_GENERATION,
+      AgentType.VOICE_OUTBOUND
+    ],
+    availableOn: ['AI_RECEPTIONIST'] as PlanType[]
+  }
+} as const
+
+export type BusinessType = 'dentist' | 'salon' | 'mechanic' | 'tradie' | 'clinic' | 'vet' | 'physio' | 'other'
+
+export const REBOOKING_INTERVALS: Record<BusinessType, { months: number; label: string }> = {
+  dentist: { months: 6, label: '6-month checkup' },
+  salon: { months: 1.5, label: '6-week appointment' },
+  mechanic: { months: 12, label: 'annual service' },
+  tradie: { months: 12, label: 'annual maintenance check' },
+  clinic: { months: 6, label: '6-month checkup' },
+  vet: { months: 12, label: 'annual checkup' },
+  physio: { months: 1, label: 'monthly session' },
+  other: { months: 6, label: '6-month follow-up' }
+}
+
+export const SERVICE_PIPELINE_STAGES = [
+  'NEW_INQUIRY',
+  'APPOINTMENT_BOOKED',
+  'APPOINTMENT_COMPLETED',
+  'FOLLOW_UP_DUE',
+  'RECURRING_CLIENT',
+  'NO_SHOW',
+  'INACTIVE'
+] as const
+
+export type ServicePipelineStage = typeof SERVICE_PIPELINE_STAGES[number]
+
 export const PLANS = {
+  AI_RECEPTIONIST: {
+    price: 147,
+    stripePriceId: process.env.STRIPE_RECEPTIONIST_PRICE_ID || 'price_receptionist',
+    pipelineType: 'service' as const,
+    phoneNumbers: 2,
+    agents: [
+      AgentType.VOICE_INBOUND,
+      AgentType.RECEPTIONIST_FOLLOWUP
+    ]
+  },
   STARTER: {
-    price: 97,
+    price: 197,
     stripePriceId: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter',
+    pipelineType: 'sales' as const,
+    phoneNumbers: 1,
     agents: [
       AgentType.LEAD_GENERATION,
       AgentType.SOCIAL_ENGAGEMENT,

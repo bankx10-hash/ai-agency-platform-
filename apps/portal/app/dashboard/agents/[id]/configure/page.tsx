@@ -54,6 +54,11 @@ const CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: 't
   APPOINTMENT_SETTER: [
     { key: 'booking_link', label: 'Booking Link', type: 'text', placeholder: 'https://calendly.com/...', help: 'The link sent to leads to book an appointment.' },
   ],
+  RECEPTIONIST_FOLLOWUP: [
+    { key: 'businessType', label: 'Business Type', type: 'text', placeholder: 'dentist / salon / mechanic / tradie / clinic / vet / physio', help: 'Sets the default rebooking reminder interval (e.g. dentist = 6 months, salon = 6 weeks).' },
+    { key: 'rebookingIntervalMonths', label: 'Rebooking Interval (months)', type: 'number', placeholder: '6', help: 'How many months between recurring appointment reminders. Auto-set based on business type.' },
+    { key: 'followupDelayDays', label: 'Post-Appointment Follow-Up Delay (days)', type: 'number', placeholder: '2', help: 'How many days after an appointment to call and check in.' },
+  ],
   LEAD_GENERATION: [
     { key: 'icp_description', label: 'Ideal Customer Profile (ICP)', type: 'textarea', placeholder: 'Business owners with 5–50 employees in the trades industry looking to automate...', help: 'Describes your ideal customer. Claude uses this to score leads.' },
     { key: 'high_score_threshold', label: 'Hot Lead Threshold (0–100)', type: 'number', placeholder: '70', help: 'Leads scored above this number are classed as hot and sent to the appointment setter.' },
@@ -68,6 +73,7 @@ const AGENT_LABELS: Record<string, string> = {
   VOICE_INBOUND: 'Voice Inbound Agent',
   VOICE_OUTBOUND: 'Voice Outbound Agent',
   VOICE_CLOSER: 'Voice Closer Agent',
+  RECEPTIONIST_FOLLOWUP: 'Receptionist Follow-Up Agent',
   SOCIAL_MEDIA: 'Social Media Agent',
   SOCIAL_ENGAGEMENT: 'Social Engagement Agent',
   APPOINTMENT_SETTER: 'Appointment Setter Agent',

@@ -606,23 +606,45 @@ router.post('/:clientId/appointments', async (req, res) => {
       await prisma.contactActivity.create({
         data: { id: randomUUID(), contactId, clientId, type: 'APPOINTMENT' as never, title: `Appointment booked: ${title || 'Meeting'}`, body: startTime, metadata: { calendarId, startTime, title, calendarBooked: bookingResult?.booked } as never, agentType: 'APPOINTMENT_SETTER' }
       }).catch(() => {})
-      await prisma.contact.updateMany({ where: { id: contactId, clientId }, data: { lastContactedAt: new Date(), pipelineStage: 'QUALIFIED' as never } }).catch(() => {})
+      // Determine pipeline stage based on client plan type
+      const clientForPlan = await prisma.client.findUnique({ where: { id: clientId }, select: { plan: true } })
+      const isReceptionist = clientForPlan?.plan === 'AI_RECEPTIONIST'
+      const pipelineStage = isReceptionist ? 'APPOINTMENT_BOOKED' : 'QUALIFIED'
+      await prisma.contact.updateMany({ where: { id: contactId, clientId }, data: { lastContactedAt: new Date(), pipelineStage: pipelineStage as never } }).catch(() => {})
 
-      // Hand off to voice closer — trigger its N8N webhook if deployed
-      const closerDeployment = await prisma.agentDeployment.findFirst({
-        where: { clientId, agentType: 'VOICE_CLOSER' as never, status: 'ACTIVE' as never },
-        select: { n8nWorkflowId: true }
-      })
-      if (closerDeployment?.n8nWorkflowId) {
-        const contact = await prisma.contact.findFirst({ where: { id: contactId, clientId }, select: { source: true } })
-        const webhookUrl = `${process.env.N8N_BASE_URL}/webhook/closer-ready-${clientId}`
-        axios.post(webhookUrl, {
-          contactId,
-          leadSource: contact?.source || 'appointment_booked',
-          appointmentTime: startTime,
-          notes: `Appointment booked: ${title || 'Meeting'}`
-        }).catch(err => logger.warn('Failed to trigger voice closer webhook', { clientId, contactId, err: String(err) }))
-        logger.info('Voice closer handoff triggered', { clientId, contactId })
+      if (isReceptionist) {
+        // Receptionist plan: trigger follow-up agent (calls 2 days after appointment)
+        const followupDeployment = await prisma.agentDeployment.findFirst({
+          where: { clientId, agentType: 'RECEPTIONIST_FOLLOWUP' as never, status: 'ACTIVE' as never },
+          select: { n8nWorkflowId: true }
+        })
+        if (followupDeployment?.n8nWorkflowId) {
+          const webhookUrl = `${process.env.N8N_BASE_URL}/webhook/followup-${clientId}`
+          axios.post(webhookUrl, {
+            contactId,
+            callType: 'post_appointment',
+            appointmentDate: startTime,
+            notes: `Appointment booked: ${title || 'Meeting'}`
+          }).catch(err => logger.warn('Failed to trigger follow-up webhook', { clientId, contactId, err: String(err) }))
+          logger.info('Receptionist follow-up scheduled', { clientId, contactId, appointmentDate: startTime })
+        }
+      } else {
+        // Sales plan: hand off to voice closer — trigger its N8N webhook if deployed
+        const closerDeployment = await prisma.agentDeployment.findFirst({
+          where: { clientId, agentType: 'VOICE_CLOSER' as never, status: 'ACTIVE' as never },
+          select: { n8nWorkflowId: true }
+        })
+        if (closerDeployment?.n8nWorkflowId) {
+          const contact = await prisma.contact.findFirst({ where: { id: contactId, clientId }, select: { source: true } })
+          const webhookUrl = `${process.env.N8N_BASE_URL}/webhook/closer-ready-${clientId}`
+          axios.post(webhookUrl, {
+            contactId,
+            leadSource: contact?.source || 'appointment_booked',
+            appointmentTime: startTime,
+            notes: `Appointment booked: ${title || 'Meeting'}`
+          }).catch(err => logger.warn('Failed to trigger voice closer webhook', { clientId, contactId, err: String(err) }))
+          logger.info('Voice closer handoff triggered', { clientId, contactId })
+        }
       }
     }
 

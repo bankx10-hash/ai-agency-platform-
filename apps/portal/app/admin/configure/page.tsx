@@ -32,7 +32,8 @@ const AGENT_LABELS: Record<string, string> = {
   VOICE_INBOUND: 'Voice Inbound',
   VOICE_OUTBOUND: 'Voice Outbound',
   VOICE_CLOSER: 'Voice Closer',
-  CLIENT_SERVICES: 'Client Services'
+  CLIENT_SERVICES: 'Client Services',
+  RECEPTIONIST_FOLLOWUP: 'Receptionist Follow-Up'
 }
 
 const AGENT_ICONS: Record<string, string> = {
@@ -44,7 +45,8 @@ const AGENT_ICONS: Record<string, string> = {
   VOICE_INBOUND: '📞',
   VOICE_OUTBOUND: '📤',
   VOICE_CLOSER: '🤝',
-  CLIENT_SERVICES: '⭐'
+  CLIENT_SERVICES: '⭐',
+  RECEPTIONIST_FOLLOWUP: '🔄'
 }
 
 // Key config fields per agent type (others use defaults)
@@ -92,7 +94,12 @@ const AGENT_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; ty
     { key: 'payment_link', label: 'Payment / Sign-Up Link', type: 'url', placeholder: 'https://app.example.com/signup' },
     { key: 'payment_walkthrough', label: 'Payment Walkthrough Instructions', type: 'textarea', placeholder: '1. Go to https://...\n2. Click Sign Up\n3. Choose your plan\n4. Enter card details\n5. Click Subscribe' }
   ],
-  CLIENT_SERVICES: []
+  CLIENT_SERVICES: [],
+  RECEPTIONIST_FOLLOWUP: [
+    { key: 'businessType', label: 'Business Type', type: 'text', placeholder: 'dentist / salon / mechanic / tradie / clinic / vet / physio' },
+    { key: 'rebookingIntervalMonths', label: 'Rebooking Interval (months)', type: 'number', placeholder: '6' },
+    { key: 'followupDelayDays', label: 'Follow-Up Delay (days)', type: 'number', placeholder: '2' }
+  ]
 }
 
 export default function AdminConfigurePage() {
@@ -273,9 +280,10 @@ export default function AdminConfigurePage() {
             onChange={e => setCreateForm(p => ({ ...p, plan: e.target.value }))}
             style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
           >
-            <option value="STARTER">STARTER — $97/mo</option>
-            <option value="GROWTH">GROWTH — $297/mo</option>
-            <option value="AGENCY">AGENCY — $697/mo</option>
+            <option value="AI_RECEPTIONIST">AI RECEPTIONIST — $147/mo</option>
+            <option value="STARTER">STARTER — $197/mo</option>
+            <option value="GROWTH">GROWTH — $497/mo</option>
+            <option value="AGENCY">AGENCY — $997/mo</option>
           </select>
         </div>
         <button

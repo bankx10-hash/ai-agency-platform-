@@ -275,6 +275,14 @@ export class OnboardingService {
       },
       [AgentType.CONVERSATIONAL_WORKFLOW]: {
         ...baseConfig
+      },
+      [AgentType.RECEPTIONIST_FOLLOWUP]: {
+        ...baseConfig,
+        businessType: 'other',
+        rebookingIntervalMonths: 6,
+        followupDelayDays: 2,
+        followupScript: '',
+        rebookingScript: ''
       }
     }
 

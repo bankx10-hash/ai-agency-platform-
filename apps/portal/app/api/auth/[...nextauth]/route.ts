@@ -31,6 +31,7 @@ const handler = NextAuth({
               email: client.email,
               name: client.businessName,
               clientId: client.id,
+              plan: client.plan,
               token
             }
           }
@@ -47,12 +48,14 @@ const handler = NextAuth({
       if (user) {
         token.clientId = (user as { clientId?: string }).clientId
         token.accessToken = (user as { token?: string }).token
+        token.plan = (user as { plan?: string }).plan
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         (session.user as { clientId?: string }).clientId = token.clientId as string
+        (session.user as { plan?: string }).plan = token.plan as string
         (session as { accessToken?: string }).accessToken = token.accessToken as string
       }
       return session

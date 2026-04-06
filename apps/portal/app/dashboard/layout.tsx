@@ -32,6 +32,19 @@ type NavItem =
   | { type: 'link';  href: string; label: string; exact?: boolean; icon: React.ReactNode }
   | { type: 'group'; href: string; label: string; icon: React.ReactNode; children: { href: string; label: string }[] }
 
+// Sections hidden for AI_RECEPTIONIST plan
+const RECEPTIONIST_HIDDEN = new Set([
+  '/dashboard/social',
+  '/dashboard/marketing',
+  '/dashboard/workflows',
+])
+
+// Sections only visible for GROWTH+ plans
+const GROWTH_PLUS_ONLY = new Set([
+  '/dashboard/social',
+  '/dashboard/marketing',
+])
+
 const NAV: NavItem[] = [
   {
     type: 'link', exact: true,
@@ -216,6 +229,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const { theme, toggle: toggleTheme } = useTheme()
   const [businessName, setBusinessName] = useState('')
+  const [clientPlan, setClientPlan] = useState('')
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
@@ -223,7 +237,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (token) localStorage.setItem('token', token)
     const name = (session?.user as { businessName?: string })?.businessName || session?.user?.name || ''
     setBusinessName(name)
+    // Load plan from session or localStorage
+    const plan = (session?.user as { plan?: string })?.plan || localStorage.getItem('clientPlan') || ''
+    if (plan) {
+      setClientPlan(plan)
+      localStorage.setItem('clientPlan', plan)
+    }
   }, [session])
+
+  // Filter nav based on plan
+  const filteredNav = NAV.filter(item => {
+    if (clientPlan === 'AI_RECEPTIONIST' && RECEPTIONIST_HIDDEN.has(item.href)) return false
+    return true
+  })
 
   const sidebarW = collapsed ? 64 : 224
 
@@ -257,7 +283,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden">
-          {NAV.map(item => {
+          {filteredNav.map(item => {
             if (item.type === 'link') {
               return <NavLink key={item.href} {...item} collapsed={collapsed} pathname={pathname} />
             }

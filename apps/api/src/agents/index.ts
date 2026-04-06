@@ -11,6 +11,7 @@ import { VoiceOutboundAgent } from './voice-outbound.agent'
 import { VoiceCloserAgent } from './voice-closer.agent'
 import { ClientServicesAgent } from './client-services.agent'
 import { ConversationalWorkflowAgent } from './conversational-workflow.agent'
+import { ReceptionistFollowupAgent } from './receptionist-followup.agent'
 
 export {
   BaseAgent,
@@ -24,7 +25,8 @@ export {
   VoiceOutboundAgent,
   VoiceCloserAgent,
   ClientServicesAgent,
-  ConversationalWorkflowAgent
+  ConversationalWorkflowAgent,
+  ReceptionistFollowupAgent
 }
 
 export type AgentConstructor = new () => BaseAgent
@@ -40,7 +42,8 @@ export const AGENT_REGISTRY: Record<AgentType, AgentConstructor> = {
   [AgentType.VOICE_OUTBOUND]: VoiceOutboundAgent,
   [AgentType.VOICE_CLOSER]: VoiceCloserAgent,
   [AgentType.CLIENT_SERVICES]: ClientServicesAgent,
-  [AgentType.CONVERSATIONAL_WORKFLOW]: ConversationalWorkflowAgent
+  [AgentType.CONVERSATIONAL_WORKFLOW]: ConversationalWorkflowAgent,
+  [AgentType.RECEPTIONIST_FOLLOWUP]: ReceptionistFollowupAgent
 }
 
 export function createAgent(agentType: AgentType): BaseAgent {

@@ -93,6 +93,34 @@ async function runStartupMigrations() {
   } catch { /* already exists, skip */ }
 
   try {
+    await prisma.$executeRaw`ALTER TYPE "AgentType" ADD VALUE IF NOT EXISTS 'RECEPTIONIST_FOLLOWUP'`
+    logger.info('Startup migration: RECEPTIONIST_FOLLOWUP enum value ensured')
+  } catch { /* already exists, skip */ }
+
+  try {
+    await prisma.$executeRaw`ALTER TYPE "Plan" ADD VALUE IF NOT EXISTS 'AI_RECEPTIONIST'`
+    logger.info('Startup migration: AI_RECEPTIONIST plan ensured')
+  } catch { /* already exists, skip */ }
+
+  // Service pipeline stages
+  for (const stage of ['NEW_INQUIRY', 'APPOINTMENT_BOOKED', 'APPOINTMENT_COMPLETED', 'FOLLOW_UP_DUE', 'RECURRING_CLIENT', 'NO_SHOW', 'INACTIVE']) {
+    try {
+      await prisma.$executeRawUnsafe(`ALTER TYPE "PipelineStage" ADD VALUE IF NOT EXISTS '${stage}'`)
+    } catch { /* already exists */ }
+  }
+  logger.info('Startup migration: Service pipeline stages ensured')
+
+  try {
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "businessType" TEXT DEFAULT 'other'`
+    logger.info('Startup migration: businessType column ensured')
+  } catch { /* already exists, skip */ }
+
+  try {
+    await prisma.$executeRaw`ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "addons" JSONB DEFAULT '[]'::jsonb`
+    logger.info('Startup migration: addons column ensured')
+  } catch { /* already exists, skip */ }
+
+  try {
     await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "Contact" (
         "id"         TEXT        NOT NULL,
