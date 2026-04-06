@@ -30,10 +30,21 @@ Daily limit: ${config.daily_limit || 25} prospects per day.`
     const typedConfig = config as unknown as LinkedInAgentConfig
     logger.info('Deploying LinkedIn Outreach Agent (Apollo)', { clientId })
 
+    // Normalise fields that may come as newline-separated strings from textarea
+    const toArray = (val: unknown): string[] => {
+      if (Array.isArray(val)) return val.filter(Boolean)
+      if (typeof val === 'string') return val.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+      return []
+    }
+    const titles = toArray(typedConfig.person_titles)
+    const locations = toArray(typedConfig.person_locations)
+    const ranges = toArray(typedConfig.employee_ranges)
+    const keywords = toArray(typedConfig.keywords)
+
     // Generate a personalised outreach message template via Claude
     const outreachTemplate = await this.callClaude(
       `Write a short, personalised outreach email/message template for ${typedConfig.businessName}.
-Target audience: ${(typedConfig.person_titles || []).join(', ')} at companies with ${(typedConfig.employee_ranges || []).join(', ')} employees.
+Target audience: ${titles.join(', ')} at companies with ${ranges.join(', ')} employees.
 The message should:
 - Be under 100 words
 - Reference their role/company naturally
