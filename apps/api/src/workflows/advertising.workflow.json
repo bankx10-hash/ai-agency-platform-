@@ -101,7 +101,7 @@
       "parameters": {
         "path": "ads-alert-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
+      }
     },
     {
       "id": "send-alert",

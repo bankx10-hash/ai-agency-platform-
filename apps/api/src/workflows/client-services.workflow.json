@@ -11,7 +11,7 @@
       "parameters": {
         "path": "client-services-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
+      }
     },
     {
       "id": "schedule-checkins",
@@ -143,7 +143,7 @@
       "parameters": {
         "path": "client-support-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
+      }
     },
     {
       "id": "claude-handle-support",

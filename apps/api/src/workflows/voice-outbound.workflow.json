@@ -68,7 +68,7 @@
       "parameters": {
         "path": "voice-outbound-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
+      }
     },
     {
       "id": "get-call-result",

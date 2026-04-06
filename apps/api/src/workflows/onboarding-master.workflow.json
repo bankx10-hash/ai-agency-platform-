@@ -11,7 +11,7 @@
       "parameters": {
         "path": "onboarding-{{CLIENT_ID}}",
         "responseMode": "onReceived"
-      },
+      }
     },
     {
       "id": "deploy-agents",
