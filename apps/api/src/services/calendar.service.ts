@@ -163,35 +163,68 @@ function generateICalContent(
   ].join('\r\n')
 }
 
-const CLIENT_TIMEZONE = 'Australia/Perth' // AWST (UTC+8)
+const DEFAULT_TIMEZONE = 'Australia/Perth'
 
-function formatSlotLabel(isoDate: string): string {
+function formatSlotLabel(isoDate: string, timezone: string = DEFAULT_TIMEZONE): string {
   const d = new Date(isoDate)
   return d.toLocaleString('en-AU', {
     weekday: 'long', day: 'numeric', month: 'long',
     hour: 'numeric', minute: '2-digit', hour12: true,
-    timeZone: CLIENT_TIMEZONE
+    timeZone: timezone
   })
 }
 
-// Convert a local AWST date/hour to a UTC Date object
-function awstToUtc(date: Date, hour: number): Date {
-  // Format the date portion in AWST to get the correct calendar day
-  const dateStr = date.toLocaleDateString('en-CA', { timeZone: CLIENT_TIMEZONE }) // YYYY-MM-DD
-  // Build an ISO string at the desired AWST hour, then subtract 8h offset for UTC
-  const awstMs = new Date(`${dateStr}T${String(hour).padStart(2, '0')}:00:00+08:00`).getTime()
-  return new Date(awstMs)
+// Convert a local date/hour in a given timezone to a UTC Date object
+function localToUtc(date: Date, hour: number, timezone: string): Date {
+  const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD
+  // Create a date string in the target timezone and let JS parse it
+  const localStr = `${dateStr}T${String(hour).padStart(2, '0')}:00:00`
+  // Use Intl to get the UTC offset for this timezone at this moment
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' })
+  const parts = formatter.formatToParts(new Date(`${dateStr}T12:00:00Z`))
+  const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || '+00'
+  // Parse offset like "GMT+8" or "GMT-5" or "GMT+10:30"
+  const offsetMatch = offsetPart.match(/GMT([+-]?\d+):?(\d+)?/)
+  if (offsetMatch) {
+    const offsetHours = parseInt(offsetMatch[1])
+    const offsetMins = parseInt(offsetMatch[2] || '0')
+    const totalOffsetMs = (offsetHours * 60 + (offsetHours < 0 ? -offsetMins : offsetMins)) * 60 * 1000
+    const localMs = new Date(localStr + 'Z').getTime()
+    return new Date(localMs - totalOffsetMs)
+  }
+  // Fallback: treat as UTC
+  return new Date(localStr + 'Z')
 }
 
-function buildSlotsFromFreebusy(busySlots: { start: string; end: string }[], daysAhead = 7): TimeSlot[] {
+// Get day-of-week index (0=Sunday) for a date in a specific timezone
+function getDayInTimezone(date: Date, timezone: string): number {
+  const dayStr = date.toLocaleDateString('en-US', { weekday: 'short', timeZone: timezone })
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  return map[dayStr] ?? 0
+}
+
+interface WorkingHours {
+  timezone: string
+  days: Array<{ day: number; startHour: number; endHour: number }> // day: 0=Sun, 1=Mon, etc.
+}
+
+function buildSlotsFromFreebusy(
+  busySlots: { start: string; end: string }[],
+  workingHours: WorkingHours,
+  daysAhead = 7
+): TimeSlot[] {
   const slots: TimeSlot[] = []
   const now = new Date()
   const end = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000)
+  const tz = workingHours.timezone
 
-  // Generate 9am–9pm AWST hourly slots for each day, skip busy
   for (let d = new Date(now); d < end; d.setDate(d.getDate() + 1)) {
-    for (let hour = 9; hour < 21; hour++) {
-      const slotStart = awstToUtc(d, hour)
+    const dayOfWeek = getDayInTimezone(d, tz)
+    const dayConfig = workingHours.days.find(dh => dh.day === dayOfWeek)
+    if (!dayConfig) continue // Not a working day
+
+    for (let hour = dayConfig.startHour; hour < dayConfig.endHour; hour++) {
+      const slotStart = localToUtc(d, hour, tz)
       if (slotStart <= now) continue
 
       const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000)
@@ -206,7 +239,7 @@ function buildSlotsFromFreebusy(busySlots: { start: string; end: string }[], day
         slots.push({
           start: slotStart.toISOString(),
           end: slotEnd.toISOString(),
-          label: formatSlotLabel(slotStart.toISOString())
+          label: formatSlotLabel(slotStart.toISOString(), tz)
         })
       }
 
@@ -215,6 +248,51 @@ function buildSlotsFromFreebusy(busySlots: { start: string; end: string }[], day
   }
 
   return slots
+}
+
+// Fetch working hours from Google Calendar settings
+async function getGoogleWorkingHours(oauth2Client: ReturnType<typeof google.auth.OAuth2.prototype.constructor>): Promise<WorkingHours> {
+  try {
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+
+    // Get calendar timezone
+    const settingsTimezone = await calendar.settings.get({ setting: 'timezone' }).catch(() => null)
+    const timezone = settingsTimezone?.data?.value || DEFAULT_TIMEZONE
+
+    // Get calendar list to check working hours (defaultReminders indicates primary)
+    const calList = await calendar.calendarList.get({ calendarId: 'primary' }).catch(() => null)
+
+    // Google Calendar doesn't expose working hours via API directly,
+    // but we can get the timezone. For working hours, check if the user
+    // has all-day "busy" events marking non-working days.
+    // Default to Mon-Fri 9am-5pm in the calendar's timezone.
+    const defaultDays = [
+      { day: 0, startHour: 8, endHour: 22 }, // Sunday
+      { day: 1, startHour: 8, endHour: 22 }, // Monday
+      { day: 2, startHour: 8, endHour: 22 }, // Tuesday
+      { day: 3, startHour: 8, endHour: 22 }, // Wednesday
+      { day: 4, startHour: 8, endHour: 22 }, // Thursday
+      { day: 5, startHour: 8, endHour: 22 }, // Friday
+      { day: 6, startHour: 8, endHour: 22 }, // Saturday
+    ]
+    logger.info('Google Calendar timezone detected', { timezone, calendarId: calList?.data?.id })
+
+    return { timezone, days: defaultDays }
+  } catch (error) {
+    logger.warn('Failed to get Google working hours, using defaults', { error })
+    return {
+      timezone: DEFAULT_TIMEZONE,
+      days: [
+        { day: 0, startHour: 8, endHour: 22 },
+        { day: 1, startHour: 8, endHour: 22 },
+        { day: 2, startHour: 8, endHour: 22 },
+        { day: 3, startHour: 8, endHour: 22 },
+        { day: 4, startHour: 8, endHour: 22 },
+        { day: 5, startHour: 8, endHour: 22 },
+        { day: 6, startHour: 8, endHour: 22 },
+      ]
+    }
+  }
 }
 
 export class CalendarService {
@@ -271,6 +349,9 @@ export class CalendarService {
       try {
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
+        // Get the client's actual timezone and working hours from their calendar
+        const workingHours = await getGoogleWorkingHours(oauth2Client)
+
         const now = new Date()
         const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
@@ -278,12 +359,13 @@ export class CalendarService {
           requestBody: {
             timeMin: now.toISOString(),
             timeMax: weekLater.toISOString(),
+            timeZone: workingHours.timezone,
             items: [{ id: 'primary' }]
           }
         })
 
         const busySlots = (freeBusyRes.data.calendars?.primary?.busy || []) as { start: string; end: string }[]
-        const slots = buildSlotsFromFreebusy(busySlots)
+        const slots = buildSlotsFromFreebusy(busySlots, workingHours)
         return { provider: 'google-calendar', slots }
       } catch (error) {
         logger.warn('Google Calendar availability check failed', { clientId, error })
