@@ -4,61 +4,96 @@ NODUS AI SYSTEMS — CLOSER KNOWLEDGE BASE
 
 Nodus AI Systems is an all-in-one AI-powered sales and marketing platform. We deploy AI agents that handle lead generation, appointment setting, phone calls, social media, and deal closing — all automated, running 24/7. Clients get a full AI sales team for a fraction of the cost of hiring real people.
 
+We also offer a standalone AI Receptionist product for service businesses like dentists, salons, and tradies who just need calls answered and appointments managed.
+
 ===== THE FOUR PLANS =====
 
 AI RECEPTIONIST — $147/month
+Best for: Dentists, salons, mechanics, tradies, clinics, vets, physios — any service business that gets phone calls and books appointments.
 - AI receptionist answers every call 24/7, books appointments, answers FAQs
 - Outbound follow-up agent calls 2 days after every appointment to check in and rebook
-- Recurring appointment reminders (configurable: 6 months for dentists, 6 weeks for salons, 12 months for mechanics, etc.)
+- Recurring appointment reminders (configurable per business type: 6 months for dentists, 6 weeks for salons, 12 months for mechanics)
 - CRM with service pipeline tracking (inquiry → booked → completed → follow-up → recurring client)
 - Unified inbox
-- 2 phone numbers included (1 inbound, 1 outbound)
+- 2 phone numbers included (1 inbound, 1 outbound follow-up)
 - 100 voice minutes, 200 SMS, 500 AI actions per month
-- Perfect for: dentists, salons, mechanics, tradies, clinics, vets, physios
-- Add-on available: Smart Capture ($49/mo) — website lead form + AI calls new enquiries within 5 minutes
+- Add-on available: Smart Capture ($49/mo) — website lead form + AI outbound calls to new online enquiries within 5 minutes
 
 STARTER — $197/month
+Best for: Small businesses wanting to stop missing leads and start automating their sales follow-up.
 - AI receptionist answers every call 24/7, qualifies callers, books appointments
-- Lead scoring — AI rates every inbound lead and routes the hot ones instantly
-- Appointment setter — auto-follows up via SMS and email, books into their calendar
+- Lead scoring — AI rates every inbound lead against your ideal customer profile and routes hot ones instantly
+- Appointment setter — auto-follows up via SMS and email, books directly into your calendar
 - Social engagement — auto-replies to Facebook and Instagram DMs and comments
 - Conversational workflows — multi-step lead qualification via WhatsApp, SMS, Instagram
-- CRM with pipeline view, unified inbox, contact management
+- CRM with sales pipeline view, unified inbox, contact management
 - 1 phone number included
 - 100 voice minutes, 200 SMS, 500 AI actions per month
 
 GROWTH — $497/month (most popular)
+Best for: Businesses ready to actively generate and close leads across multiple channels.
 - Everything in Starter, PLUS:
-- LinkedIn outreach — auto-connects, sends personalised messages, follows up
+- B2B prospecting agent (powered by Apollo.io) — finds ideal prospects by job title, industry, location, and company size. Gets verified emails and phone numbers. Sends personalised outreach emails automatically. Runs daily Mon-Fri.
 - Social media manager — AI creates and posts branded content across Facebook, Instagram, LinkedIn with AI-generated images
-- Outbound calling agent — proactively calls lead lists, follows up, qualifies, books
-- Content calendar, social analytics, competitor tracking
+- Outbound calling agent — proactively calls your lead list, follows up, qualifies, and books appointments
+- Content calendar, social analytics, competitor tracking, industry news feed
 - SMS and email campaign builder
 - Marketing funnel builder
 - 2 phone numbers included
 - 300 voice minutes, 500 SMS, 1,500 AI actions, 50 AI images per month
 
 AGENCY — $997/month (the full machine)
+Best for: Businesses that want every part of their sales pipeline automated from first touch to closed deal to client retention.
 - Everything in Growth, PLUS:
-- Voice Closer agent — AI calls warm leads and closes the deal on the phone
-- Advertising manager — manages Meta and Google ads, optimises ROAS, auto-generates ad creatives
-- Client services agent — automated onboarding sequences, health scoring, churn prevention, NPS surveys
-- Ad performance dashboard
+- Voice Closer agent — AI calls warm leads at their booked appointment time, conducts the sales call, handles objections, and walks them through payment while on the call
+- Advertising manager — manages Meta and Google ads, optimises ROAS, auto-generates ad creatives and copy
+- Client services agent — automated onboarding sequences for new clients, health scoring, churn prevention, NPS surveys
+- Ad performance dashboard with ROAS tracking
 - 3 phone numbers included
 - 600 voice minutes, 1,000 SMS, 3,000 AI actions, 150 AI images per month
 - Priority support
 
+===== HOW THE SALES PIPELINE WORKS =====
+
+The full automated sales pipeline (Starter/Growth/Agency plans):
+
+1. LEAD CAPTURE — Leads come in from website forms, Facebook/Instagram ads, Apollo B2B prospecting, social media DMs, or inbound phone calls
+2. LEAD SCORING — AI scores every lead 0-100 against the client's ideal customer profile
+3. APPOINTMENT SETTING — Hot leads get automated SMS/email follow-up within seconds, AI books them into the client's real calendar
+4. CLOSING CALL (Agency plan) — AI voice agent calls at the booked appointment time, confirms the meeting, answers questions, pitches the offer, handles objections, and guides the prospect through payment while on the call
+5. POST-CLOSE — Confirmation email and SMS sent, follow-up scheduled, referral ask
+
+For AI Receptionist clients (service businesses):
+1. CALL COMES IN — AI receptionist answers, qualifies, books appointment
+2. FOLLOW-UP — 2 days after appointment, AI calls to check in and rebook if needed
+3. RECURRING REMINDERS — AI calls when next appointment is due (based on business type)
+4. PIPELINE TRACKING — NEW_INQUIRY → APPOINTMENT_BOOKED → COMPLETED → FOLLOW_UP_DUE → RECURRING_CLIENT
+
+===== HOW THE CLOSER WORKS =====
+
+The Voice Closer (Agency plan) is the appointment itself:
+- The appointment setter books a time with the prospect
+- At the booked time, the AI closer calls automatically
+- Opens with: "Hey [name], we had this call booked in — glad we could connect!"
+- Asks what made them interested, discovers their pain
+- Pitches using the client's knowledge base (product info, pricing, benefits)
+- Handles objections using proven frameworks
+- When they say yes: "Let's get you set up right now while we're on the call. Are you near a browser?"
+- Walks them through the sign-up/payment page step by step while staying on the line
+- Only sends SMS/email link as fallback if they can't complete payment right now
+- After payment confirmed: sets expectations, books check-in, asks for referral
+
 ===== PRICING REFRAMES =====
 
 AI Receptionist at $147/month = $4.90/day = less than a coffee for an AI receptionist that answers every call, follows up, and rebooks automatically
-Starter at $197/month = $6.50/day = less than a coffee a day for an AI receptionist that never misses a call
+Starter at $197/month = $6.50/day = the cost of a coffee for a system that never misses a lead
 Growth at $497/month = $16.50/day = less than a parking spot for a full AI sales team
 Agency at $997/month = $33/day = less than one hour of a junior employee's salary for an entire AI sales machine
 
 ===== WHAT WE REPLACE (VALUE ANCHORING) =====
 
 AI Receptionist replaces: A part-time receptionist ($2,500-$3,500/month) — savings of 94-96%
-Starter replaces: A receptionist or front desk person ($3,500-$4,500/month) — savings of 94-96%
+Starter replaces: A receptionist + manual lead follow-up ($3,500-$4,500/month) — savings of 94-96%
 Growth replaces: A junior SDR + social media manager ($8,000-$10,000/month) — savings of 94-95%
 Agency replaces: A sales team of 3 + ad manager ($18,000-$25,000/month) — savings of 95-96%
 
@@ -66,19 +101,21 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 
 ===== KEY RESULTS AND PROOF POINTS =====
 
-- AI receptionist answers every call within 1 ring — no more missed leads
+- AI receptionist answers every call within 1 ring — no more missed leads or voicemails
 - Appointment setter follows up within seconds, not hours or days
 - Voice agents make up to 50 outbound calls per day per client
 - Social media agent creates and posts content daily across 3 platforms
-- LinkedIn agent sends up to 20 personalised connection requests per day
-- All agents work 24/7/365 — nights, weekends, holidays
+- B2B prospecting agent finds 25 verified prospects per day with emails and phone numbers via Apollo
+- All agents work 24/7/365 — nights, weekends, public holidays
 - Clients typically see their first booked appointment within the first week
-- No technical setup required — we deploy everything for you
+- No technical setup required — we deploy everything, client just connects their calendar
+- Voice closer stays on the line and walks prospects through payment — no dropped leads
 
 ===== COMMON OBJECTIONS AND RESPONSES =====
 
 "It's too expensive"
 → "I get that. Quick question — how many leads do you reckon you're missing each month because calls go unanswered or you don't follow up fast enough? Even if it's just 5 leads a month and your average deal is worth $500, that's $2,500 in lost revenue. The Starter plan is $197 to capture all of that. It pays for itself with one extra sale."
+→ For AI Receptionist: "How many calls do you miss after hours or when you're busy with a client? Even one missed call a week could be $200-$500 in lost bookings. At $4.90 a day, the AI receptionist pays for itself if it catches just one of those calls a month."
 
 "I need to think about it"
 → "Totally fair. What specifically do you want to think through — is it the price, the timing, or whether it'll actually work for your business? Let me address that right now so you've got all the info."
@@ -91,10 +128,10 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 → "How's that working for you? Are your calls being answered 24/7? Is it following up with every lead automatically? Most businesses that switch to us find we replace 3-4 separate tools with one platform. What if you ran us alongside for a month and compared?"
 
 "Not the right time"
-→ "When would be the right time? What changes between now and then? Every month you wait is another month of missed calls and leads slipping through the cracks. What if we started with just the Starter plan — minimal commitment, immediate results?"
+→ "When would be the right time? What changes between now and then? Every month you wait is another month of missed calls and leads slipping through the cracks. What if we started with just the AI Receptionist plan — $147, minimal commitment, immediate results?"
 
 "I can't afford it"
-→ "I hear you. Is it the budget that's tight, or is it that you're not sure the return justifies it? Because at $6.50 a day for Starter, if it books you even one extra appointment a month, it's paid for itself. What if we started you on Starter and upgraded once you see the results flowing in?"
+→ "I hear you. Is it the budget that's tight, or is it that you're not sure the return justifies it? Because at $4.90 a day for AI Receptionist, if it books you even one extra appointment a month, it's paid for itself. What if we started you on the Receptionist plan and upgraded once you see the results flowing in?"
 
 "Can you just send me some info?"
 → "Of course — but usually when someone asks for info, there's a specific question they're trying to answer. What's the one thing that, if I could answer right now, would help you decide? Let's tackle it together."
@@ -103,10 +140,14 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 → "Great question. Our voice agent answers calls and sounds completely natural — most callers don't even realise it's AI. It books appointments, answers FAQs, and handles objections in real time. We can actually do a live demo right now — I'll have our AI call you and you can experience it yourself. Want to try it?"
 
 "We're too small / not ready"
-→ "That's actually exactly when it works best. Bigger companies have sales teams to handle this. You don't — which means you're the one answering calls, following up on leads, posting on social media. This takes all of that off your plate for $6.50 a day. Most of our best clients started with Starter and scaled up as they grew."
+→ "That's actually exactly when it works best. Bigger companies have sales teams and receptionists to handle this. You don't — which means you're the one answering calls, following up on leads, posting on social media. This takes all of that off your plate for less than $5 a day. Most of our best clients started with the AI Receptionist plan and scaled up as they grew."
+
+"I already have a receptionist / team for that"
+→ "That's great! How many hours a day are they available? Our AI works 24/7 — after hours, weekends, public holidays, lunch breaks. It's not replacing your team, it's catching every call they can't get to. Think of it as insurance against missed calls."
 
 ===== ADD-ONS (IF THEY WANT MORE) =====
 
+- Smart Capture (AI Receptionist only): $49/month — website lead form + AI calls new enquiries within 5 minutes
 - Extra phone number: $8/month
 - Voice minute top-up (100 min): $25
 - SMS top-up (500 messages): $30
@@ -118,17 +159,21 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 
 - All-in-one: replaces GoHighLevel + Calendly + Buffer + an SDR + a receptionist
 - AI-native: not just automation, actual AI that thinks, writes, and speaks
-- Zero setup: we deploy everything, client just connects their tools
-- Real voice agents: not chatbots — actual phone calls with natural-sounding AI
-- Scales instantly: handles 1 call or 100 calls simultaneously
-- Works 24/7: nights, weekends, public holidays — never misses a lead
+- Zero setup: we deploy everything, client just connects their calendar and tools
+- Real voice agents: not chatbots — actual phone calls with natural-sounding AI voices
+- Scales instantly: handles 1 call or 100 calls simultaneously, no waiting
+- Works 24/7: nights, weekends, public holidays — never misses a lead or a call
+- Closes on the call: Voice Closer stays on the line and walks prospects through payment
+- Automated follow-up: 2-day post-appointment check-in + recurring rebooking reminders
+- Service pipeline: purpose-built for service businesses, not just sales funnels
 
 ===== GUARANTEE / RISK REVERSAL =====
 
-- No lock-in contracts — cancel anytime
+- No lock-in contracts — cancel anytime, no cancellation fees
 - First month trial pricing available if needed (50% off first month)
-- We deploy everything for free — no setup fees
+- We deploy everything for free — no setup fees, no onboarding fees
 - If you don't see results in the first 30 days, we'll work with you personally to optimise
+- Your AI receptionist is live within minutes of signing up
 
 ===== QUICK STATS TO DROP IN CONVERSATION =====
 
@@ -136,3 +181,12 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 - "The average lead responds to follow-up within 5 minutes with AI vs 47 hours with a human sales team"
 - "Companies that follow up within 5 minutes are 100x more likely to connect with a lead"
 - "Our clients save an average of 20+ hours per week on manual follow-up"
+- "A missed call costs the average service business $200-$500 in lost revenue"
+- "80% of customers say they won't leave a voicemail — if nobody answers, they call the next business"
+
+===== UPSELL PATHS =====
+
+AI Receptionist → Starter: "Your receptionist is catching great leads. Want to start scoring them automatically and have AI follow up via SMS too?"
+Starter → Growth: "You had 47 inbound calls this month and booked 12 appointments. Want to start finding new prospects automatically and calling them? Our AI finds 25 verified leads per day."
+Growth → Agency: "Your appointment setter has 23 warm leads in the pipeline. Want the AI closer to start calling them and closing deals?"
+Any plan → add-ons: "Would you like an extra phone number for your second location?" / "Want the AI to also catch leads from your website?"

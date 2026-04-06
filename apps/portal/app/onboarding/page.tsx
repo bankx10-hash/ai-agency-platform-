@@ -42,10 +42,10 @@ const plans = [
     id: 'GROWTH',
     name: 'Growth',
     price: 497,
-    description: 'Proactive outreach across LinkedIn, social media, and outbound calling.',
+    description: 'Proactive outreach, social media, and outbound calling to fill your pipeline.',
     agents: [
       'Everything in Starter',
-      'LinkedIn Outreach Agent',
+      'B2B Prospecting Agent (Apollo)',
       'Social Media Agent',
       'Voice Outbound Agent',
       'Content Calendar & Analytics'
