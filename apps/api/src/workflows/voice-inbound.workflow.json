@@ -260,7 +260,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactName: $('Build Calendar Confirmation Email').first().json.contactName, contactEmail: $('Build Calendar Confirmation Email').first().json.contactEmail, startTime: $('Build Calendar Confirmation Email').first().json.startTime, title: 'Inbound Call Booking' }) }}"
+        "jsonBody": "={{ JSON.stringify({ contactId: $('Save Contact').first().json.id, contactName: $('Build Calendar Confirmation Email').first().json.contactName, contactEmail: $('Build Calendar Confirmation Email').first().json.contactEmail, startTime: $('Build Calendar Confirmation Email').first().json.startTime, title: 'Inbound Call Booking' }) }}"
       }
     }
   ],

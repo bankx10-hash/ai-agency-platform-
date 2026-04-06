@@ -569,8 +569,19 @@ router.get('/:clientId/calendar-slots', async (req, res) => {
 // POST /:clientId/appointments
 router.post('/:clientId/appointments', async (req, res) => {
   const { clientId } = req.params
-  const { contactId, calendarId, startTime, title, contactName, contactEmail } = req.body
+  let { contactId, calendarId, startTime, title, contactName, contactEmail } = req.body
   try {
+    // If no contactId provided, look up by email or name
+    if (!contactId && (contactEmail || contactName)) {
+      const existing = await prisma.contact.findFirst({
+        where: {
+          clientId,
+          ...(contactEmail ? { email: contactEmail } : { name: contactName })
+        },
+        select: { id: true }
+      })
+      if (existing) contactId = existing.id
+    }
     logger.info('N8N appointment booking', { clientId, contactId, startTime, contactName, contactEmail })
 
     const client = await prisma.client.findUnique({ where: { id: clientId }, select: { businessName: true } })

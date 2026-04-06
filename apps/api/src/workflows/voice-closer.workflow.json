@@ -116,7 +116,7 @@
       "position": [1750, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.retellai.com/create-call",
+        "url": "https://api.retellai.com/v2/create-phone-call",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
