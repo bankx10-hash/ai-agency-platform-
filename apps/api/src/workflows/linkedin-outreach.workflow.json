@@ -1,221 +1,88 @@
 {
-  "name": "LinkedIn Outreach Agent",
+  "name": "LinkedIn Outreach Agent (Apollo)",
+  "active": false,
   "nodes": [
     {
-      "id": "edc62f93-b6c0-41b7-bfca-68b576aa3aae",
-      "name": "Daily Schedule",
+      "id": "daily-trigger",
+      "name": "Daily Prospecting Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
-      "position": [250, 200],
+      "position": [250, 300],
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 9 * * 1-5"
-            }
-          ]
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1-5" }]
         }
       }
     },
     {
-      "id": "5bf365a9-5424-40bb-956d-8ec552fca7e6",
-      "name": "Launch Lead Outreach Phantom",
+      "id": "search-apollo",
+      "name": "Apollo - Search Prospects",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 200],
-      "continueOnFail": true,
+      "position": [500, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.phantombuster.com/api/v2/agents/launch",
+        "url": "https://api.apollo.io/api/v1/mixed_people/search",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "X-Phantombuster-Key",
-              "value": "{{PHANTOMBUSTER_API_KEY}}"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Cache-Control", "value": "no-cache" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "keypair",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "id",
-              "value": "{{PHANTOMBUSTER_LEADOUTREACH_ID}}"
-            }
-          ]
-        }
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ api_key: '{{APOLLO_API_KEY}}', per_page: 25, page: 1 }) }}"
       }
     },
     {
-      "id": "1d88a561-5f65-4743-a1c1-8e3c1a8b75ab",
-      "name": "Wait 15 Minutes",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
-      "position": [750, 200],
-      "parameters": {
-        "resume": "timeInterval",
-        "amount": 15,
-        "unit": "minutes"
-      }
-    },
-    {
-      "id": "892ac952-56b7-494e-8181-e7fcd051aed5",
-      "name": "Fetch Phantom Output",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1000, 200],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "GET",
-        "url": "=https://api.phantombuster.com/api/v2/agents/fetch-output?id={{PHANTOMBUSTER_LEADOUTREACH_ID}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Phantombuster-Key",
-              "value": "{{PHANTOMBUSTER_API_KEY}}"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "extract-s3-url-001",
-      "name": "Extract S3 JSON URL",
+      "id": "filter-new-prospects",
+      "name": "Filter New Prospects",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 200],
+      "position": [750, 300],
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst log = raw.output || raw.log || JSON.stringify(raw);\nconst match = String(log).match(/https:\\/\\/[^\\s'\"]+\\.json/);\nif (!match) {\n  return [{ json: { skipped: true, reason: 'No S3 JSON URL found in Phantombuster output' } }];\n}\nreturn [{ json: { jsonUrl: match[0] } }];"
+        "jsCode": "const data = $input.first().json;\nconst people = data.people || [];\nconst results = people.slice(0, 25).map(p => ({\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  linkedinUrl: p.linkedin_url || '',\n  city: p.city || '',\n  state: p.state || '',\n  country: p.country || '',\n  companyName: p.organization?.name || '',\n  companyWebsite: p.organization?.website_url || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n}));\nreturn results.map(r => ({ json: r }));"
       }
     },
     {
-      "id": "if-has-url-001",
-      "name": "IF - Has URL?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [1500, 200],
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "check-url",
-              "leftValue": "={{ $json.skipped }}",
-              "rightValue": true,
-              "operator": { "type": "boolean", "operation": "notEquals" }
-            }
-          ],
-          "combinator": "and"
-        }
-      }
-    },
-    {
-      "id": "fetch-s3-json-001",
-      "name": "Fetch Profile JSON",
+      "id": "enrich-prospect",
+      "name": "Apollo - Enrich Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1750, 200],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $json.jsonUrl }}"
-      }
-    },
-    {
-      "id": "ae32de78-2ef8-40ad-8bb8-5207d17c77f8",
-      "name": "Parse Profiles",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2000, 200],
-      "parameters": {
-        "jsCode": "// n8n splits JSON arrays into multiple items — use $input.all()\nconst items = $input.all();\nif (!items || items.length === 0) {\n  return [{ json: { skipped: true, reason: 'No profiles returned from Phantombuster' } }];\n}\nconst valid = items\n  .map(i => i.json)\n  .filter(p => p && (p.firstName || p.lastName || p.profileUrl));\nif (valid.length === 0) {\n  return [{ json: { skipped: true, reason: 'No profiles found' } }];\n}\nreturn valid.map(p => ({\n  json: {\n    firstName: p.firstName || '',\n    lastName: p.lastName || '',\n    fullName: p.fullName || ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || 'Unknown',\n    headline: p.headline || p.title || p.occupation || '',\n    company: p.company || p.companyName || '',\n    location: p.location || '',\n    profileUrl: p.profileUrl || p.linkedInProfileUrl || '',\n    email: p.email || '',\n    connectedAt: p.connectedAt || p.timestamp || new Date().toISOString()\n  }\n}));"
-      }
-    },
-    {
-      "id": "if-has-profiles-001",
-      "name": "IF - Has Profiles?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [2250, 200],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "check-skipped-top",
-              "leftValue": "={{ $json.skipped }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notEquals"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      }
-    },
-    {
-      "id": "66af8cab-8ed3-459a-b222-e48570049037",
-      "name": "Build Claude Request",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2500, 200],
-      "parameters": {
-        "jsCode": "const profile = $input.first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nreturn [{\n  json: {\n    model: 'claude-haiku-4-5-20251001',\n    max_tokens: 300,\n    system: 'You are a LinkedIn outreach specialist for ' + businessName + '. Write a short warm follow-up message for a new LinkedIn connection. Under 200 characters. Human, not salesy. Return ONLY the message text, no quotes.',\n    messages: [{ role: 'user', content: 'Write a personalised follow-up for this new connection.\\n\\nProfile: ' + JSON.stringify({ firstName: profile.firstName, headline: profile.headline, company: profile.company, location: profile.location }) }],\n    profile: profile\n  }\n}];"
-      }
-    },
-    {
-      "id": "4f3dde8c-da56-4ae8-a48e-0a10de80f2ac",
-      "name": "Claude - Personalise Follow-up",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [2750, 200],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 5000,
+      "position": [1000, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
+        "url": "https://api.apollo.io/api/v1/people/match",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Cache-Control", "value": "no-cache" }
           ]
         },
         "sendBody": true,
         "specifyBody": "string",
-        "body": "={{ JSON.stringify({ model: $json.model, max_tokens: $json.max_tokens, system: $json.system, messages: $json.messages }) }}",
-        "contentType": "raw"
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ api_key: '{{APOLLO_API_KEY}}', id: $json.apolloId, reveal_personal_emails: true, reveal_phone_number: true }) }}"
       }
     },
     {
-      "id": "34a966a2-afe1-458c-9303-e3d26c04c386",
-      "name": "Parse Message",
+      "id": "extract-contact-info",
+      "name": "Extract Contact Info",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3000, 200],
+      "position": [1250, 300],
       "parameters": {
-        "jsCode": "const message = $input.first().json.content?.[0]?.text?.trim() || '';\nconst profile = $('Build Claude Request').first().json.profile || {};\nreturn [{ json: { message, profile } }];"
+        "jsCode": "const p = $input.first().json.person;\nif (!p) return [];\nconst email = p.email || (p.personal_emails && p.personal_emails[0]) || '';\nconst phone = (p.phone_numbers && p.phone_numbers[0]?.sanitized_number) || '';\nif (!email && !phone) return [];\nreturn [{ json: {\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  email: email,\n  phone: phone,\n  linkedinUrl: p.linkedin_url || '',\n  companyName: p.organization?.name || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n} }];"
       }
     },
     {
-      "id": "a17af0e5-6af8-4e28-8ae1-e7c5cbb4d4ab",
-      "name": "Save Contact",
+      "id": "save-contact",
+      "name": "Save Contact to CRM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3250, 200],
-      "continueOnFail": true,
+      "position": [1500, 300],
       "parameters": {
         "method": "POST",
         "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
@@ -228,512 +95,92 @@
         },
         "sendBody": true,
         "specifyBody": "string",
-        "body": "={{ JSON.stringify({ name: $json.profile.fullName, email: $json.profile.email || '', linkedinUrl: $json.profile.profileUrl || '', source: 'LinkedIn Outreach', tags: ['linkedin-connected'] }) }}",
-        "contentType": "raw"
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', linkedinUrl: $json.linkedinUrl, tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName }) }}"
       }
     },
     {
-      "id": "1280f557-d370-4e3c-8b6e-10b7712fb11b",
-      "name": "Save Note",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [3500, 200],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "POST",
-        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.id + '/notes' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "={{ JSON.stringify({ body: '--- READY TO SEND ON LINKEDIN ---\\n\\nOpen their profile and send this message:\\n\\n' + $('Parse Message').first().json.message + '\\n\\n---------------------------------\\nProfile: ' + $('Parse Message').first().json.profile.profileUrl + '\\nHeadline: ' + $('Parse Message').first().json.profile.headline + '\\nCompany: ' + $('Parse Message').first().json.profile.company }) }}",
-        "contentType": "raw"
-      }
-    },
-    {
-      "id": "reply-poll-schedule-001",
-      "name": "Reply Poll Schedule",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1,
-      "position": [250, 600],
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 */2 * * 1-5"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "launch-msg-sender-001",
-      "name": "Launch Message Sender Phantom",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [500, 600],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.phantombuster.com/api/v2/agents/launch",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Phantombuster-Key",
-              "value": "{{PHANTOMBUSTER_API_KEY}}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "keypair",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "id",
-              "value": "{{PHANTOMBUSTER_MESSAGESENDER_ID}}"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "wait-reply-poll-001",
-      "name": "Wait For Phantom",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
-      "position": [750, 600],
-      "parameters": {
-        "resume": "timeInterval",
-        "amount": 10,
-        "unit": "minutes"
-      }
-    },
-    {
-      "id": "fetch-reply-output-001",
-      "name": "Fetch Message Sender Output",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1000, 600],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "GET",
-        "url": "=https://api.phantombuster.com/api/v2/agents/fetch-output?id={{PHANTOMBUSTER_MESSAGESENDER_ID}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Phantombuster-Key",
-              "value": "{{PHANTOMBUSTER_API_KEY}}"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "pb-parse-conversation-001",
-      "name": "Parse PB Conversation",
+      "id": "build-outreach",
+      "name": "Build Personalised Outreach",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 600],
+      "position": [1750, 300],
       "parameters": {
-        "jsCode": "// Handles PhantomBuster fetch-output response: { data: { resultObject: '...' } }\nconst raw = $input.first().json;\nlet items = [];\n// fetch-output format\nconst resultObject = raw.data?.resultObject || raw.resultObject;\nif (resultObject) {\n  try { items = typeof resultObject === 'string' ? JSON.parse(resultObject) : resultObject; } catch { items = []; }\n} else if (typeof raw.output === 'string') {\n  try { items = JSON.parse(raw.output); } catch { items = []; }\n} else if (Array.isArray(raw.output)) {\n  items = raw.output;\n} else if (Array.isArray(raw)) {\n  items = raw;\n}\nif (!Array.isArray(items)) items = [];\n// Filter for inbound replies — Message Sender marks these as isIncoming or action === 'reply'\nconst incoming = items.filter(m =>\n  m.isIncoming === true ||\n  m.action === 'reply' ||\n  m.type === 'received' ||\n  (m.message && !m.sent)\n);\nif (incoming.length === 0) {\n  return [{ json: { skipped: true, reason: 'No incoming messages found' } }];\n}\nconst latest = incoming[incoming.length - 1];\nreturn [{ json: {\n  profileUrl: latest.profileUrl || latest.linkedinProfileUrl || '',\n  firstName: latest.firstName || '',\n  lastName: latest.lastName || '',\n  message: latest.message || latest.messageText || latest.text || '',\n  timestamp: latest.timestamp || latest.date || new Date().toISOString()\n} }];"
+        "jsCode": "const contact = $('Extract Contact Info').first().json;\nconst saved = $input.first().json;\nconst contactId = saved.id || saved.contactId || '';\nconst template = '{{AGENT_PROMPT}}';\nconst message = template\n  .replace(/\\{\\{firstName\\}\\}/g, contact.firstName)\n  .replace(/\\{\\{title\\}\\}/g, contact.title)\n  .replace(/\\{\\{companyName\\}\\}/g, contact.companyName);\nreturn [{ json: { contactId, email: contact.email, phone: contact.phone, message, firstName: contact.firstName } }];"
       }
     },
     {
-      "id": "if-has-reply-001",
-      "name": "IF - Has Reply?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [1500, 600],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "check-skipped-bottom",
-              "leftValue": "={{ $json.skipped }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notEquals"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      }
-    },
-    {
-      "id": "pb-look-up-contact-001",
-      "name": "Look Up Contact",
+      "id": "send-outreach-email",
+      "name": "Send Outreach Email",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1750, 600],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "GET",
-        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/by-linkedin?url=' + encodeURIComponent($json.profileUrl) }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "4563c5d9-54a7-4d2e-9827-878b0a9158db",
-      "name": "Build Classify Request",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2000, 600],
-      "parameters": {
-        "jsCode": "const parsed = $('Parse PB Conversation').first().json;\nconst contactData = $('Look Up Contact').first().json;\nconst message = parsed.message || '';\nconst contactId = contactData.id || (contactData.contact && contactData.contact.id) || null;\nreturn [{\n  json: {\n    model: 'claude-haiku-4-5-20251001',\n    max_tokens: 300,\n    system: 'You are a LinkedIn reply classifier. Analyse the reply and return ONLY valid JSON with no extra text.',\n    messages: [{ role: 'user', content: 'Classify this LinkedIn reply. Return ONLY valid JSON: {\"intent\":\"interested|not_interested|question|other\",\"responseMessage\":\"suggested reply under 200 chars\"}\\n\\nReply: ' + message }],\n    contactId: contactId,\n    originalMessage: message,\n    profileUrl: parsed.profileUrl,\n    firstName: parsed.firstName || ''\n  }\n}];"
-      }
-    },
-    {
-      "id": "99cc4515-904c-45b3-a88f-d71c90a4a0d1",
-      "name": "Claude - Classify Reply",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [2250, 600],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 5000,
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "={{ JSON.stringify({ model: $json.model, max_tokens: $json.max_tokens, system: $json.system, messages: $json.messages }) }}",
-        "contentType": "raw"
-      }
-    },
-    {
-      "id": "6249685b-d77e-4bb0-9943-dba037ec75b8",
-      "name": "Parse Classification",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2500, 600],
-      "parameters": {
-        "jsCode": "const text = $input.first().json.content?.[0]?.text?.trim() || '';\nconst classify = $('Build Classify Request').first().json;\nconst contactId = classify.contactId;\nconst originalMessage = classify.originalMessage;\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/i, '').replace(/```\\s*$/, '').trim();\n  result = JSON.parse(clean);\n} catch {\n  result = { intent: 'other', responseMessage: '' };\n}\nreturn [{ json: {\n  intent: result.intent || 'other',\n  responseMessage: result.responseMessage || '',\n  contactId: contactId,\n  originalMessage: originalMessage\n} }];"
-      }
-    },
-    {
-      "id": "7a121c05-c6ad-49b0-bc5e-4566b3a8e5f7",
-      "name": "Save Reply Note",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [2750, 600],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "POST",
-        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.contactId + '/notes' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "={{ JSON.stringify({ body: 'LinkedIn reply received. Intent: ' + $json.intent + '.\\nMessage: ' + $json.originalMessage + '\\nSuggested response: ' + $json.responseMessage }) }}",
-        "contentType": "raw"
-      }
-    },
-    {
-      "id": "c01d7198-3e65-4905-947c-723acc848fc1",
-      "name": "IF - Interested?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [3000, 600],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "41d7d8c6-0d5a-4a7f-ace3-c3a2f9721eeb",
-              "leftValue": "={{ $('Parse Classification').first().json.intent }}",
-              "rightValue": "interested",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      }
-    },
-    {
-      "id": "aa15a26c-a6f7-4c02-b1c6-3b251479ff3a",
-      "name": "Get Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [3250, 600],
-      "continueOnFail": true,
-      "parameters": {
-        "method": "GET",
-        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Parse Classification').first().json.contactId }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "ae424431-8c18-4f2f-9f20-1f3a55796e74",
-      "name": "Build Booking Message",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [3500, 600],
-      "parameters": {
-        "jsCode": "const classification = $('Parse Classification').first().json;\nconst contactData = $input.first().json;\nconst contact = contactData.contact || contactData;\nconst name = contact.name || $('Build Classify Request').first().json.firstName || 'there';\nconst firstName = name.split(' ')[0];\nconst bookingLink = '{{BOOKING_LINK}}';\nreturn [{\n  json: {\n    model: 'claude-haiku-4-5-20251001',\n    max_tokens: 400,\n    system: 'You are a professional sales assistant for {{BUSINESS_NAME}}. Write a warm, concise LinkedIn reply (2-3 sentences max) that thanks the person for their interest, suggests a quick call to explore how you can help them, and naturally includes the booking link. Do NOT use generic filler phrases. Sound human and specific.',\n    messages: [{ role: 'user', content: 'Write a LinkedIn reply to ' + firstName + ' who responded positively to our outreach. Their message: \"' + classification.originalMessage + '\". Include this booking link: ' + bookingLink + '. Return ONLY the message text.' }],\n    contactId: classification.contactId,\n    contactName: name,\n    contactEmail: contact.email || '',\n    originalMessage: classification.originalMessage,\n    bookingLink: bookingLink\n  }\n}];"
-      }
-    },
-    {
-      "id": "5e23180d-73ba-4c23-bd87-bca6d285a1ae",
-      "name": "Claude - Write Booking Reply",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [3750, 600],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 5000,
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-key", "value": "{{ANTHROPIC_API_KEY}}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "={{ JSON.stringify({ model: $json.model, max_tokens: $json.max_tokens, system: $json.system, messages: $json.messages }) }}",
-        "contentType": "raw"
-      }
-    },
-    {
-      "id": "464c599f-594e-49ea-8cc8-73d8de8e232e",
-      "name": "Parse Booking Message",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [4000, 600],
-      "parameters": {
-        "jsCode": "const reply = $input.first().json;\nconst buildNode = $('Build Booking Message').first().json;\nconst replyText = reply.content?.[0]?.text?.trim() || '';\nreturn [{ json: {\n  replyText,\n  contactId: buildNode.contactId,\n  contactName: buildNode.contactName,\n  contactEmail: buildNode.contactEmail,\n  originalMessage: buildNode.originalMessage,\n  bookingLink: buildNode.bookingLink\n} }];"
-      }
-    },
-    {
-      "id": "df2a6fac-30db-4f7d-9aed-2559efebe621",
-      "name": "Send Owner Notification",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [4250, 600],
-      "continueOnFail": true,
+      "position": [2000, 200],
       "parameters": {
         "method": "POST",
         "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
-        "sendBody": true,
-        "specifyBody": "keypair",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "to",
-              "value": "{{OWNER_EMAIL}}"
-            },
-            {
-              "name": "subject",
-              "value": "={{ 'LinkedIn Lead Interested: ' + $json.contactName }}"
-            },
-            {
-              "name": "html",
-              "value": "={{ '<h2>A LinkedIn connection is interested in booking!</h2><p><strong>Name:</strong> ' + $json.contactName + '</p><p><strong>Their message:</strong> ' + $json.originalMessage + '</p><hr><p><strong>Send this reply to them on LinkedIn:</strong></p><blockquote style=\"border-left:3px solid #4f46e5;padding-left:12px;color:#333;margin:12px 0\">' + $json.replyText + '</blockquote><p><a href=\"{{BOOKING_LINK}}\" style=\"background:#4f46e5;color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block\">Open Booking Link</a></p>' }}"
-            }
-          ]
-        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ contactId: $json.contactId, to: $json.email, subject: 'Quick question, ' + $json.firstName, body: $json.message }) }}"
       }
     },
     {
-      "id": "abe9d9c5-4155-4430-b19a-f3c6a2ae014c",
-      "name": "Save Booking Note",
+      "id": "forward-to-lead-gen",
+      "name": "Forward to Lead Scoring",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [4500, 600],
-      "continueOnFail": true,
+      "position": [2000, 400],
       "parameters": {
         "method": "POST",
-        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Parse Booking Message').first().json.contactId + '/notes' }}",
-        "sendBody": true,
-        "specifyBody": "keypair",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "body",
-              "value": "={{ 'Lead marked INTERESTED. Owner notified at {{OWNER_EMAIL}}. Suggested LinkedIn reply: ' + $('Parse Booking Message').first().json.replyText }}"
-            }
-          ]
-        },
+        "url": "={{ '{{N8N_BASE_URL}}/webhook/lead-gen-{{CLIENT_ID}}' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+            { "name": "Content-Type", "value": "application/json" }
           ]
-        }
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ contactId: $json.contactId }) }}"
       }
     }
   ],
   "connections": {
-    "Daily Schedule": {
-      "main": [[{ "node": "Launch Lead Outreach Phantom", "type": "main", "index": 0 }]]
+    "Daily Prospecting Trigger": {
+      "main": [[{ "node": "Apollo - Search Prospects", "type": "main", "index": 0 }]]
     },
-    "Launch Lead Outreach Phantom": {
-      "main": [[{ "node": "Wait 15 Minutes", "type": "main", "index": 0 }]]
+    "Apollo - Search Prospects": {
+      "main": [[{ "node": "Filter New Prospects", "type": "main", "index": 0 }]]
     },
-    "Wait 15 Minutes": {
-      "main": [[{ "node": "Fetch Phantom Output", "type": "main", "index": 0 }]]
+    "Filter New Prospects": {
+      "main": [[{ "node": "Apollo - Enrich Contact", "type": "main", "index": 0 }]]
     },
-    "Fetch Phantom Output": {
-      "main": [[{ "node": "Extract S3 JSON URL", "type": "main", "index": 0 }]]
+    "Apollo - Enrich Contact": {
+      "main": [[{ "node": "Extract Contact Info", "type": "main", "index": 0 }]]
     },
-    "Extract S3 JSON URL": {
-      "main": [[{ "node": "IF - Has URL?", "type": "main", "index": 0 }]]
+    "Extract Contact Info": {
+      "main": [[{ "node": "Save Contact to CRM", "type": "main", "index": 0 }]]
     },
-    "IF - Has URL?": {
+    "Save Contact to CRM": {
+      "main": [[{ "node": "Build Personalised Outreach", "type": "main", "index": 0 }]]
+    },
+    "Build Personalised Outreach": {
       "main": [
-        [{ "node": "Fetch Profile JSON", "type": "main", "index": 0 }],
-        []
+        [{ "node": "Send Outreach Email", "type": "main", "index": 0 },
+         { "node": "Forward to Lead Scoring", "type": "main", "index": 0 }]
       ]
-    },
-    "Fetch Profile JSON": {
-      "main": [[{ "node": "Parse Profiles", "type": "main", "index": 0 }]]
-    },
-    "Parse Profiles": {
-      "main": [[{ "node": "IF - Has Profiles?", "type": "main", "index": 0 }]]
-    },
-    "IF - Has Profiles?": {
-      "main": [
-        [{ "node": "Build Claude Request", "type": "main", "index": 0 }],
-        []
-      ]
-    },
-    "Build Claude Request": {
-      "main": [[{ "node": "Claude - Personalise Follow-up", "type": "main", "index": 0 }]]
-    },
-    "Claude - Personalise Follow-up": {
-      "main": [[{ "node": "Parse Message", "type": "main", "index": 0 }]]
-    },
-    "Parse Message": {
-      "main": [[{ "node": "Save Contact", "type": "main", "index": 0 }]]
-    },
-    "Save Contact": {
-      "main": [[{ "node": "Save Note", "type": "main", "index": 0 }]]
-    },
-    "Save Note": {
-      "main": [[]]
-    },
-    "Reply Poll Schedule": {
-      "main": [[{ "node": "Launch Message Sender Phantom", "type": "main", "index": 0 }]]
-    },
-    "Launch Message Sender Phantom": {
-      "main": [[{ "node": "Wait For Phantom", "type": "main", "index": 0 }]]
-    },
-    "Wait For Phantom": {
-      "main": [[{ "node": "Fetch Message Sender Output", "type": "main", "index": 0 }]]
-    },
-    "Fetch Message Sender Output": {
-      "main": [[{ "node": "Parse PB Conversation", "type": "main", "index": 0 }]]
-    },
-    "Parse PB Conversation": {
-      "main": [[{ "node": "IF - Has Reply?", "type": "main", "index": 0 }]]
-    },
-    "IF - Has Reply?": {
-      "main": [
-        [{ "node": "Look Up Contact", "type": "main", "index": 0 }],
-        []
-      ]
-    },
-    "Look Up Contact": {
-      "main": [[{ "node": "Build Classify Request", "type": "main", "index": 0 }]]
-    },
-    "Build Classify Request": {
-      "main": [[{ "node": "Claude - Classify Reply", "type": "main", "index": 0 }]]
-    },
-    "Claude - Classify Reply": {
-      "main": [[{ "node": "Parse Classification", "type": "main", "index": 0 }]]
-    },
-    "Parse Classification": {
-      "main": [[{ "node": "Save Reply Note", "type": "main", "index": 0 }]]
-    },
-    "Save Reply Note": {
-      "main": [[{ "node": "IF - Interested?", "type": "main", "index": 0 }]]
-    },
-    "IF - Interested?": {
-      "main": [
-        [{ "node": "Get Contact", "type": "main", "index": 0 }],
-        []
-      ]
-    },
-    "Get Contact": {
-      "main": [[{ "node": "Build Booking Message", "type": "main", "index": 0 }]]
-    },
-    "Build Booking Message": {
-      "main": [[{ "node": "Claude - Write Booking Reply", "type": "main", "index": 0 }]]
-    },
-    "Claude - Write Booking Reply": {
-      "main": [[{ "node": "Parse Booking Message", "type": "main", "index": 0 }]]
-    },
-    "Parse Booking Message": {
-      "main": [[{ "node": "Send Owner Notification", "type": "main", "index": 0 }]]
-    },
-    "Send Owner Notification": {
-      "main": [[{ "node": "Save Booking Note", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": {
-    "node:Daily Schedule": {
-      "recurrenceRules": []
-    }
+    "saveManualExecutions": true
   }
 }

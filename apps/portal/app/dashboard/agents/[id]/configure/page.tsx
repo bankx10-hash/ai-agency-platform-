@@ -64,8 +64,10 @@ const CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: 't
     { key: 'high_score_threshold', label: 'Hot Lead Threshold (0–100)', type: 'number', placeholder: '70', help: 'Leads scored above this number are classed as hot and sent to the appointment setter.' },
   ],
   LINKEDIN_OUTREACH: [
-    { key: 'connection_message_template', label: 'Connection Request Message', type: 'textarea', placeholder: 'Hi {{firstName}}, I came across your profile and...', help: 'Message sent with LinkedIn connection requests. Use {{firstName}} for personalisation.' },
-    { key: 'daily_limit', label: 'Daily Connection Limit', type: 'number', placeholder: '20', help: 'Max connection invites per day (LinkedIn recommends ≤20).' },
+    { key: 'person_titles', label: 'Target Job Titles', type: 'textarea', placeholder: 'CEO, Business Owner, Managing Director, Founder (one per line)', help: 'Job titles to search for in Apollo. Enter one title per line.' },
+    { key: 'person_locations', label: 'Target Locations', type: 'textarea', placeholder: 'Sydney, Melbourne, Perth (one per line)', help: 'Where your ideal prospects are located.' },
+    { key: 'keywords', label: 'Industry Keywords', type: 'textarea', placeholder: 'dental, construction, real estate (one per line)', help: 'Keywords to filter prospects by industry or niche.' },
+    { key: 'daily_limit', label: 'Daily Prospect Limit', type: 'number', placeholder: '25', help: 'Max prospects to find and contact per day.' },
   ],
 }
 

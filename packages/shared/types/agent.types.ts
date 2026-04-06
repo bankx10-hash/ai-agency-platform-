@@ -54,11 +54,13 @@ export interface LeadGenerationConfig {
 }
 
 export interface LinkedInConfig {
-  search_url: string
-  connection_message_template: string
-  followup_sequences: FollowUpSequence[]
+  person_titles: string[]
+  person_locations: string[]
+  employee_ranges: string[]
+  industries: string[]
+  keywords: string[]
+  outreach_message_template: string
   daily_limit: number
-  linkedin_cookie: string
 }
 
 export interface FollowUpSequence {

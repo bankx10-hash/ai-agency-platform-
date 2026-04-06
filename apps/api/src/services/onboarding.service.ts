@@ -155,15 +155,13 @@ export class OnboardingService {
       },
       [AgentType.LINKEDIN_OUTREACH]: {
         ...baseConfig,
-        search_url: '',
-        connection_message_template: 'Hi {{firstName}}, I noticed your profile and thought we might be able to help each other out.',
-        followup_sequences: [
-          { day: 2, message: 'Thanks for connecting! I wanted to reach out about...' },
-          { day: 5, message: 'Just following up on my previous message...' },
-          { day: 10, message: 'One last message - would love to connect if timing is right...' }
-        ],
-        daily_limit: 20,
-        linkedin_cookie: ''
+        person_titles: [],
+        person_locations: [],
+        employee_ranges: ['1,10', '11,50', '51,200'],
+        industries: [],
+        keywords: [],
+        outreach_message_template: '',
+        daily_limit: 25
       },
       [AgentType.SOCIAL_MEDIA]: {
         ...baseConfig,

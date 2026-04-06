@@ -52,10 +52,10 @@ const AGENT_ICONS: Record<string, string> = {
 // Key config fields per agent type (others use defaults)
 const AGENT_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: string; placeholder: string; required?: boolean }>> = {
   LINKEDIN_OUTREACH: [
-    { key: 'search_url', label: 'LinkedIn Search URL', type: 'url', placeholder: 'https://www.linkedin.com/search/results/people/?keywords=...', required: true },
-    { key: 'connection_message_template', label: 'Connection Message Template', type: 'textarea', placeholder: 'Hi {{firstName}}, I noticed your profile...' },
-    { key: 'daily_limit', label: 'Daily Connection Limit', type: 'number', placeholder: '20' },
-    { key: 'linkedin_cookie', label: 'LinkedIn Session Cookie (li_at)', type: 'textarea', placeholder: 'Paste your li_at cookie value here' }
+    { key: 'person_titles', label: 'Target Job Titles (one per line)', type: 'textarea', placeholder: 'CEO\nBusiness Owner\nManaging Director' },
+    { key: 'person_locations', label: 'Target Locations (one per line)', type: 'textarea', placeholder: 'Sydney\nMelbourne\nPerth' },
+    { key: 'keywords', label: 'Industry Keywords (one per line)', type: 'textarea', placeholder: 'dental\nconstruction\nreal estate' },
+    { key: 'daily_limit', label: 'Daily Prospect Limit', type: 'number', placeholder: '25' }
   ],
   LEAD_GENERATION: [
     { key: 'icp_description', label: 'Ideal Customer Profile', type: 'textarea', placeholder: 'Business owners with 5-50 employees looking to automate their sales process...' },
