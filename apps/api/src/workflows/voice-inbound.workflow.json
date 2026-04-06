@@ -262,6 +262,27 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ contactId: $('Save Contact').first().json.id, contactName: $('Build Calendar Confirmation Email').first().json.contactName, contactEmail: $('Build Calendar Confirmation Email').first().json.contactEmail, startTime: $('Build Calendar Confirmation Email').first().json.startTime, title: 'Inbound Call Booking' }) }}"
       }
+    },
+    {
+      "id": "log-appointment-from-call",
+      "name": "Log Appointment From Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2500, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/appointments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactId: $('Save Contact').first().json.id, contactName: $('Parse Call Analysis').first().json.callerName, contactEmail: $('Parse Call Analysis').first().json.callerEmail, startTime: $('Parse Call Analysis').first().json.appointmentTime || new Date(Date.now() + 86400000).toISOString(), title: 'Inbound Call Booking', source: 'call-analysis' }) }}"
+      }
     }
   ],
   "connections": {
@@ -299,6 +320,9 @@
     },
     "Build Call Booking Confirmation": {
       "main": [[{ "node": "Send Call Booking Confirmation", "type": "main", "index": 0 }]]
+    },
+    "Send Call Booking Confirmation": {
+      "main": [[{ "node": "Log Appointment From Call", "type": "main", "index": 0 }]]
     },
     "Build Booking Link Email": {
       "main": [[{ "node": "Send Booking Link Email", "type": "main", "index": 0 }]]

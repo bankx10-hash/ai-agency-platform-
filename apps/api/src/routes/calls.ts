@@ -33,10 +33,14 @@ export async function handleCallWebhook(req: Request, res: Response): Promise<vo
     // Only process ended/completed calls
     const status: string = callData.call_status || ''
     const event: string = body.event || ''
-    if (status !== 'ended' && status !== 'completed' && event !== 'call_ended') {
+    if (status !== 'ended' && status !== 'completed' && event !== 'call_ended' && event !== 'call_analyzed') {
       res.json({ received: true })
       return
     }
+
+    // Only forward to N8N once per call — prefer call_analyzed event (has full transcript)
+    // call_ended fires first, call_analyzed fires after — skip call_ended if we'd rather wait
+    const shouldForwardToN8n = event === 'call_analyzed' || (event !== 'call_ended' && !!callData.transcript)
 
     const agentId: string | null = callData.agent_id || null
 
@@ -108,14 +112,18 @@ export async function handleCallWebhook(req: Request, res: Response): Promise<vo
     logger.info('Call logged via webhook', { clientId, callId: callData.call_id, direction, durationSeconds })
 
     // Forward to N8N for Claude analysis + contact creation (async — don't block response)
-    const n8nPath = direction === 'OUTBOUND'
-      ? `voice-outbound-${clientId}`
-      : `voice-inbound-${clientId}`
-    const n8nUrl = `${process.env.N8N_BASE_URL}/webhook/${n8nPath}`
-    logger.info('Forwarding call to N8N', { n8nUrl, direction, clientId })
-    axios.post(n8nUrl, body, { timeout: 8000 })
-      .then(() => logger.info('N8N webhook triggered successfully', { n8nUrl }))
-      .catch((err) => logger.error('N8N webhook failed', { n8nUrl, status: err?.response?.status, message: err?.message }))
+    if (shouldForwardToN8n) {
+      const n8nPath = direction === 'OUTBOUND'
+        ? `voice-outbound-${clientId}`
+        : `voice-inbound-${clientId}`
+      const n8nUrl = `${process.env.N8N_BASE_URL}/webhook/${n8nPath}`
+      logger.info('Forwarding call to N8N', { n8nUrl, direction, clientId, event })
+      axios.post(n8nUrl, body, { timeout: 8000 })
+        .then(() => logger.info('N8N webhook triggered successfully', { n8nUrl }))
+        .catch((err) => logger.error('N8N webhook failed', { n8nUrl, status: err?.response?.status, message: err?.message }))
+    } else {
+      logger.info('Skipping N8N forward (waiting for call_analyzed)', { event, clientId })
+    }
 
     res.json({ received: true })
   } catch (err) {

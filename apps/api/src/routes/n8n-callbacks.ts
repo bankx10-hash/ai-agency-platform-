@@ -584,6 +584,24 @@ router.post('/:clientId/appointments', async (req, res) => {
     }
     logger.info('N8N appointment booking', { clientId, contactId, startTime, contactName, contactEmail })
 
+    // Dedup: skip if we already logged an appointment for this contact in the last 5 minutes
+    if (contactId) {
+      const recent = await prisma.contactActivity.findFirst({
+        where: {
+          contactId,
+          clientId,
+          type: 'APPOINTMENT' as never,
+          createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) }
+        },
+        select: { id: true }
+      })
+      if (recent) {
+        logger.info('Skipping duplicate appointment log', { clientId, contactId })
+        res.json({ success: true, duplicate: true })
+        return
+      }
+    }
+
     const client = await prisma.client.findUnique({ where: { id: clientId }, select: { businessName: true } })
     const businessName = client?.businessName || 'our business'
 
