@@ -338,6 +338,11 @@ export class VoiceService {
     return transcript
   }
 
+  async getAgent(agentId: string): Promise<Record<string, unknown>> {
+    const res = await retellApi.get(`/get-agent/${agentId}`)
+    return res.data
+  }
+
   async deleteAgent(agentId: string): Promise<void> {
     await retellApi.delete(`/delete-agent/${agentId}`)
     logger.info('Retell agent deleted', { agentId })

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { prisma, Prisma } from '../lib/prisma'
 import { n8nService } from './n8n.service'
 import { emailService } from './email.service'
@@ -117,6 +118,19 @@ export class OnboardingService {
           })
         } catch (dbError) {
           logger.error('Failed to create error record for agent', { clientId, agentType, dbError })
+        }
+
+        // Create a notification so the portal can alert the client
+        try {
+          const notifId = randomUUID()
+          const agentLabel = agentType.replace(/_/g, ' ').toLowerCase()
+          await prisma.$executeRaw`
+            INSERT INTO "Notification" ("id", "clientId", "type", "title", "body", "link", "isRead", "createdAt")
+            VALUES (${notifId}, ${clientId}, 'AGENT_ERROR', ${'Agent deployment failed: ' + agentLabel}, ${String(error).slice(0, 200)}, '/dashboard/agents', false, NOW())
+          `
+          logger.info('Agent failure notification created', { clientId, agentType })
+        } catch (notifErr) {
+          logger.error('Failed to create agent failure notification', { clientId, agentType, notifErr })
         }
       }
     }

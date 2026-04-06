@@ -14,6 +14,70 @@ const updateConfigSchema = z.object({
   config: z.record(z.unknown())
 })
 
+// Health check endpoint — checks all deployed agents for a client
+router.get('/health/:clientId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { clientId } = req.params
+    if (clientId !== req.clientId) {
+      res.status(403).json({ error: 'Forbidden' })
+      return
+    }
+
+    const deployments = await prisma.agentDeployment.findMany({
+      where: { clientId }
+    })
+
+    const agents = await Promise.all(deployments.map(async (deployment) => {
+      const checks = { db: false, n8n: true, retell: true }
+      let lastError: string | undefined
+
+      // DB check: is the record ACTIVE?
+      checks.db = deployment.status === AgentStatus.ACTIVE
+
+      // N8N check: is the workflow active?
+      if (deployment.n8nWorkflowId) {
+        try {
+          const wfStatus = await n8nService.getWorkflowStatus(deployment.n8nWorkflowId)
+          checks.n8n = wfStatus.active === true
+        } catch (err) {
+          checks.n8n = false
+          lastError = `N8N workflow check failed: ${String(err)}`
+        }
+      }
+
+      // Retell check: does the agent exist?
+      if (deployment.retellAgentId) {
+        try {
+          const { voiceService } = await import('../services/voice.service')
+          await voiceService.getAgent(deployment.retellAgentId)
+          checks.retell = true
+        } catch (err) {
+          checks.retell = false
+          lastError = `Retell agent check failed: ${String(err)}`
+        }
+      }
+
+      // Determine overall status
+      const allPassing = checks.db && checks.n8n && checks.retell
+      const allFailing = !checks.db && (!deployment.n8nWorkflowId || !checks.n8n) && (!deployment.retellAgentId || !checks.retell)
+      const status = allPassing ? 'healthy' : allFailing ? 'down' : 'degraded'
+
+      return {
+        agentType: deployment.agentType,
+        deploymentId: deployment.id,
+        status,
+        checks,
+        ...(lastError && { lastError })
+      }
+    }))
+
+    res.json({ agents })
+  } catch (error) {
+    logger.error('Error checking agent health', { error, clientId: req.params.clientId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 router.get('/:deploymentId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { deploymentId } = req.params

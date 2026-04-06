@@ -21,6 +21,70 @@ interface DashboardMetrics {
   leadsToday: number; callsMade: number; appointmentsBooked: number; emailsSent: number; activeAgents: number
 }
 
+interface AgentHealthCheck {
+  agentType: string
+  deploymentId: string
+  status: 'healthy' | 'degraded' | 'down'
+  checks: { db: boolean; n8n: boolean; retell: boolean }
+  lastError?: string
+}
+
+const STATUS_DOT: Record<string, { color: string; label: string }> = {
+  healthy:  { color: '#22c55e', label: 'Healthy' },
+  degraded: { color: '#eab308', label: 'Degraded' },
+  down:     { color: '#ef4444', label: 'Down' },
+}
+
+function AgentHealthStatus({ clientId }: { clientId: string }) {
+  const [healthData, setHealthData] = useState<AgentHealthCheck[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token') || ''
+    axios.get(`${API_URL}/agents/health/${clientId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => setHealthData(res.data.agents || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [clientId])
+
+  if (loading) return null
+  if (healthData.length === 0) return null
+
+  return (
+    <div>
+      <SectionHeader title="Agent Health" badge={`${healthData.filter(a => a.status === 'healthy').length}/${healthData.length} healthy`} href="/dashboard/agents" linkLabel="Details" />
+      <div className="theme-card rounded-xl p-4">
+        <div className="space-y-2">
+          {healthData.map(agent => {
+            const dot = STATUS_DOT[agent.status] || STATUS_DOT.down
+            const label = agent.agentType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+            return (
+              <div key={agent.deploymentId} className="flex items-center justify-between py-1.5 px-2 rounded-lg" style={{ background: 'var(--bg-secondary, transparent)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dot.color }} />
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{label}</span>
+                </div>
+                <span className="text-[11px] font-medium" style={{ color: dot.color }}>{dot.label}</span>
+              </div>
+            )
+          })}
+        </div>
+        {healthData.some(a => a.lastError) && (
+          <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-card)' }}>
+            {healthData.filter(a => a.lastError).map(a => (
+              <p key={a.deploymentId} className="text-[11px] mb-1" style={{ color: 'var(--text-muted)' }}>
+                {a.agentType.replace(/_/g, ' ')}: {a.lastError}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const CONNECTIONS = [
   { key: 'facebook',        label: 'Facebook',   color: '#1877f2', abbr: 'FB' },
   { key: 'instagram',       label: 'Instagram',  color: '#e1306c', abbr: 'IG' },
@@ -166,6 +230,12 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Agent Health */}
+      {(() => {
+        const clientId = (session?.user as { clientId?: string })?.clientId
+        return clientId ? <AgentHealthStatus clientId={clientId} /> : null
+      })()}
 
       {/* Connected accounts */}
       <div>

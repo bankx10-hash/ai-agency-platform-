@@ -31,6 +31,7 @@ const TYPE_ICON: Record<string, string> = {
   STAGE_CHANGE: '📊',
   TASK_DUE: '✅',
   EMAIL_RECEIVED: '✉️',
+  AGENT_ERROR: '⚠️',
 }
 
 export default function NotificationBell() {
