@@ -81,7 +81,18 @@ export default function DashboardPage() {
         ])
 
         const clientData = clientRes.data.client
-        if (clientData.status === 'PENDING') { router.push(`/onboarding/connect?clientId=${clientId}`); return }
+        // Store plan for sidebar filtering and onboarding
+        if (clientData.plan) localStorage.setItem('clientPlan', clientData.plan)
+        if (clientData.status === 'PENDING') {
+          // Check onboarding step — step 1 = needs plan selection, step 2+ = go to connect
+          const onboardingStep = clientData.onboarding?.step || 1
+          if (onboardingStep <= 1 && !clientData.stripeSubId) {
+            router.push('/onboarding')
+          } else {
+            router.push(`/onboarding/connect?clientId=${clientId}`)
+          }
+          return
+        }
 
         const agentsData: AgentDeployment[] = agentsRes.data.agents
         const callStats = callStatsRes.data

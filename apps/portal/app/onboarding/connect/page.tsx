@@ -30,7 +30,10 @@ function ConnectPageInner() {
     calcomApiKey: ''
   })
   const [connected, setConnected] = useState<Record<string, boolean>>({})
-  const [clientPlan, setClientPlan] = useState('')
+  const [clientPlan, setClientPlan] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('clientPlan') || ''
+    return ''
+  })
   const [businessType, setBusinessType] = useState('other')
 
   const isReceptionist = clientPlan === 'AI_RECEPTIONIST'
@@ -94,7 +97,15 @@ function ConnectPageInner() {
   }, [searchParams])
 
   function getToken() { return localStorage.getItem('token') || '' }
-  function getClientId() { return localStorage.getItem('clientId') || '' }
+  function getClientId() {
+    // Try URL param first (admin direct link), then localStorage
+    const fromUrl = searchParams.get('clientId')
+    if (fromUrl) {
+      localStorage.setItem('clientId', fromUrl)
+      return fromUrl
+    }
+    return localStorage.getItem('clientId') || ''
+  }
   function mark(key: string) { setConnected(prev => ({ ...prev, [key]: true })) }
 
   async function disconnectPlatform(platform: string) {

@@ -10,6 +10,8 @@ const updateClientSchema = z.object({
   businessName: z.string().min(1).optional(),
   phone: z.string().optional(),
   country: z.string().optional(),
+  plan: z.enum(['AI_RECEPTIONIST', 'STARTER', 'GROWTH', 'AGENCY']).optional(),
+  businessType: z.string().optional(),
   crmType: z.string().nullable().optional().transform(v => (!v || v.toLowerCase() === 'none') ? null : v),
   businessDescription: z.string().optional(),
   icpDescription: z.string().optional()

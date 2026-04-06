@@ -9,14 +9,31 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 const plans = [
   {
+    id: 'AI_RECEPTIONIST',
+    name: 'AI Receptionist',
+    price: 147,
+    description: 'AI answers every call 24/7, books appointments, follows up, and reminds clients to rebook. Perfect for service businesses.',
+    agents: [
+      'AI Receptionist (24/7 inbound)',
+      'Automated Follow-Up Calls',
+      'Recurring Rebooking Reminders',
+      '2 Phone Numbers Included',
+      'CRM with Service Pipeline'
+    ],
+    color: 'from-emerald-500 to-teal-500',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_RECEPTIONIST_PRICE_ID || 'price_receptionist'
+  },
+  {
     id: 'STARTER',
     name: 'Starter',
-    price: 97,
-    description: 'Perfect for small businesses ready to automate lead generation and appointment booking.',
+    price: 197,
+    description: 'AI lead scoring, appointment setting, and inbound voice — your first AI sales team.',
     agents: [
       'Lead Generation Agent',
       'Appointment Setter Agent',
-      'Voice Inbound Agent (24/7)'
+      'Voice Inbound Agent (24/7)',
+      'Social Engagement Agent',
+      'Conversational Workflows'
     ],
     color: 'from-blue-500 to-cyan-500',
     priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || 'price_starter'
@@ -24,15 +41,14 @@ const plans = [
   {
     id: 'GROWTH',
     name: 'Growth',
-    price: 297,
-    description: 'Expand your reach with LinkedIn outreach, social media, and outbound calling.',
+    price: 497,
+    description: 'Proactive outreach across LinkedIn, social media, and outbound calling.',
     agents: [
-      'Lead Generation Agent',
+      'Everything in Starter',
       'LinkedIn Outreach Agent',
       'Social Media Agent',
-      'Appointment Setter Agent',
-      'Voice Inbound Agent (24/7)',
-      'Voice Outbound Agent'
+      'Voice Outbound Agent',
+      'Content Calendar & Analytics'
     ],
     color: 'from-indigo-500 to-purple-600',
     highlighted: true,
@@ -41,18 +57,14 @@ const plans = [
   {
     id: 'AGENCY',
     name: 'Agency',
-    price: 697,
-    description: 'Full AI workforce. Every agent working together to grow your business 24/7.',
+    price: 997,
+    description: 'The complete AI-powered sales machine. From first touch to closed deal.',
     agents: [
-      'Lead Generation Agent',
-      'LinkedIn Outreach Agent',
-      'Social Media Agent',
-      'Advertising Optimisation Agent',
-      'Appointment Setter Agent',
-      'Voice Inbound Agent (24/7)',
-      'Voice Outbound Agent',
+      'Everything in Growth',
       'Voice Closer Agent',
-      'Client Services Agent'
+      'Advertising Manager (Meta/Google)',
+      'Client Services Agent',
+      'Priority Support'
     ],
     color: 'from-purple-600 to-pink-600',
     priceId: process.env.NEXT_PUBLIC_STRIPE_AGENCY_PRICE_ID || 'price_agency'
@@ -78,21 +90,39 @@ export default function OnboardingPage() {
         return
       }
 
-      const response = await axios.post(
-        `${API_URL}/billing/create-checkout-session`,
-        {
-          priceId,
-          clientId,
-          successUrl: `${window.location.origin}/onboarding/connect?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${window.location.origin}/onboarding`
-        },
+      // Update client plan in DB
+      await axios.patch(
+        `${API_URL}/clients/${clientId}`,
+        { plan: planId },
         { headers: { Authorization: `Bearer ${token}` } }
-      )
+      ).catch(() => {})
 
-      const stripe = await stripePromise
-      if (!stripe) throw new Error('Stripe not loaded')
+      localStorage.setItem('clientPlan', planId)
 
-      await stripe.redirectToCheckout({ sessionId: response.data.sessionId })
+      // Try Stripe checkout if configured
+      try {
+        const response = await axios.post(
+          `${API_URL}/billing/create-checkout-session`,
+          {
+            priceId,
+            clientId,
+            successUrl: `${window.location.origin}/onboarding/connect?session_id={CHECKOUT_SESSION_ID}&clientId=${clientId}`,
+            cancelUrl: `${window.location.origin}/onboarding`
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+
+        const stripe = await stripePromise
+        if (stripe && response.data.sessionId) {
+          await stripe.redirectToCheckout({ sessionId: response.data.sessionId })
+          return
+        }
+      } catch {
+        // Stripe not configured — skip payment (testing mode)
+      }
+
+      // Fallback: go directly to connect (testing mode / no Stripe)
+      window.location.href = `/onboarding/connect?clientId=${clientId}`
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.error || 'Failed to start checkout')
@@ -127,7 +157,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {plans.map(plan => (
             <div
               key={plan.id}
