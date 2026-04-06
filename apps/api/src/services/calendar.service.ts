@@ -174,11 +174,13 @@ function formatSlotLabel(isoDate: string, timezone: string = DEFAULT_TIMEZONE): 
   })
 }
 
-// Convert a local date/hour in a given timezone to a UTC Date object
+// Convert a local date/hour (supports half-hours like 8.5 = 8:30) to a UTC Date object
 function localToUtc(date: Date, hour: number, timezone: string): Date {
   const dateStr = date.toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD
   // Create a date string in the target timezone and let JS parse it
-  const localStr = `${dateStr}T${String(hour).padStart(2, '0')}:00:00`
+  const wholeHour = Math.floor(hour)
+  const minutes = Math.round((hour - wholeHour) * 60)
+  const localStr = `${dateStr}T${String(wholeHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`
   // Use Intl to get the UTC offset for this timezone at this moment
   const formatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' })
   const parts = formatter.formatToParts(new Date(`${dateStr}T12:00:00Z`))
@@ -223,11 +225,11 @@ function buildSlotsFromFreebusy(
     const dayConfig = workingHours.days.find(dh => dh.day === dayOfWeek)
     if (!dayConfig) continue // Not a working day
 
-    for (let hour = dayConfig.startHour; hour < dayConfig.endHour; hour++) {
+    for (let hour = dayConfig.startHour; hour < dayConfig.endHour; hour += 0.5) {
       const slotStart = localToUtc(d, hour, tz)
       if (slotStart <= now) continue
 
-      const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000)
+      const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000)
 
       const isBusy = busySlots.some(b => {
         const bStart = new Date(b.start)
@@ -251,7 +253,7 @@ function buildSlotsFromFreebusy(
 }
 
 // Fetch working hours from Google Calendar settings
-async function getGoogleWorkingHours(oauth2Client: ReturnType<typeof google.auth.OAuth2.prototype.constructor>): Promise<WorkingHours> {
+async function getGoogleWorkingHours(oauth2Client: InstanceType<typeof google.auth.OAuth2>): Promise<WorkingHours> {
   try {
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
@@ -267,13 +269,13 @@ async function getGoogleWorkingHours(oauth2Client: ReturnType<typeof google.auth
     // has all-day "busy" events marking non-working days.
     // Default to Mon-Fri 9am-5pm in the calendar's timezone.
     const defaultDays = [
-      { day: 0, startHour: 8, endHour: 22 }, // Sunday
-      { day: 1, startHour: 8, endHour: 22 }, // Monday
-      { day: 2, startHour: 8, endHour: 22 }, // Tuesday
-      { day: 3, startHour: 8, endHour: 22 }, // Wednesday
-      { day: 4, startHour: 8, endHour: 22 }, // Thursday
-      { day: 5, startHour: 8, endHour: 22 }, // Friday
-      { day: 6, startHour: 8, endHour: 22 }, // Saturday
+      { day: 0, startHour: 8, endHour: 24 }, // Sunday
+      { day: 1, startHour: 8, endHour: 24 }, // Monday
+      { day: 2, startHour: 8, endHour: 24 }, // Tuesday
+      { day: 3, startHour: 8, endHour: 24 }, // Wednesday
+      { day: 4, startHour: 8, endHour: 24 }, // Thursday
+      { day: 5, startHour: 8, endHour: 24 }, // Friday
+      { day: 6, startHour: 8, endHour: 24 }, // Saturday
     ]
     logger.info('Google Calendar timezone detected', { timezone, calendarId: calList?.data?.id })
 
@@ -283,13 +285,13 @@ async function getGoogleWorkingHours(oauth2Client: ReturnType<typeof google.auth
     return {
       timezone: DEFAULT_TIMEZONE,
       days: [
-        { day: 0, startHour: 8, endHour: 22 },
-        { day: 1, startHour: 8, endHour: 22 },
-        { day: 2, startHour: 8, endHour: 22 },
-        { day: 3, startHour: 8, endHour: 22 },
-        { day: 4, startHour: 8, endHour: 22 },
-        { day: 5, startHour: 8, endHour: 22 },
-        { day: 6, startHour: 8, endHour: 22 },
+        { day: 0, startHour: 8, endHour: 24 },
+        { day: 1, startHour: 8, endHour: 24 },
+        { day: 2, startHour: 8, endHour: 24 },
+        { day: 3, startHour: 8, endHour: 24 },
+        { day: 4, startHour: 8, endHour: 24 },
+        { day: 5, startHour: 8, endHour: 24 },
+        { day: 6, startHour: 8, endHour: 24 },
       ]
     }
   }
@@ -417,6 +419,8 @@ export class CalendarService {
     if (gcalClient) {
       try {
         const calendar = google.calendar({ version: 'v3', auth: gcalClient })
+        const workingHours = await getGoogleWorkingHours(gcalClient)
+        const clientTimezone = workingHours.timezone
 
         const event = await calendar.events.insert({
           calendarId: 'primary',
@@ -424,8 +428,8 @@ export class CalendarService {
           requestBody: {
             summary: `Appointment — ${contact.name}`,
             description: `Booked via inbound call for ${businessName}`,
-            start: { dateTime: startTime, timeZone: CLIENT_TIMEZONE },
-            end: { dateTime: endTime, timeZone: CLIENT_TIMEZONE },
+            start: { dateTime: startTime, timeZone: clientTimezone },
+            end: { dateTime: endTime, timeZone: clientTimezone },
             attendees: [{ email: contact.email, displayName: contact.name }]
           }
         })
@@ -455,7 +459,7 @@ export class CalendarService {
             start: startTime,
             end: endTime,
             responses: { name: contact.name, email: contact.email, phone: contact.phone || '' },
-            timeZone: CLIENT_TIMEZONE,
+            timeZone: DEFAULT_TIMEZONE,
             language: 'en',
             metadata: { source: 'voice-inbound' }
           }
