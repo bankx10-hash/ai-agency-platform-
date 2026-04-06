@@ -22,7 +22,19 @@
       "typeVersion": 2,
       "position": [500, 300],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\nreturn [{ json: { contactId: body.contactId, leadSource: body.leadSource || 'unknown', appointmentTime: body.appointmentTime || '', notes: body.notes || '' } }];"
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || data;\nlet apptTime = body.appointmentTime || '';\nif (apptTime) {\n  const d = new Date(apptTime);\n  apptTime = isNaN(d.getTime()) ? '' : d.toISOString();\n}\nreturn [{ json: { contactId: body.contactId, leadSource: body.leadSource || 'unknown', appointmentTime: apptTime, hasAppointmentTime: !!apptTime, notes: body.notes || '' } }];"
+      }
+    },
+    {
+      "id": "check-appointment-time",
+      "name": "Has Appointment Time?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.hasAppointmentTime }}", "value2": true }]
+        }
       }
     },
     {
@@ -30,7 +42,7 @@
       "name": "Wait Until Appointment Time",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [750, 300],
+      "position": [900, 200],
       "parameters": {
         "resume": "specificTime",
         "dateTime": "={{ $json.appointmentTime }}"
@@ -308,7 +320,13 @@
       "main": [[{ "node": "Extract Handoff Data", "type": "main", "index": 0 }]]
     },
     "Extract Handoff Data": {
-      "main": [[{ "node": "Wait Until Appointment Time", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Has Appointment Time?", "type": "main", "index": 0 }]]
+    },
+    "Has Appointment Time?": {
+      "main": [
+        [{ "node": "Wait Until Appointment Time", "type": "main", "index": 0 }],
+        [{ "node": "Get Prospect Data", "type": "main", "index": 0 }]
+      ]
     },
     "Wait Until Appointment Time": {
       "main": [[{ "node": "Get Prospect Data", "type": "main", "index": 0 }]]
