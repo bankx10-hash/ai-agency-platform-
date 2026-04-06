@@ -10,8 +10,9 @@
       "position": [250, 300],
       "parameters": {
         "path": "client-services-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "client-services-{{CLIENT_ID}}"
     },
     {
       "id": "schedule-checkins",
@@ -142,8 +143,9 @@
       "position": [250, 700],
       "parameters": {
         "path": "client-support-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "client-support-{{CLIENT_ID}}"
     },
     {
       "id": "claude-handle-support",

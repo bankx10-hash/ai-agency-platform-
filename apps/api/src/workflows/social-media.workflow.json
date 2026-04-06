@@ -23,8 +23,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "social-brief-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "social-brief-{{CLIENT_ID}}"
     },
     {
       "id": "claude-generate-content",

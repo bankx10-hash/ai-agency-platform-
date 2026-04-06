@@ -100,8 +100,9 @@
       "position": [250, 500],
       "parameters": {
         "path": "ads-alert-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "ads-alert-{{CLIENT_ID}}"
     },
     {
       "id": "send-alert",

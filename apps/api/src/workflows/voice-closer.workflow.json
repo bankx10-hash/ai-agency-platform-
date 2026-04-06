@@ -11,8 +11,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "closer-ready-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "closer-ready-{{CLIENT_ID}}"
     },
     {
       "id": "extract-handoff",
@@ -126,8 +127,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "closer-result-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "closer-result-{{CLIENT_ID}}"
     },
     {
       "id": "build-analysis-request",

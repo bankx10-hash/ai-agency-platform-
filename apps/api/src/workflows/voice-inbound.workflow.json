@@ -11,9 +11,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "voice-inbound-{{CLIENT_ID}}",
-        "responseMode": "onReceived",
-        "responseData": "allEntries"
-      }
+        "options": {}
+      },
+      "webhookId": "voice-inbound-{{CLIENT_ID}}"
     },
     {
       "id": "build-claude-request",
@@ -207,8 +207,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "voice-calendar-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "voice-calendar-{{CLIENT_ID}}"
     },
     {
       "id": "build-calendar-confirmation",

@@ -11,8 +11,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "followup-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "followup-{{CLIENT_ID}}"
     },
     {
       "id": "extract-data",
@@ -93,8 +94,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "followup-result-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "followup-result-{{CLIENT_ID}}"
     },
     {
       "id": "analyse-result",

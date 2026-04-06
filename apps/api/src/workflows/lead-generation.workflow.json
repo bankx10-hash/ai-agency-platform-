@@ -24,9 +24,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "lead-gen-{{CLIENT_ID}}",
-        "responseMode": "onReceived",
-        "responseData": "allEntries"
-      }
+        "options": {}
+      },
+      "webhookId": "lead-gen-{{CLIENT_ID}}"
     },
     {
       "id": "fetch-leads",

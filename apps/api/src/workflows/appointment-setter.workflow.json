@@ -11,9 +11,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "appointments-{{CLIENT_ID}}",
-        "responseMode": "onReceived",
-        "responseData": "allEntries"
-      }
+        "options": {}
+      },
+      "webhookId": "appointments-{{CLIENT_ID}}"
     },
     {
       "id": "get-contact-details",
@@ -107,9 +107,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "appt-reply-{{CLIENT_ID}}",
-        "responseMode": "onReceived",
-        "responseData": "allEntries"
-      }
+        "options": {}
+      },
+      "webhookId": "appt-reply-{{CLIENT_ID}}"
     },
     {
       "id": "build-classify-request",

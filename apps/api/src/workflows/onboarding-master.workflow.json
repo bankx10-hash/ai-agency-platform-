@@ -10,8 +10,9 @@
       "position": [250, 300],
       "parameters": {
         "path": "onboarding-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "onboarding-{{CLIENT_ID}}"
     },
     {
       "id": "deploy-agents",

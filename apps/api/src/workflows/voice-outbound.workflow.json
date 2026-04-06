@@ -67,8 +67,9 @@
       "position": [250, 500],
       "parameters": {
         "path": "voice-outbound-{{CLIENT_ID}}",
-        "responseMode": "onReceived"
-      }
+        "options": {}
+      },
+      "webhookId": "voice-outbound-{{CLIENT_ID}}"
     },
     {
       "id": "get-call-result",
