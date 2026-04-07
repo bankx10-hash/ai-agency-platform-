@@ -605,16 +605,12 @@ router.post('/:clientId/appointments', async (req, res) => {
     const client = await prisma.client.findUnique({ where: { id: clientId }, select: { businessName: true } })
     const businessName = client?.businessName || 'our business'
 
-    // Book on real calendar (Google Calendar / Calendly / Cal.com)
-    let bookingResult: { success: boolean; booked: boolean; confirmationMessage: string; eventLink?: string } | undefined
-    if (startTime && contactName && contactEmail) {
-      bookingResult = await calendarService.bookAppointment(
-        clientId,
-        startTime,
-        { name: contactName, email: contactEmail },
-        businessName
-      )
-      logger.info('Calendar booking result', { clientId, booked: bookingResult.booked, message: bookingResult.confirmationMessage })
+    // Calendar booking happens upstream in /calendar/:clientId/book (Retell tool) or
+    // via the N8N calendar webhook path. Skip booking + email here to avoid duplicate
+    // invites. This endpoint is now metrics + closer trigger only.
+    const bookingResult: { success: boolean; booked: boolean; confirmationMessage: string; eventLink?: string } | undefined = undefined
+    logger.info('Calendar booking skipped (handled upstream)', { clientId })
+    if (false) {
     }
 
     // Update agent metrics
