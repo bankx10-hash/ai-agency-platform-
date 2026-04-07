@@ -125,9 +125,8 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({ agent_id: '{{RETELL_AGENT_ID}}', to_number: $json.phone, from_number: '{{PHONE_NUMBER}}', metadata: { contactId: $json.contactId, script: $json.script } }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from_number: '{{PHONE_NUMBER}}', to_number: $json.phone, override_agent_id: '{{RETELL_AGENT_ID}}', metadata: { contactId: $json.contactId, script: $json.script } }) }}"
       }
     },
     {
