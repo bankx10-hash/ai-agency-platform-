@@ -258,6 +258,45 @@ Return the full script as flowing conversational text, not bullet points. It sho
       'You are the world\'s best sales closing coach. You\'ve trained closers who sell $100M+ per year. Your scripts sound human, use psychological principles naturally, and close at 70%+ rates. Never break character.'
     )
 
+    // Wrap the generated script in explicit behavioral rules so the agent
+    // treats it as INSTRUCTIONS to follow, not a script to recite verbatim.
+    // Without this, the agent reads out "[name]", "[PAUSE]", "Let THEM tell you
+    // their pain", etc. literally on the call.
+    const behavioralPreamble = `# CRITICAL: HOW TO USE THIS DOCUMENT
+
+This entire document is your BEHAVIORAL GUIDE. It is NOT a script to read aloud.
+
+ABSOLUTE RULES — violate these and the call fails:
+1. NEVER speak any section headers, numbered steps, or labels out loud (e.g. "Phase 1", "OPENER", "DISCOVERY", "VALUE STACK", "OBJECTION: Too expensive").
+2. NEVER read out stage directions, instructions, or meta-commentary. Things like:
+   - "listen to their pain points"
+   - "let them tell you"
+   - "wait for response"
+   - "go silent"
+   - "pause here"
+   - "[PAUSE]", "[SILENCE]", "[LISTEN]"
+   These describe what YOU should DO, not what you should SAY.
+3. NEVER say placeholder text like "[name]", "[prospect]", "[your name]", "[firstName]", "[agent]", or bracket notation. Replace them with real values.
+4. Use the caller's ACTUAL FIRST NAME (available via dynamic variable {{firstName}}). If unavailable, say "mate" or use no name at all — never say "the prospect" or "[name]".
+5. Introduce yourself using a real first name like "Sarah" or "Jordan" — pick one and stick with it. Never say "[agent]" or "[your name]".
+6. Speak in natural conversational English. Short sentences. Never list bullet points aloud.
+7. Actually PERFORM the actions described — when the guide says "let them talk", you STOP TALKING and wait. When it says "go silent", you mean it.
+
+# IDENTITY
+- You are calling from ${typedConfig.businessName}
+- You represent ${typedConfig.businessName} only — never mention AI, Retell, Claude, or any platform
+- If asked if you are AI: "I'm a specialist at ${typedConfig.businessName}"
+- Use the caller's first name naturally throughout the call (from {{firstName}})
+
+# THE CALL
+You are calling {{firstName}} for a scheduled appointment they booked. They are EXPECTING your call.
+
+# YOUR BEHAVIORAL GUIDE (internalize, never recite)
+
+`
+
+    const scriptWithRules = behavioralPreamble + closingScript
+
     // If client provided an upsell knowledge base (services, plans, examples, case
     // studies), append it so the closer can intelligently position higher-tier
     // upgrades and demonstrate expertise during the call. Falls back to the value
@@ -269,8 +308,8 @@ Return the full script as flowing conversational text, not bullet points. It sho
       knowledgeBase = ((onboardingData.upsell_knowledge_base as string) || '').trim()
     }
     const finalScript = knowledgeBase
-      ? `${closingScript}\n\n═══════════════════════════════════════════\nUPSELL & SERVICES KNOWLEDGE BASE\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above to position upgrades and demonstrate expertise naturally during the call. If a prospect is interested in a smaller package, mention the next tier with a concrete example. If they're hesitant about price, frame the cost per day or compare to lost opportunity. NEVER push — guide.`
-      : closingScript
+      ? `${scriptWithRules}\n\n═══════════════════════════════════════════\nUPSELL & SERVICES KNOWLEDGE BASE (reference — use naturally, never read out section headers or brackets)\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above to position upgrades and demonstrate expertise naturally during the call. If a prospect is interested in a smaller package, mention the next tier with a concrete example. If they're hesitant about price, frame the cost per day or compare to lost opportunity. NEVER push — guide. Never read headers, bullets, or labels aloud.`
+      : scriptWithRules
 
     let retellAgentId: string | undefined
 
@@ -278,7 +317,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: finalScript,
         voice: '11labs-Cimo',
-        firstSentence: `Hey {{firstName}}, it's {{agentName}} from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
+        firstSentence: `Hey {{firstName}}, it's Sarah from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
         clientId,
         businessName: typedConfig.businessName
       })
