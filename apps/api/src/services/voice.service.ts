@@ -8,6 +8,11 @@ import { logger } from '../utils/logger'
 const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
+// SIP credentials Retell uses to authenticate against the Twilio trunk's
+// Termination credential list. Required for outbound calls when the trunk
+// rejects unauthenticated INVITEs (which it does by default).
+const RETELL_SIP_AUTH_USERNAME = process.env.RETELL_SIP_AUTH_USERNAME || ''
+const RETELL_SIP_AUTH_PASSWORD = process.env.RETELL_SIP_AUTH_PASSWORD || ''
 
 function getTwilioClient() {
   return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -264,6 +269,8 @@ export class VoiceService {
         await retellApi.post('/import-phone-number', {
           phone_number: phoneNumber,
           termination_uri: terminationUri,
+          ...(RETELL_SIP_AUTH_USERNAME && { sip_trunk_auth_username: RETELL_SIP_AUTH_USERNAME }),
+          ...(RETELL_SIP_AUTH_PASSWORD && { sip_trunk_auth_password: RETELL_SIP_AUTH_PASSWORD }),
           inbound_agents: [{ agent_id: agentId, weight: 1 }],
           nickname: `${businessName} - ${clientId}`
         })
@@ -414,6 +421,8 @@ export class VoiceService {
         await retellApi.post('/import-phone-number', {
           phone_number: phoneNumber,
           termination_uri: terminationUri,
+          ...(RETELL_SIP_AUTH_USERNAME && { sip_trunk_auth_username: RETELL_SIP_AUTH_USERNAME }),
+          ...(RETELL_SIP_AUTH_PASSWORD && { sip_trunk_auth_password: RETELL_SIP_AUTH_PASSWORD }),
           ...(retellAgentId && { outbound_agent_id: retellAgentId }),
           nickname: `${businessName} Outbound - ${clientId}`
         })
