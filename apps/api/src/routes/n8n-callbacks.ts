@@ -608,10 +608,9 @@ router.post('/:clientId/appointments', async (req, res) => {
     // Calendar booking happens upstream in /calendar/:clientId/book (Retell tool) or
     // via the N8N calendar webhook path. Skip booking + email here to avoid duplicate
     // invites. This endpoint is now metrics + closer trigger only.
-    const bookingResult: { success: boolean; booked: boolean; confirmationMessage: string; eventLink?: string } | undefined = undefined
+    type BookingResult = { success: boolean; booked: boolean; confirmationMessage: string; eventLink?: string }
+    const bookingResult = undefined as BookingResult | undefined
     logger.info('Calendar booking skipped (handled upstream)', { clientId })
-    if (false) {
-    }
 
     // Update agent metrics
     const agent = await prisma.agentDeployment.findFirst({ where: { clientId, agentType: 'APPOINTMENT_SETTER' as never } })
@@ -633,7 +632,7 @@ router.post('/:clientId/appointments', async (req, res) => {
       }).catch(() => {})
       // Determine pipeline stage based on client plan type
       const clientForPlan = await prisma.client.findUnique({ where: { id: clientId }, select: { plan: true } })
-      const isReceptionist = clientForPlan?.plan === 'AI_RECEPTIONIST'
+      const isReceptionist = (clientForPlan?.plan as string | undefined) === 'AI_RECEPTIONIST'
       const pipelineStage = isReceptionist ? 'APPOINTMENT_BOOKED' : 'QUALIFIED'
       await prisma.contact.updateMany({ where: { id: contactId, clientId }, data: { lastContactedAt: new Date(), pipelineStage: pipelineStage as never } }).catch(() => {})
 
