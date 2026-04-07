@@ -314,26 +314,14 @@
     },
     "Already Booked During Call?": {
       "main": [
-        [{ "node": "Build Call Booking Confirmation", "type": "main", "index": 0 }],
+        [{ "node": "Log Appointment From Call", "type": "main", "index": 0 }],
         [{ "node": "Build Booking Link Email", "type": "main", "index": 0 }]
       ]
-    },
-    "Build Call Booking Confirmation": {
-      "main": [[{ "node": "Send Call Booking Confirmation", "type": "main", "index": 0 }]]
-    },
-    "Send Call Booking Confirmation": {
-      "main": [[{ "node": "Log Appointment From Call", "type": "main", "index": 0 }]]
     },
     "Build Booking Link Email": {
       "main": [[{ "node": "Send Booking Link Email", "type": "main", "index": 0 }]]
     },
     "Calendar Booking Webhook": {
-      "main": [[{ "node": "Build Calendar Confirmation Email", "type": "main", "index": 0 }]]
-    },
-    "Build Calendar Confirmation Email": {
-      "main": [[{ "node": "Send Calendar Confirmation Email", "type": "main", "index": 0 }]]
-    },
-    "Send Calendar Confirmation Email": {
       "main": [[{ "node": "Log Appointment to Dashboard", "type": "main", "index": 0 }]]
     }
   },
