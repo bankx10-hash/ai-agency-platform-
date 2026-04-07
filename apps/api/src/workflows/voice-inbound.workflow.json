@@ -78,7 +78,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ name: $('Parse Call Analysis').first().json.callerName, phone: $('Parse Call Analysis').first().json.callerPhone, email: $('Parse Call Analysis').first().json.callerEmail, source: 'Inbound Call', tags: ['inbound-call'], intent: $('Parse Call Analysis').first().json.intent }) }}"
+        "jsonBody": "={{ JSON.stringify({ name: $('Parse Call Analysis').first().json.callerName, phone: $('Parse Call Analysis').first().json.callerPhone, email: $('Parse Call Analysis').first().json.callerEmail, source: 'Inbound Call', tags: ['inbound-call'], intent: $('Parse Call Analysis').first().json.intent, callId: ($('Call Completed Webhook').first().json.body || $('Call Completed Webhook').first().json).call?.call_id, transcript: ($('Call Completed Webhook').first().json.body || $('Call Completed Webhook').first().json).call?.transcript, callSummary: $('Parse Call Analysis').first().json.summary, durationSeconds: ((($('Call Completed Webhook').first().json.body || $('Call Completed Webhook').first().json).call?.duration_ms || 0) / 1000) || undefined, fromNumber: ($('Call Completed Webhook').first().json.body || $('Call Completed Webhook').first().json).call?.from_number, appointmentBooked: $('Parse Call Analysis').first().json.appointmentBooked }) }}"
       }
     },
     {

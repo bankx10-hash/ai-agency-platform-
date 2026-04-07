@@ -313,10 +313,14 @@ router.get('/:clientId/contacts/by-linkedin', async (req, res) => {
 // POST /:clientId/contacts
 router.post('/:clientId/contacts', async (req, res) => {
   const { clientId } = req.params
-  const { name, email, phone, source, tags = [], intent, linkedinUrl } = req.body
+  const {
+    name, email, phone, source, tags = [], intent, linkedinUrl,
+    // Inbound-call enrichment fields (sent by voice-inbound workflow)
+    callId, transcript, callSummary, durationSeconds, fromNumber, appointmentBooked
+  } = req.body
   try {
     const crmType = await getClientCrmType(clientId)
-    logger.info('N8N contact save', { clientId, crmType, name })
+    logger.info('N8N contact save', { clientId, crmType, name, hasCallData: !!callId })
 
     // Upsert to internal DB — deduplicates by email within the same client
     const newId = randomUUID()
@@ -376,6 +380,76 @@ router.post('/:clientId/contacts', async (req, res) => {
         } catch (hsErr) {
           logger.warn('HubSpot sync failed, contact still saved locally', { clientId, hsErr })
         }
+      }
+    }
+
+    // If this contact came from an inbound call, link the CallLog row to the
+    // contact and create a CALL activity on the contact's timeline so the
+    // user can see full call details (transcript, duration, summary) in CRM.
+    if (callId || transcript || callSummary) {
+      try {
+        // Link the CallLog to this contact (CallLog row is created earlier by
+        // /calls/webhook in routes/calls.ts — match by retellCallId)
+        if (callId) {
+          await prisma.$executeRaw`
+            UPDATE "CallLog"
+            SET "contactId" = ${id},
+                "callerName" = COALESCE(${name || null}, "callerName"),
+                "callerEmail" = COALESCE(${email || null}, "callerEmail"),
+                "intent" = COALESCE(${intent || null}, "intent"),
+                "appointmentBooked" = COALESCE(${appointmentBooked ?? null}, "appointmentBooked")
+            WHERE "retellCallId" = ${callId} AND "clientId" = ${clientId}
+          `
+        }
+
+        // Create a CALL ContactActivity on the platform CRM timeline so the
+        // call appears in /dashboard/crm/contacts/:id with full details.
+        const activityTitle = `Inbound call${name ? ` from ${name}` : ''}${durationSeconds ? ` (${Math.round(durationSeconds / 60)}m ${durationSeconds % 60}s)` : ''}`
+        await prisma.contactActivity.create({
+          data: {
+            id: randomUUID(),
+            contactId: id,
+            clientId,
+            type: 'CALL' as never,
+            title: activityTitle,
+            body: callSummary || transcript?.slice(0, 2000) || null,
+            metadata: {
+              callId,
+              direction: 'INBOUND',
+              fromNumber,
+              durationSeconds,
+              intent,
+              appointmentBooked,
+              transcriptPreview: transcript?.slice(0, 500),
+              hasFullTranscript: !!transcript
+            } as never,
+            agentType: 'VOICE_INBOUND'
+          }
+        }).catch((err) => logger.warn('Failed to create CALL activity', { clientId, err: String(err) }))
+
+        // Also push a call summary note to the connected external CRM
+        // (HubSpot) if linked, so the call shows up there too.
+        if (crmType === 'hubspot' && crmId) {
+          const token = await getHubSpotToken(clientId)
+          if (token) {
+            const noteBody = [
+              `📞 ${activityTitle}`,
+              callSummary ? `\nSummary: ${callSummary}` : '',
+              intent ? `Intent: ${intent}` : '',
+              fromNumber ? `From: ${fromNumber}` : '',
+              durationSeconds ? `Duration: ${Math.round(durationSeconds / 60)}m ${durationSeconds % 60}s` : '',
+              appointmentBooked ? '✅ Appointment booked during call' : '',
+              transcript ? `\n--- Transcript ---\n${transcript.slice(0, 5000)}` : ''
+            ].filter(Boolean).join('\n')
+            await hubspotAddNote(token, crmId, noteBody).catch((err) =>
+              logger.warn('HubSpot call note sync failed', { clientId, err: String(err) })
+            )
+          }
+        }
+
+        logger.info('Call linked to contact in platform CRM and synced to external CRM', { clientId, contactId: id, callId, crmType })
+      } catch (callLinkErr) {
+        logger.error('Failed to link call to contact', { clientId, contactId: id, err: String(callLinkErr) })
       }
     }
 
