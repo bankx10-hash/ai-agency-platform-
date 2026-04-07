@@ -86,7 +86,7 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
     try {
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: outboundScript,
-        voice: '11labs-Adrian',
+        voice: '11labs-Cimo',
         firstSentence: `Hi, is this a good time to chat for just 2 minutes? I'm calling from ${typedConfig.businessName}.`,
         clientId,
         businessName: typedConfig.businessName,
@@ -99,6 +99,19 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
       logger.warn('Failed to create Retell AI outbound agent', { clientId, error })
     }
 
+    // Provision dedicated outbound phone number for voice outbound agent
+    const phoneNumber = await voiceService.provisionOutboundPhoneNumber({
+      clientId,
+      businessName: typedConfig.businessName,
+      country: ((typedConfig as unknown as Record<string, unknown>).country as string) || 'AU',
+      address: (typedConfig as unknown as Record<string, unknown>).address as { street: string; city: string; state?: string; postcode?: string } | undefined,
+      credentialService: 'voice-outbound-phone',
+      retellAgentId
+    }) || ''
+    if (!phoneNumber) {
+      logger.warn('Voice outbound: no outbound phone provisioned — outbound calls will fail', { clientId })
+    }
+
     let workflowResult: { workflowId: string } | undefined
 
     try {
@@ -108,6 +121,7 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
         agentPrompt: outboundScript,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-outbound-${clientId}`,
         retellAgentId,
+        phoneNumber,
         businessName: typedConfig.businessName
       })
     } catch (error) {

@@ -13,9 +13,10 @@ function getTwilioClient() {
   return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 }
 
-const DEFAULT_VOICE_ID = '11labs-Adrian'
+const DEFAULT_VOICE_ID = '11labs-Cimo'
 // Known-valid Retell voice IDs — any value not in this set is replaced with the default
 const VALID_VOICE_IDS = new Set([
+  '11labs-Cimo',
   '11labs-Adrian',
   '11labs-MyrtleInevitable',
   '11labs-Myrtleinev',
@@ -320,6 +321,131 @@ export class VoiceService {
     logger.info('Retell outbound agent created', { agentId, clientId })
 
     return { agentId }
+  }
+
+  /**
+   * Provision a dedicated outbound phone number for a client (used by closer + receptionist followup).
+   * Retell numbers are inbound XOR outbound, so outbound agents need their own number.
+   * Saves to ClientCredential under the supplied service key. Idempotent — returns existing if found.
+   */
+  async provisionOutboundPhoneNumber(params: {
+    clientId: string
+    businessName: string
+    country?: string
+    address?: { street: string; city: string; state?: string; postcode?: string }
+    credentialService: string  // e.g. 'closer-outbound-phone' or 'receptionist-outbound-phone'
+    retellAgentId?: string     // optional — link the imported number to this outbound agent
+  }): Promise<string | undefined> {
+    const { clientId, businessName, country = 'AU', address, credentialService, retellAgentId } = params
+    const provisionNumbers = process.env.VOICE_PROVISION_NUMBERS !== 'false'
+
+    // Reuse existing if already provisioned (idempotent on redeploy)
+    const existing = await prisma.clientCredential.findFirst({
+      where: { clientId, service: credentialService },
+      select: { credentials: true }
+    })
+    if (existing) {
+      try {
+        const decrypted = JSON.parse(existing.credentials) as { phoneNumber?: string }
+        if (decrypted.phoneNumber) {
+          logger.info('Reusing existing outbound phone number', { clientId, credentialService, phoneNumber: decrypted.phoneNumber })
+          return decrypted.phoneNumber
+        }
+      } catch { /* fall through to provision */ }
+    }
+
+    if (!provisionNumbers) {
+      logger.info('Outbound phone provisioning disabled (VOICE_PROVISION_NUMBERS=false)', { clientId, credentialService })
+      return undefined
+    }
+
+    let phoneNumber: string | undefined
+
+    try {
+      if (country === 'AU') {
+        const twilioClient = getTwilioClient()
+        const bundleSid = process.env.TWILIO_BUNDLE_SID
+        let addressSid = process.env.TWILIO_BUNDLE_ADDRESS_SID
+
+        if (!addressSid && address?.street && address?.city) {
+          try {
+            const created = await twilioClient.addresses.create({
+              customerName: businessName,
+              street: address.street,
+              city: address.city,
+              region: address.state || '',
+              postalCode: address.postcode || '',
+              isoCountry: 'AU'
+            })
+            addressSid = created.sid
+          } catch (addrError) {
+            logger.warn('Outbound: address creation failed', { clientId, addrError })
+            const list = await twilioClient.addresses.list({ customerName: businessName, limit: 1 })
+            if (list.length) addressSid = list[0].sid
+          }
+        }
+        if (!addressSid) throw new Error('No Twilio address available for AU outbound number purchase')
+
+        const mobileNumbers = await twilioClient.availablePhoneNumbers('AU').mobile.list({ limit: 1, voiceEnabled: true, smsEnabled: true })
+        const localNumbers = mobileNumbers.length
+          ? []
+          : await twilioClient.availablePhoneNumbers('AU').local.list({ limit: 1, voiceEnabled: true })
+        const available: { phoneNumber: string }[] = mobileNumbers.length ? mobileNumbers : localNumbers
+        if (!available.length) throw new Error('No Australian Twilio numbers available for outbound')
+
+        const trunkSid = process.env.TWILIO_SIP_TRUNK_SID
+        if (!trunkSid) throw new Error('TWILIO_SIP_TRUNK_SID env var not set')
+
+        const purchased = await twilioClient.incomingPhoneNumbers.create({
+          phoneNumber: available[0].phoneNumber,
+          friendlyName: `${businessName} Outbound (${credentialService}) - ${clientId}`,
+          trunkSid,
+          addressSid,
+          ...(bundleSid && { bundleSid })
+        })
+        phoneNumber = purchased.phoneNumber
+        logger.info('AU outbound number purchased', { phoneNumber, clientId, credentialService })
+
+        const trunk = await twilioClient.trunking.v1.trunks(trunkSid).fetch()
+        const terminationUri = trunk.domainName
+        if (!terminationUri) throw new Error('Twilio SIP trunk has no domain name configured')
+
+        // Import to Retell as an outbound number — link to the outbound agent if provided
+        await retellApi.post('/import-phone-number', {
+          phone_number: phoneNumber,
+          termination_uri: terminationUri,
+          ...(retellAgentId && { outbound_agent_id: retellAgentId }),
+          nickname: `${businessName} Outbound - ${clientId}`
+        })
+        logger.info('AU outbound number imported to Retell', { phoneNumber, clientId, credentialService })
+      } else {
+        // US/CA: Retell auto-provisions via Twilio
+        const phoneRes = await retellApi.post('/create-phone-number', {
+          area_code: 512,
+          ...(retellAgentId && { outbound_agents: [{ agent_id: retellAgentId, weight: 1 }] }),
+          nickname: `${businessName} Outbound - ${clientId}`,
+          twilio_account_sid: TWILIO_ACCOUNT_SID,
+          twilio_auth_token: TWILIO_AUTH_TOKEN
+        })
+        phoneNumber = phoneRes.data.phone_number
+        logger.info('Outbound phone number provisioned via Retell', { phoneNumber, clientId, credentialService })
+      }
+
+      // Save the provisioned number under the supplied credential service key
+      if (phoneNumber) {
+        await prisma.clientCredential.create({
+          data: {
+            clientId,
+            service: credentialService,
+            credentials: JSON.stringify({ phoneNumber })
+          }
+        })
+      }
+    } catch (error) {
+      logger.error('Failed to provision outbound phone number', { clientId, credentialService, error })
+    }
+
+    return phoneNumber
   }
 
   async launchCall(agentId: string, toNumber: string, fromNumber: string, requestData?: Record<string, unknown>): Promise<string> {

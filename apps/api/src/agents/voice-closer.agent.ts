@@ -256,7 +256,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
     try {
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: closingScript,
-        voice: '11labs-Adrian',
+        voice: '11labs-Cimo',
         firstSentence: `Hey {{firstName}}, it's {{agentName}} from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
         clientId,
         businessName: typedConfig.businessName
@@ -268,33 +268,17 @@ Return the full script as flowing conversational text, not bullet points. It sho
       logger.warn('Failed to create Retell AI closer agent', { clientId, error })
     }
 
-    // Outbound closer needs its own phone number (Retell numbers are inbound XOR outbound).
-    // Priority: 1) typedConfig.outbound_phone_number 2) closer-outbound credential 3) inbound fallback
-    let phoneNumber = (typedConfig as Record<string, unknown>).outbound_phone_number as string | undefined
+    // Provision dedicated outbound phone number for closer (idempotent — reuses on redeploy)
+    const phoneNumber = await voiceService.provisionOutboundPhoneNumber({
+      clientId,
+      businessName: typedConfig.businessName,
+      country: ((typedConfig as unknown as Record<string, unknown>).country as string) || 'AU',
+      address: (typedConfig as unknown as Record<string, unknown>).address as { street: string; city: string; state?: string; postcode?: string } | undefined,
+      credentialService: 'closer-outbound-phone',
+      retellAgentId
+    }) || ''
     if (!phoneNumber) {
-      const cred = await prisma.clientCredential.findFirst({
-        where: { clientId, service: 'closer-outbound-phone' },
-        select: { credentials: true }
-      })
-      if (cred) {
-        try {
-          const decrypted = JSON.parse(cred.credentials) as { phoneNumber?: string }
-          phoneNumber = decrypted.phoneNumber
-        } catch { /* ignore */ }
-      }
-    }
-    if (!phoneNumber) {
-      const inboundDeployment = await prisma.agentDeployment.findFirst({
-        where: { clientId, agentType: 'VOICE_INBOUND' as never, status: 'ACTIVE' as never },
-        select: { config: true }
-      })
-      const inboundConfig = (inboundDeployment?.config as Record<string, unknown>) || {}
-      phoneNumber = (inboundConfig.phone_number as string) || ''
-    }
-    if (!phoneNumber) {
-      logger.warn('Voice closer: no outbound phone number found — outbound calls will fail', { clientId })
-    } else {
-      logger.info('Voice closer outbound phone number resolved', { clientId, phoneNumber })
+      logger.warn('Voice closer: no outbound phone number provisioned — outbound calls will fail', { clientId })
     }
 
     const workflowResult = await n8nService.deployWorkflow('voice-closer', {

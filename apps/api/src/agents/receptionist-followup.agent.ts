@@ -93,7 +93,7 @@ RULES
     try {
       const voiceResult = await voiceService.createOutboundAgent({
         prompt,
-        voice: '11labs-Adrian',
+        voice: '11labs-Cimo',
         firstSentence: `Hi {{firstName}}, it's your team from ${typedConfig.businessName} — just a quick call to check in. How are you going?`,
         clientId,
         businessName: typedConfig.businessName
@@ -104,12 +104,26 @@ RULES
       logger.warn('Failed to create Retell follow-up agent', { clientId, error })
     }
 
+    // Provision dedicated outbound phone number for receptionist follow-up
+    const phoneNumber = await voiceService.provisionOutboundPhoneNumber({
+      clientId,
+      businessName: typedConfig.businessName,
+      country: ((typedConfig as unknown as Record<string, unknown>).country as string) || 'AU',
+      address: (typedConfig as unknown as Record<string, unknown>).address as { street: string; city: string; state?: string; postcode?: string } | undefined,
+      credentialService: 'receptionist-outbound-phone',
+      retellAgentId
+    }) || ''
+    if (!phoneNumber) {
+      logger.warn('Receptionist follow-up: no outbound phone provisioned — outbound calls will fail', { clientId })
+    }
+
     const workflowResult = await n8nService.deployWorkflow('receptionist-followup', {
       clientId,
       locationId: typedConfig.locationId,
       agentPrompt: prompt,
       webhookUrl: `${process.env.N8N_BASE_URL}/webhook/followup-${clientId}`,
       retellAgentId,
+      phoneNumber,
       businessName: typedConfig.businessName
     })
 

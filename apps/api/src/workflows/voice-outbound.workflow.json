@@ -46,17 +46,16 @@
       "position": [750, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.retellai.com/v2/create-call",
+        "url": "https://api.retellai.com/v2/create-phone-call",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "Bearer ={{$env.RETELL_API_KEY}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "Authorization", "value": "Bearer ={{$env.RETELL_API_KEY}}" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"agent_id\":\"{{RETELL_AGENT_ID}}\",\"to_number\":$json.contacts?.[0]?.phone,\"from_number\":\"{{PHONE_NUMBER}}\",\"metadata\":{\"contactId\":$json.contacts?.[0]?.id,\"firstName\":$json.contacts?.[0]?.firstName}}"
+        "jsonBody": "={{ JSON.stringify({ from_number: '{{PHONE_NUMBER}}', to_number: $json.contacts?.[0]?.phone, override_agent_id: '{{RETELL_AGENT_ID}}', metadata: { contactId: $json.contacts?.[0]?.id, firstName: $json.contacts?.[0]?.firstName } }) }}"
       }
     },
     {
