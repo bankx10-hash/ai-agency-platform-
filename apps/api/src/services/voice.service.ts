@@ -315,12 +315,17 @@ export class VoiceService {
     const llmId = await this.createRetellLlm(prompt, firstSentence)
     logger.info('Retell LLM created for outbound agent', { llmId, clientId })
 
-    // Step 2: create the agent
+    // Step 2: create the agent (with voicemail detection for outbound agents)
     const agentRes = await retellApi.post('/create-agent', {
       response_engine: { type: 'retell-llm', llm_id: llmId },
       voice_id: sanitizeVoiceId(voice),
       agent_name: `${businessName} Outbound - ${clientId}`,
       boosted_keywords: [businessName],
+      // Voicemail detection — hang up cleanly if we reach voicemail
+      enable_voicemail_detection: true,
+      voicemail_detection_timeout_ms: 30000,
+      voicemail_message: '',  // empty = hang up silently when voicemail detected
+      end_call_after_silence_ms: 15000,
       ...(callWebhook && { webhook_url: callWebhook })
     })
 
