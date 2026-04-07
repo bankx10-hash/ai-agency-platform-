@@ -225,11 +225,15 @@ function buildSlotsFromFreebusy(
     const dayConfig = workingHours.days.find(dh => dh.day === dayOfWeek)
     if (!dayConfig) continue // Not a working day
 
-    for (let hour = dayConfig.startHour; hour < dayConfig.endHour; hour += 10 / 60) {
-      const slotStart = localToUtc(d, hour, tz)
+    // Use integer minute counter to avoid floating-point drift
+    const startMinutes = dayConfig.startHour * 60
+    const endMinutes = dayConfig.endHour * 60
+    const SLOT_LENGTH_MIN = 10
+    for (let totalMin = startMinutes; totalMin < endMinutes; totalMin += SLOT_LENGTH_MIN) {
+      const slotStart = localToUtc(d, totalMin / 60, tz)
       if (slotStart <= now) continue
 
-      const slotEnd = new Date(slotStart.getTime() + 10 * 60 * 1000)
+      const slotEnd = new Date(slotStart.getTime() + SLOT_LENGTH_MIN * 60 * 1000)
 
       const isBusy = busySlots.some(b => {
         const bStart = new Date(b.start)
