@@ -78,7 +78,11 @@ Respond naturally as if in a real phone conversation.`
        PRIORITY ORDER — the agent must do these in order on every call:
        1. Greet with: "${typedConfig.greeting_script}"
        2. Ask why they are calling (one sentence)
-       3. Collect their name, phone number, and email address — ask for each one at a time, do not skip any of these three fields
+       3. CONTACT DETAILS — collect ALL THREE, one at a time, NEVER skip any:
+          a. Ask: "Could I grab your full name please?"
+          b. Ask: "And the best phone number to reach you on?" — REPEAT BACK the digits to confirm accuracy ("Just to confirm, that's [digits]?")
+          c. Ask: "And what email address should I send the confirmation to?" — spell-check if unclear
+          DO NOT proceed to qualification or booking until all three are collected. If caller refuses any, politely explain you need it for the booking confirmation.
        4. Ask the qualification questions ONE AT A TIME — do not ask more than one at once: ${(typedConfig.qualification_questions || []).join(', ')}
        5. ${bookingInstruction}
        6. End the call with a clear next step
