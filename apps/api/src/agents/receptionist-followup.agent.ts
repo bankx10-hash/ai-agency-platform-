@@ -15,6 +15,12 @@ export interface ReceptionistFollowupConfig {
   rebookingScript: string
   country?: string
   existingPhoneNumber?: string
+  /**
+   * Plain-text or markdown knowledge base shared with closer/inbound/outbound —
+   * services, plans, examples, FAQs. The follow-up agent uses this to answer
+   * caller questions and explain services during check-in calls.
+   */
+  upsell_knowledge_base?: string
 }
 
 export class ReceptionistFollowupAgent extends BaseAgent {
@@ -86,7 +92,18 @@ RULES
     const typedConfig = config as unknown as ReceptionistFollowupConfig
     logger.info('Deploying Receptionist Follow-Up Agent', { clientId })
 
-    const prompt = this.generatePrompt(typedConfig)
+    const basePrompt = this.generatePrompt(typedConfig)
+
+    // Append client-provided knowledge base for service questions during follow-up calls
+    let knowledgeBase = (typedConfig.upsell_knowledge_base || '').trim()
+    if (!knowledgeBase) {
+      const onboarding = await prisma.onboarding.findUnique({ where: { clientId } })
+      const onboardingData = (onboarding?.data as Record<string, unknown>) || {}
+      knowledgeBase = ((onboardingData.upsell_knowledge_base as string) || '').trim()
+    }
+    const prompt = knowledgeBase
+      ? `${basePrompt}\n\n═══════════════════════════════════════════\nSERVICES & KNOWLEDGE BASE\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above when callers ask about services, pricing, or upcoming offers during the check-in. Reference specific details naturally — never read it verbatim.`
+      : basePrompt
 
     let retellAgentId: string | undefined
 

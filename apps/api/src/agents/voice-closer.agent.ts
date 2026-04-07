@@ -16,6 +16,13 @@ export interface VoiceCloserConfig {
   locationId: string
   businessName: string
   businessDescription?: string
+  /**
+   * Plain-text or markdown knowledge base for upsells. Each client can configure
+   * their own services, plans, examples, and case studies during onboarding so
+   * the closer can intelligently position higher-tier upgrades during calls.
+   * See knowledge-base-template.md in the project root for a reference format.
+   */
+  upsell_knowledge_base?: string
 }
 
 export class VoiceCloserAgent extends BaseAgent {
@@ -251,11 +258,25 @@ Return the full script as flowing conversational text, not bullet points. It sho
       'You are the world\'s best sales closing coach. You\'ve trained closers who sell $100M+ per year. Your scripts sound human, use psychological principles naturally, and close at 70%+ rates. Never break character.'
     )
 
+    // If client provided an upsell knowledge base (services, plans, examples, case
+    // studies), append it so the closer can intelligently position higher-tier
+    // upgrades and demonstrate expertise during the call. Falls back to the value
+    // stored in the Onboarding.data JSON if not present in the closer config.
+    let knowledgeBase = (typedConfig.upsell_knowledge_base || '').trim()
+    if (!knowledgeBase) {
+      const onboarding = await prisma.onboarding.findUnique({ where: { clientId } })
+      const onboardingData = (onboarding?.data as Record<string, unknown>) || {}
+      knowledgeBase = ((onboardingData.upsell_knowledge_base as string) || '').trim()
+    }
+    const finalScript = knowledgeBase
+      ? `${closingScript}\n\n═══════════════════════════════════════════\nUPSELL & SERVICES KNOWLEDGE BASE\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above to position upgrades and demonstrate expertise naturally during the call. If a prospect is interested in a smaller package, mention the next tier with a concrete example. If they're hesitant about price, frame the cost per day or compare to lost opportunity. NEVER push — guide.`
+      : closingScript
+
     let retellAgentId: string | undefined
 
     try {
       const voiceResult = await voiceService.createOutboundAgent({
-        prompt: closingScript,
+        prompt: finalScript,
         voice: '11labs-Cimo',
         firstSentence: `Hey {{firstName}}, it's {{agentName}} from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
         clientId,
@@ -284,7 +305,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
     const workflowResult = await n8nService.deployWorkflow('voice-closer', {
       clientId,
       locationId: typedConfig.locationId,
-      agentPrompt: closingScript,
+      agentPrompt: finalScript,
       webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-closer-${clientId}`,
       retellAgentId,
       phoneNumber,
@@ -296,7 +317,7 @@ Return the full script as flowing conversational text, not bullet points. It sho
       clientId,
       {
         ...typedConfig,
-        generatedScript: closingScript,
+        generatedScript: finalScript,
         retell_agent_id: retellAgentId
       },
       workflowResult.workflowId

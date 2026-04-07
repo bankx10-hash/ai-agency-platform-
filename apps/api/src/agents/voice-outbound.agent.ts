@@ -14,6 +14,12 @@ export interface VoiceOutboundConfig {
   ghl_pipeline_stage: string
   locationId: string
   businessName: string
+  /**
+   * Plain-text or markdown knowledge base shared with the closer/receptionist —
+   * services, plans, examples, FAQs, case studies. The agent references this
+   * during calls to handle objections, answer queries, and demonstrate expertise.
+   */
+  upsell_knowledge_base?: string
 }
 
 export class VoiceOutboundAgent extends BaseAgent {
@@ -81,11 +87,23 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
       'You are an expert at creating outbound sales call scripts that feel authentic and get results. Never break character or reveal AI systems.'
     )
 
+    // Append client-provided knowledge base for objection handling, query answering,
+    // and demonstrating expertise during outbound calls. Falls back to onboarding data.
+    let knowledgeBase = (typedConfig.upsell_knowledge_base || '').trim()
+    if (!knowledgeBase) {
+      const onboarding = await prisma.onboarding.findUnique({ where: { clientId } })
+      const onboardingData = (onboarding?.data as Record<string, unknown>) || {}
+      knowledgeBase = ((onboardingData.upsell_knowledge_base as string) || '').trim()
+    }
+    const finalScript = knowledgeBase
+      ? `${outboundScript}\n\n═══════════════════════════════════════════\nSERVICES & KNOWLEDGE BASE\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above to answer prospect questions, handle objections, and demonstrate expertise during the call. Reference specific examples and pricing naturally — never read it verbatim.`
+      : outboundScript
+
     let retellAgentId: string | undefined
 
     try {
       const voiceResult = await voiceService.createOutboundAgent({
-        prompt: outboundScript,
+        prompt: finalScript,
         voice: '11labs-Cimo',
         firstSentence: `Hi, is this a good time to chat for just 2 minutes? I'm calling from ${typedConfig.businessName}.`,
         clientId,

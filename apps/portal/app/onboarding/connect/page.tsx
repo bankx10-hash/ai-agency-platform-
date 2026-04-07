@@ -18,6 +18,7 @@ function ConnectPageInner() {
     icpDescription: '',
     greetingScript: '',
     faqKnowledgeBase: '',
+    upsellKnowledgeBase: '',
     q1: '',
     q2: '',
     q3: '',
@@ -163,6 +164,13 @@ function ConnectPageInner() {
           apiKey: form.calcomApiKey.trim(),
           bookingLink: form.bookingLink.trim() || undefined
         }, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
+      }
+
+      // Save upsell knowledge base for voice agents (closer/inbound/outbound/followup)
+      if (form.upsellKnowledgeBase.trim()) {
+        await axios.put(`${API_URL}/onboarding/${clientId}/knowledge-base`, {
+          knowledgeBase: form.upsellKnowledgeBase.trim()
+        }).catch(() => {})
       }
 
       await axios.post(`${API_URL}/onboarding/start`, {
@@ -498,6 +506,15 @@ function ConnectPageInner() {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-none"/>
               <p className="text-xs text-gray-400 mt-1">The more detail you provide, the better your AI agents will qualify leads.</p>
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Sales knowledge base</label>
+              <textarea value={form.upsellKnowledgeBase}
+                onChange={e => setForm(f => ({ ...f, upsellKnowledgeBase: e.target.value }))}
+                rows={10}
+                placeholder="Your services, plans, pricing, case studies, examples, common objections + answers. Used by closer + voice agents to handle objections, answer questions, and upsell. See knowledge-base-template.md for the recommended format."
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-y font-mono"/>
+              <p className="text-xs text-gray-400 mt-1">The closer, voice inbound, voice outbound, and follow-up agents all pull from this. Use real numbers and case studies for best results.</p>
+            </div>
           </div>
           </>)}{/* end !isReceptionist */}
 
@@ -528,6 +545,15 @@ function ConnectPageInner() {
                   rows={3} placeholder="Describe your business, services you offer, hours, location..."
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-none"/>
                 <p className="text-xs text-gray-400 mt-1">Your AI receptionist uses this to answer caller questions.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Services knowledge base</label>
+                <textarea value={form.upsellKnowledgeBase}
+                  onChange={e => setForm(f => ({ ...f, upsellKnowledgeBase: e.target.value }))}
+                  rows={10}
+                  placeholder="List all your services, pricing, packages, common questions, and example case studies. The receptionist + follow-up agent reference this to answer caller questions and explain services. See knowledge-base-template.md for the recommended format."
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 text-sm resize-y font-mono"/>
+                <p className="text-xs text-gray-400 mt-1">Both the receptionist and the follow-up agent pull from this knowledge base.</p>
               </div>
             </div>
             </>

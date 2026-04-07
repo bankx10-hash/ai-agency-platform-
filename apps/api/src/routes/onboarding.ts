@@ -698,6 +698,66 @@ router.get('/oauth/:platform/callback', async (req: Request, res: Response): Pro
   }
 })
 
+// GET /onboarding/:clientId/knowledge-base — fetch the upsell knowledge base
+router.get('/:clientId/knowledge-base', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { clientId } = req.params
+    const onboarding = await prisma.onboarding.findUnique({ where: { clientId } })
+    const data = (onboarding?.data as Record<string, unknown>) || {}
+    res.json({ knowledgeBase: (data.upsell_knowledge_base as string) || '' })
+  } catch (error) {
+    logger.error('Error fetching knowledge base', { error, clientId: req.params.clientId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// PUT /onboarding/:clientId/knowledge-base — save the upsell knowledge base for the closer
+router.put('/:clientId/knowledge-base', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { clientId } = req.params
+    const { knowledgeBase } = req.body as { knowledgeBase?: string }
+    if (typeof knowledgeBase !== 'string') {
+      res.status(400).json({ error: 'knowledgeBase must be a string' })
+      return
+    }
+
+    const existing = await prisma.onboarding.findUnique({ where: { clientId } })
+    const existingData = (existing?.data as Record<string, unknown>) || {}
+    const newData = { ...existingData, upsell_knowledge_base: knowledgeBase }
+
+    if (existing) {
+      await prisma.onboarding.update({
+        where: { clientId },
+        data: { data: newData as never }
+      })
+    } else {
+      await prisma.onboarding.create({
+        data: { clientId, step: 1, data: newData as never }
+      })
+    }
+
+    // Also push to any active VOICE_CLOSER deployment config so the next agent
+    // redeploy picks it up automatically.
+    await prisma.agentDeployment.updateMany({
+      where: { clientId, agentType: 'VOICE_CLOSER' as never },
+      data: {
+        config: {
+          // Merge: this overwrites the whole config which is fine because the
+          // closer reads upsell_knowledge_base on every deploy.
+          ...((await prisma.agentDeployment.findFirst({ where: { clientId, agentType: 'VOICE_CLOSER' as never }, select: { config: true } }))?.config as Record<string, unknown> || {}),
+          upsell_knowledge_base: knowledgeBase
+        } as never
+      }
+    })
+
+    logger.info('Upsell knowledge base saved', { clientId, length: knowledgeBase.length })
+    res.json({ success: true })
+  } catch (error) {
+    logger.error('Error saving knowledge base', { error, clientId: req.params.clientId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // DELETE /onboarding/disconnect/:platform — removes stored credentials for a platform
 router.get('/:clientId/connections', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {

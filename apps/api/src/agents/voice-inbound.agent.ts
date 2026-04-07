@@ -23,6 +23,12 @@ export interface VoiceInboundConfig {
     state?: string
     postcode?: string
   }
+  /**
+   * Plain-text or markdown knowledge base shared with the closer/outbound —
+   * services, plans, examples, FAQs, case studies. The receptionist references
+   * this when callers ask about services, pricing, or have objections.
+   */
+  upsell_knowledge_base?: string
 }
 
 export class VoiceInboundAgent extends BaseAgent {
@@ -106,11 +112,23 @@ Respond naturally as if in a real phone conversation.`
       'You are an expert at creating focused, efficient AI voice agent scripts. Prioritise brevity and momentum. No filler, no rambling.'
     )
 
+    // Append client-provided knowledge base (services, plans, FAQs, examples)
+    // so the receptionist can answer caller questions and demonstrate expertise.
+    let knowledgeBase = (typedConfig.upsell_knowledge_base || '').trim()
+    if (!knowledgeBase) {
+      const onboarding = await prisma.onboarding.findUnique({ where: { clientId } })
+      const onboardingData = (onboarding?.data as Record<string, unknown>) || {}
+      knowledgeBase = ((onboardingData.upsell_knowledge_base as string) || '').trim()
+    }
+    const promptWithKnowledge = knowledgeBase
+      ? `${voicePrompt}\n\n═══════════════════════════════════════════\nSERVICES & KNOWLEDGE BASE\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above when callers ask about services, pricing, or have questions. Reference specific details naturally — never read it verbatim.`
+      : voicePrompt
+
     // Append explicit tool-calling rules directly to prompt — Claude's generated script alone
     // is not reliable enough to trigger Retell tool calls when needed.
     const finalPrompt = calendarProvider
-      ? voicePrompt + `\n\n## BOOKING TOOLS — MANDATORY (override everything above)\n\nWhen the caller mentions booking, appointments, availability, or scheduling — do this immediately:\n\nSTEP 1: Call check_availability tool — do not say you cannot check the calendar, just call it and read the slots aloud: "I have the following times available: [list options]. Which works for you?"\n\nSTEP 2: Once they pick a time, confirm you have their name and email (you should already have these from earlier in the call — if somehow missing, ask for them one at a time before proceeding).\n\nSTEP 3: Call book_appointment tool with: start_time (ISO 8601), caller_name, caller_email.\n\nSTEP 4: Confirm booking — "Done, you are booked for [time]. A confirmation will be sent to [email]."\n\nNEVER say you lack calendar access. NEVER suggest transferring for scheduling. ALWAYS call the tools.`
-      : voicePrompt
+      ? promptWithKnowledge + `\n\n## BOOKING TOOLS — MANDATORY (override everything above)\n\nWhen the caller mentions booking, appointments, availability, or scheduling — do this immediately:\n\nSTEP 1: Call check_availability tool — do not say you cannot check the calendar, just call it and read the slots aloud: "I have the following times available: [list options]. Which works for you?"\n\nSTEP 2: Once they pick a time, confirm you have their name and email (you should already have these from earlier in the call — if somehow missing, ask for them one at a time before proceeding).\n\nSTEP 3: Call book_appointment tool with: start_time (ISO 8601), caller_name, caller_email.\n\nSTEP 4: Confirm booking — "Done, you are booked for [time]. A confirmation will be sent to [email]."\n\nNEVER say you lack calendar access. NEVER suggest transferring for scheduling. ALWAYS call the tools.`
+      : promptWithKnowledge
 
     // Build Retell tools if the client has a calendar connected (calendarProvider already fetched above)
     const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000'
