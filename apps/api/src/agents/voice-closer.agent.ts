@@ -268,12 +268,24 @@ Return the full script as flowing conversational text, not bullet points. It sho
       logger.warn('Failed to create Retell AI closer agent', { clientId, error })
     }
 
+    // Reuse the voice inbound phone number for outbound closer calls
+    const inboundDeployment = await prisma.agentDeployment.findFirst({
+      where: { clientId, agentType: 'VOICE_INBOUND' as never, status: 'ACTIVE' as never },
+      select: { config: true }
+    })
+    const inboundConfig = (inboundDeployment?.config as Record<string, unknown>) || {}
+    const phoneNumber = (inboundConfig.phone_number as string) || ''
+    if (!phoneNumber) {
+      logger.warn('Voice closer: no inbound phone number found — outbound calls will fail', { clientId })
+    }
+
     const workflowResult = await n8nService.deployWorkflow('voice-closer', {
       clientId,
       locationId: typedConfig.locationId,
       agentPrompt: closingScript,
       webhookUrl: `${process.env.N8N_BASE_URL}/webhook/voice-closer-${clientId}`,
       retellAgentId,
+      phoneNumber,
       businessName: typedConfig.businessName,
       paymentLink: typedConfig.payment_link || ''
     })
