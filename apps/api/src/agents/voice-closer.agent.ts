@@ -268,15 +268,33 @@ Return the full script as flowing conversational text, not bullet points. It sho
       logger.warn('Failed to create Retell AI closer agent', { clientId, error })
     }
 
-    // Reuse the voice inbound phone number for outbound closer calls
-    const inboundDeployment = await prisma.agentDeployment.findFirst({
-      where: { clientId, agentType: 'VOICE_INBOUND' as never, status: 'ACTIVE' as never },
-      select: { config: true }
-    })
-    const inboundConfig = (inboundDeployment?.config as Record<string, unknown>) || {}
-    const phoneNumber = (inboundConfig.phone_number as string) || ''
+    // Outbound closer needs its own phone number (Retell numbers are inbound XOR outbound).
+    // Priority: 1) typedConfig.outbound_phone_number 2) closer-outbound credential 3) inbound fallback
+    let phoneNumber = (typedConfig as Record<string, unknown>).outbound_phone_number as string | undefined
     if (!phoneNumber) {
-      logger.warn('Voice closer: no inbound phone number found — outbound calls will fail', { clientId })
+      const cred = await prisma.clientCredential.findFirst({
+        where: { clientId, service: 'closer-outbound-phone' },
+        select: { credentials: true }
+      })
+      if (cred) {
+        try {
+          const decrypted = JSON.parse(cred.credentials) as { phoneNumber?: string }
+          phoneNumber = decrypted.phoneNumber
+        } catch { /* ignore */ }
+      }
+    }
+    if (!phoneNumber) {
+      const inboundDeployment = await prisma.agentDeployment.findFirst({
+        where: { clientId, agentType: 'VOICE_INBOUND' as never, status: 'ACTIVE' as never },
+        select: { config: true }
+      })
+      const inboundConfig = (inboundDeployment?.config as Record<string, unknown>) || {}
+      phoneNumber = (inboundConfig.phone_number as string) || ''
+    }
+    if (!phoneNumber) {
+      logger.warn('Voice closer: no outbound phone number found — outbound calls will fail', { clientId })
+    } else {
+      logger.info('Voice closer outbound phone number resolved', { clientId, phoneNumber })
     }
 
     const workflowResult = await n8nService.deployWorkflow('voice-closer', {
