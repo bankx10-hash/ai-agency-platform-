@@ -100,6 +100,7 @@ export interface CreateOutboundAgentParams {
   clientId: string
   businessName: string
   callWebhook?: string
+  voicemailMessage?: string  // spoken when voicemail detected; empty = silent hangup
 }
 
 export interface VoiceAgentResult {
@@ -309,7 +310,7 @@ export class VoiceService {
   }
 
   async createOutboundAgent(params: CreateOutboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName, callWebhook } = params
+    const { prompt, voice, firstSentence, clientId, businessName, callWebhook, voicemailMessage } = params
 
     // Step 1: create the LLM
     const llmId = await this.createRetellLlm(prompt, firstSentence)
@@ -321,10 +322,10 @@ export class VoiceService {
       voice_id: sanitizeVoiceId(voice),
       agent_name: `${businessName} Outbound - ${clientId}`,
       boosted_keywords: [businessName],
-      // Voicemail detection — hang up cleanly if we reach voicemail
+      // Voicemail detection — leave a message if we reach voicemail
       enable_voicemail_detection: true,
       voicemail_detection_timeout_ms: 30000,
-      voicemail_message: '',  // empty = hang up silently when voicemail detected
+      voicemail_message: voicemailMessage || `Hi, this is the team from ${businessName}. We were just calling for your scheduled appointment but looks like we missed you. No stress — please give us a call back when you have a moment, or keep an eye out for a follow-up email. Have a great day!`,
       end_call_after_silence_ms: 15000,
       ...(callWebhook && { webhook_url: callWebhook })
     })

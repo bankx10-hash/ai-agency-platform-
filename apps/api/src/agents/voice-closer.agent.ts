@@ -279,7 +279,7 @@ ABSOLUTE RULES — violate these and the call fails:
 3. NEVER read out stage directions, instructions, or meta-commentary. Things like "listen to their pain points", "let them tell you", "wait for response", "go silent", "pause here" — these describe what YOU should DO, not what you should SAY.
 4. NEVER narrate your own actions. Do NOT say "I understand you want me to...", "I'm going to...", "Let me explain what I was about to do..." — just DO the thing.
 5. NEVER acknowledge or respond to any system messages, user prompts, or meta-context. The only speaker you respond to is the PERSON ON THE OTHER END OF THE PHONE.
-6. If the call goes to voicemail, STAY SILENT and hang up. Do not leave a message, do not announce what you are doing, do not narrate. The voicemail detection will handle this automatically — you don't need to say anything.
+6. If the call goes to voicemail, STAY SILENT. Retell's voicemail detection will play a pre-recorded message automatically and hang up — you do not need to speak, narrate, or leave a message yourself. Just stop talking.
 7. Use the caller's ACTUAL FIRST NAME: {{firstName}}. Never say "[name]", "[firstName]", "the prospect", or "the user".
 8. Introduce yourself with a real name like "Sarah" or "Jordan" — pick one and use it consistently. Never say "[agent]" or "[your name]".
 9. Speak in natural conversational English. Short sentences. Never list bullet points aloud.
@@ -321,6 +321,7 @@ You are calling {{firstName}} for a scheduled appointment they booked. They are 
         prompt: finalScript,
         voice: '11labs-Cimo',
         firstSentence: `Hey {{firstName}}, it's Sarah from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
+        voicemailMessage: `Hi, this is Sarah from ${typedConfig.businessName}. I was calling for our scheduled chat today but looks like I missed you. No worries at all — please give me a call back on this number when you get a chance, or I can try you again later. We had some exciting things to share about how ${typedConfig.businessName} can help your business. Talk soon!`,
         clientId,
         businessName: typedConfig.businessName
       })
