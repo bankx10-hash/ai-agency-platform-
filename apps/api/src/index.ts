@@ -33,12 +33,17 @@ import { startSocialNewsScheduler } from './queue/social-news.queue'
 import socialRouter from './routes/social'
 import { logger } from './utils/logger'
 
-// Prevent silent crashes — log and keep running
+// Unhandled rejections: log but keep running (Node default in v15+)
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled promise rejection', { reason })
 })
+// Uncaught exceptions: the process is in an undefined state — log and exit so
+// Railway's restart policy kicks in and we get a fresh, healthy instance.
+// Without exit, Node stays "alive" but broken, which is worse than a restart.
 process.on('uncaughtException', (err) => {
-  logger.error('Uncaught exception', { message: err.message, stack: err.stack })
+  logger.error('Uncaught exception — exiting for restart', { message: err.message, stack: err.stack })
+  // Give the logger a beat to flush before exit
+  setTimeout(() => process.exit(1), 200)
 })
 
 async function runStartupMigrations() {
@@ -760,8 +765,18 @@ app.get('/uploads/social/:filename', async (req, res) => {
 
 app.use(apiRateLimit)
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+// Real health check: ping the database. If Postgres dropped the connection
+// (Railway idles old connections), this returns 503 and Railway's restart
+// policy will recycle the service, giving us a fresh connection pool.
+app.get('/health', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`
+    res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logger.error('Health check failed — DB unreachable', { message })
+    res.status(503).json({ status: 'error', message })
+  }
 })
 
 app.use('/auth', authRouter)
