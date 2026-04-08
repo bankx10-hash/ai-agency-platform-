@@ -63,7 +63,7 @@ const CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: 't
     { key: 'icp_description', label: 'Ideal Customer Profile (ICP)', type: 'textarea', placeholder: 'Business owners with 5–50 employees in the trades industry looking to automate...', help: 'Describes your ideal customer. Claude uses this to score leads.' },
     { key: 'high_score_threshold', label: 'Hot Lead Threshold (0–100)', type: 'number', placeholder: '70', help: 'Leads scored above this number are classed as hot and sent to the appointment setter.' },
   ],
-  LINKEDIN_OUTREACH: [
+  B2B_OUTREACH: [
     { key: 'person_titles', label: 'Target Job Titles', type: 'textarea', placeholder: 'CEO, Business Owner, Managing Director, Founder (one per line)', help: 'Job titles to search for in Apollo. Enter one title per line.' },
     { key: 'person_locations', label: 'Target Locations', type: 'textarea', placeholder: 'Sydney, Melbourne, Perth (one per line)', help: 'Where your ideal prospects are located.' },
     { key: 'keywords', label: 'Industry Keywords', type: 'textarea', placeholder: 'dental, construction, real estate (one per line)', help: 'Keywords to filter prospects by industry or niche.' },
@@ -80,7 +80,7 @@ const AGENT_LABELS: Record<string, string> = {
   SOCIAL_ENGAGEMENT: 'Social Engagement Agent',
   APPOINTMENT_SETTER: 'Appointment Setter Agent',
   LEAD_GENERATION: 'Lead Generation Agent',
-  LINKEDIN_OUTREACH: 'LinkedIn Outreach Agent',
+  B2B_OUTREACH: 'B2B Outreach Agent',
   ADVERTISING: 'Advertising Agent',
   CLIENT_SERVICES: 'Client Services Agent',
 }

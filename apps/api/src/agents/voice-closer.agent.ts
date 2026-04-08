@@ -314,6 +314,26 @@ You are calling {{firstName}} for a scheduled appointment they booked. They are 
       ? `${scriptWithRules}\n\n═══════════════════════════════════════════\nUPSELL & SERVICES KNOWLEDGE BASE (reference — use naturally, never read out section headers or brackets)\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above to position upgrades and demonstrate expertise naturally during the call. If a prospect is interested in a smaller package, mention the next tier with a concrete example. If they're hesitant about price, frame the cost per day or compare to lost opportunity. NEVER push — guide. Never read headers, bullets, or labels aloud.`
       : scriptWithRules
 
+    // Look up the client's inbound voice agent number so the voicemail asks
+     // the prospect to call back on the receptionist line, not the closer's
+     // outbound-only number.
+    let inboundCallbackNumber: string | undefined
+    try {
+      const inboundDeployment = await prisma.agentDeployment.findFirst({
+        where: { clientId, agentType: AgentType.VOICE_INBOUND },
+        orderBy: { createdAt: 'desc' }
+      })
+      const inboundConfig = (inboundDeployment?.config as Record<string, unknown>) || {}
+      const num = (inboundConfig.phone_number as string) || ''
+      if (num) inboundCallbackNumber = num
+    } catch (error) {
+      logger.warn('Could not load inbound voice number for closer voicemail', { clientId, error })
+    }
+
+    const callbackLine = inboundCallbackNumber
+      ? `please give us a call back on ${inboundCallbackNumber} when you get a chance`
+      : `please give us a call back when you get a chance`
+
     let retellAgentId: string | undefined
 
     try {
@@ -321,7 +341,7 @@ You are calling {{firstName}} for a scheduled appointment they booked. They are 
         prompt: finalScript,
         voice: '11labs-Cimo',
         firstSentence: `Hey {{firstName}}, it's Sarah from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
-        voicemailMessage: `Hi, this is Sarah from ${typedConfig.businessName}. I was calling for our scheduled chat today but looks like I missed you. No worries at all — please give me a call back on this number when you get a chance, or I can try you again later. We had some exciting things to share about how ${typedConfig.businessName} can help your business. Talk soon!`,
+        voicemailMessage: `Hi, this is Sarah from ${typedConfig.businessName}. I was calling for our scheduled chat today but looks like I missed you. No worries at all — ${callbackLine}, or I can try you again later. We had some exciting things to share about how ${typedConfig.businessName} can help your business. Talk soon!`,
         clientId,
         businessName: typedConfig.businessName
       })

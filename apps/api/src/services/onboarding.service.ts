@@ -167,7 +167,7 @@ export class OnboardingService {
         pipeline_id: '',
         high_score_threshold: 70
       },
-      [AgentType.LINKEDIN_OUTREACH]: {
+      [AgentType.B2B_OUTREACH]: {
         ...baseConfig,
         person_titles: [],
         person_locations: [],

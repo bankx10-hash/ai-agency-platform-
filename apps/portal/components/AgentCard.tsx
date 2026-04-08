@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const AGENTS: Record<string, { label: string; metricLabel: string; metricKey: string; color: string; iconPath: string }> = {
   LEAD_GENERATION:    { label: 'Lead Generation',    metricLabel: 'Leads today',    metricKey: 'leadsToday',        color: '#2563eb', iconPath: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-  LINKEDIN_OUTREACH:  { label: 'LinkedIn Outreach',  metricLabel: 'Connections',    metricKey: 'connectionsSent',   color: '#0a66c2', iconPath: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zM4 6a2 2 0 100-4 2 2 0 000 4z' },
+  B2B_OUTREACH:       { label: 'B2B Outreach',       metricLabel: 'Prospects sent', metricKey: 'emailsSent',        color: '#0ea5e9', iconPath: 'M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
   SOCIAL_MEDIA:       { label: 'Social Media',       metricLabel: 'Posts',          metricKey: 'postsPublished',    color: '#e1306c', iconPath: 'M22 12h-4l-3 9L9 3l-3 9H2' },
   SOCIAL_ENGAGEMENT:  { label: 'Social Engagement',  metricLabel: 'Replies',        metricKey: 'repliesSent',       color: '#7c3aed', iconPath: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' },
   ADVERTISING:        { label: 'Advertising',        metricLabel: 'Ads optimised',  metricKey: 'adsOptimised',      color: '#ea580c', iconPath: 'M3 3v18h18M7 16l4-4 4 4 4-4' },

@@ -84,7 +84,7 @@ Key models — see `prisma/schema.prisma` for full definition:
 
 ```typescript
 STARTER  $97/mo  → LEAD_GENERATION, APPOINTMENT_SETTER, VOICE_INBOUND
-GROWTH  $297/mo  → + LINKEDIN_OUTREACH, SOCIAL_MEDIA, VOICE_OUTBOUND
+GROWTH  $297/mo  → + B2B_OUTREACH, SOCIAL_MEDIA, VOICE_OUTBOUND
 AGENCY  $697/mo  → + ADVERTISING, VOICE_CLOSER, CLIENT_SERVICES
 ```
 
@@ -99,7 +99,7 @@ Stripe price IDs live in env vars (`STRIPE_STARTER_PRICE_ID`, etc.). When a subs
 | `stripe.service.ts` | Subscription lifecycle, webhook signature verification |
 | `voice.service.ts` | Retell AI — create inbound/outbound agents, launch calls, fetch transcripts. Phone numbers provisioned via Twilio credentials passed to Retell's `/create-phone-number` endpoint |
 | `email.service.ts` | Gmail OAuth2 flow + SMTP sending via Nodemailer |
-| `linkedin.service.ts` | Phantombuster — search, connection requests, follow-up sequences |
+| `apollo.service.ts` | Apollo.io — B2B prospect search, contact enrichment, verified emails/phones |
 | `social.service.ts` | Buffer scheduling + Meta Graph API posting |
 | `encrypt.ts` | AES-256 encrypt/decrypt for `ClientCredential.credentials` |
 | `onboarding.service.ts` | **Master orchestrator** — chains all services post-payment: deploy agents by plan → send welcome email. GHL sub-account creation removed; clients supply their own `ghlLocationId`. Phone number provisioning (`assignVoiceNumbers`) exists but is paused during testing |
@@ -111,7 +111,7 @@ All agents extend `base.agent.ts`. Each has a typed `Config` interface, `deploy(
 | Agent | Trigger | Key config fields |
 |-------|---------|-------------------|
 | `lead-generation` | Schedule (2h) + form webhooks | `icp_description`, `lead_sources[]`, `pipeline_id`, `high_score_threshold` |
-| `linkedin` | Daily schedule | `search_url`, `connection_message_template`, `followup_sequences[]`, `daily_limit` |
+| `b2b-outreach` | Daily schedule | `person_titles[]`, `person_locations[]`, `keywords[]`, `employee_ranges[]`, `daily_limit` (Apollo.io) |
 | `social-media` | Schedule + brief webhook | `business_description`, `platforms[]`, `content_pillars[]`, `buffer_token` |
 | `advertising` | Daily + budget webhooks | `meta_ad_account_id`, `target_roas`, `daily_budget_limit` |
 | `appointment-setter` | GHL webhook (lead score > 70) | `followup_sequence[]`, `calendar_id`, `objection_handlers{}`, `booking_link` |

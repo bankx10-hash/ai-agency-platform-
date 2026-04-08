@@ -72,13 +72,12 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "body": "={{ JSON.stringify({ name: $('Prepare Lead Data').first().json.lead.name || '', email: $('Prepare Lead Data').first().json.lead.email || '', phone: $('Prepare Lead Data').first().json.lead.phone || '', source: $('Prepare Lead Data').first().json.lead.source || 'Lead Form', tags: ['unscored'] }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $('Prepare Lead Data').first().json.lead.name || '', email: $('Prepare Lead Data').first().json.lead.email || '', phone: $('Prepare Lead Data').first().json.lead.phone || '', source: $('Prepare Lead Data').first().json.lead.source || 'Lead Form', title: $('Prepare Lead Data').first().json.lead.title || '', companyName: $('Prepare Lead Data').first().json.lead.companyName || '', industry: $('Prepare Lead Data').first().json.lead.industry || '', tags: ['unscored'] }) }}"
       }
     },
     {
@@ -88,7 +87,7 @@
       "typeVersion": 2,
       "position": [1250, 300],
       "parameters": {
-        "jsCode": "const icpDescription = '{{ICP_DESCRIPTION}}';\nconst lead = $('Prepare Lead Data').first().json.lead;\nconst contactId = $('Save Contact').first().json.id || '';\nif (!lead) return [];\nreturn [{\n  json: {\n    contactId,\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 1024,\n      system: 'You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Respond ONLY with valid JSON.',\n      messages: [{\n        role: 'user',\n        content: 'Score this lead and return ONLY valid JSON with no extra text:\\n{\"score\": <0-100>, \"summary\": \"<2-sentence qualification summary>\", \"nextAction\": \"<recommended next step>\", \"tags\": [\"<tag1>\", \"<tag2>\"]}\\n\\nLead data:\\n' + JSON.stringify(lead, null, 2)\n      }]\n    }\n  }\n}];"
+        "jsCode": "const icpDescription = '{{ICP_DESCRIPTION}}';\nconst lead = $('Prepare Lead Data').first().json.lead;\nconst contactId = $('Save Contact').first().json.id || '';\nif (!lead) return [];\nreturn [{\n  json: {\n    contactId,\n    claudeRequest: {\n      model: 'claude-haiku-4-5-20251001',\n      max_tokens: 1024,\n      system: 'You are a lead qualification specialist. ICP: ' + icpDescription + '. Score leads 0-100 based on ICP fit. Respond ONLY with valid JSON.',\n      messages: [{\n        role: 'user',\n        content: 'Score this lead and return ONLY valid JSON with no extra text:\\n{\"score\": <0-100>, \"summary\": \"<2-sentence qualification summary>\", \"nextAction\": \"<recommended next step>\", \"tags\": [\"<tag1>\", \"<tag2>\"]}\\n\\nLead data:\\n' + JSON.stringify(lead, null, 2)\n      }]\n    }\n  }\n}];"
       }
     },
     {
@@ -98,8 +97,8 @@
       "typeVersion": 4,
       "position": [1500, 300],
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 5000,
+      "maxTries": 5,
+      "waitBetweenTries": 15000,
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
@@ -176,11 +175,11 @@
         "url": "{{N8N_BASE_URL}}/webhook/appointments-{{CLIENT_ID}}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+          "parameters": []
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "body": "={{ JSON.stringify({ contactId: $('Parse Lead Score').first().json.contactId, score: $('Parse Lead Score').first().json.score, summary: $('Parse Lead Score').first().json.summary, nextAction: $('Parse Lead Score').first().json.nextAction, contactName: $('Prepare Lead Data').first().json.lead.name || '', contactEmail: $('Prepare Lead Data').first().json.lead.email || '', contactPhone: $('Prepare Lead Data').first().json.lead.phone || '' }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactId: $('Parse Lead Score').first().json.contactId, score: $('Parse Lead Score').first().json.score, summary: $('Parse Lead Score').first().json.summary, nextAction: $('Parse Lead Score').first().json.nextAction, contactName: $('Prepare Lead Data').first().json.lead.name || '', contactEmail: $('Prepare Lead Data').first().json.lead.email || '', contactPhone: $('Prepare Lead Data').first().json.lead.phone || '' }) }}"
       }
     },
     {

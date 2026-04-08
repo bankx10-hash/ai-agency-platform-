@@ -36,7 +36,7 @@ const WORKFLOWS = [
   'lead-generation',
   'appointment-setter',
   'social-media',
-  'linkedin-outreach',
+  'b2b-outreach',
   'advertising',
   'voice-inbound',
   'voice-outbound',

@@ -16,20 +16,13 @@
       "webhookId": "appointments-{{CLIENT_ID}}"
     },
     {
-      "id": "get-contact-details",
+      "id": "unwrap-webhook",
       "name": "Get Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [500, 200],
       "parameters": {
-        "method": "GET",
-        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $json.contactId }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
-          ]
-        }
+        "jsCode": "// Defensive webhook body extraction — handles all 3 shapes n8n can deliver:\n// 1) body as parsed JSON object (normal case)\n// 2) body as JSON string (when upstream sent specifyBody:string)\n// 3) body as form-encoded object where the JSON IS the single key (n8n quirk)\nconst raw = $input.first().json;\nlet body = raw.body;\nif (body && typeof body === 'object' && !body.contactId) {\n  const keys = Object.keys(body);\n  if (keys.length === 1 && typeof keys[0] === 'string' && keys[0].startsWith('{')) {\n    try { body = JSON.parse(keys[0]); } catch { /* keep as is */ }\n  }\n}\nif (typeof body === 'string') {\n  try { body = JSON.parse(body); } catch { body = {}; }\n}\nif (!body || typeof body !== 'object') body = raw;\nconst phoneRaw = (body.contactPhone || '').toString().trim();\nconst phone = phoneRaw ? (phoneRaw.startsWith('+') ? phoneRaw : '+' + phoneRaw.replace(/^\\+/, '')) : '';\nreturn [{\n  json: {\n    contact: {\n      id: body.contactId || '',\n      name: body.contactName || '',\n      email: body.contactEmail || '',\n      phone: phone,\n      score: body.score || 0,\n      summary: body.summary || ''\n    }\n  }\n}];"
       }
     },
     {
@@ -39,7 +32,7 @@
       "typeVersion": 2,
       "position": [750, 200],
       "parameters": {
-        "jsCode": "const contact = $input.first().json.contact || $input.first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nreturn [{\n  json: {\n    model: 'claude-sonnet-4-20250514',\n    max_tokens: 500,\n    system: 'You are a friendly appointment-setting assistant for ' + businessName + '. Your job is to write short, warm, conversational follow-up SMS messages to new leads. Always personalise with their first name if available. Keep messages under 160 characters. Return ONLY the SMS message text — no explanation, no quotes, no markdown.',\n    messages: [{\n      role: 'user',\n      content: 'Write a follow-up SMS for this new lead to invite them to book a time with us.\\n\\nLead details:\\n' + JSON.stringify(contact)\n    }]\n  }\n}];"
+        "jsCode": "const contact = $input.first().json.contact || $input.first().json;\nconst businessName = \"{{BUSINESS_NAME}}\";\nconst bookingLink = \"{{BOOKING_LINK}}\";\nconst firstName = (contact.name || '').split(' ')[0] || 'there';\nreturn [{\n  json: {\n    model: 'claude-haiku-4-5-20251001',\n    max_tokens: 500,\n    system: 'You are a friendly appointment-setting assistant for ' + businessName + '. Your job is to write short, warm, conversational follow-up SMS messages to new leads. Always personalise with their first name. Keep messages under 320 characters. You MUST include the booking link at the end of the message exactly as provided, no modifications. Return ONLY the SMS message text — no explanation, no quotes, no markdown.',\n    messages: [{\n      role: 'user',\n      content: 'Write a follow-up SMS for this lead inviting them to book a quick call. Use their first name \"' + firstName + '\". Reference their role/company naturally if available. End with the booking link exactly as-is: ' + bookingLink + '\\n\\nLead details:\\n' + JSON.stringify(contact)\n    }]\n  }\n}];"
       }
     },
     {
@@ -74,7 +67,7 @@
       "typeVersion": 2,
       "position": [1250, 200],
       "parameters": {
-        "jsCode": "const text = $input.first().json.content[0].text.trim();\nconst contactId = $('New Lead Webhook').first().json.contactId;\nconst contact = $('Get Contact').first().json.contact || $('Get Contact').first().json;\nconst to = contact.phone || '';\nreturn [{ json: { message: text, contactId, to } }];"
+        "jsCode": "const text = $input.first().json.content[0].text.trim();\nconst contact = $('Get Contact').first().json.contact;\nconst contactId = contact.id || '';\nconst to = contact.phone || '';\nreturn [{ json: { message: text, contactId, to } }];"
       }
     },
     {
@@ -95,7 +88,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, type: 'SMS', message: $json.message }) }}"
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, type: 'SMS', to: $json.to, message: $json.message }) }}"
       }
     },
     {
@@ -153,7 +146,7 @@
       "typeVersion": 2,
       "position": [1000, 500],
       "parameters": {
-        "jsCode": "const text = $input.first().json.content[0].text.trim();\nconst replyData = $('Handle Lead Reply').first().json;\nconst body = replyData.body || replyData;\nconst contactId = body.contactId || '';\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/, '').replace(/```\\s*$/, '');\n  result = JSON.parse(clean);\n} catch {\n  result = { appointmentRequested: false, intent: 'other', responseMessage: '' };\n}\nresult.contactId = contactId;\nreturn [{ json: result }];"
+        "jsCode": "const text = $input.first().json.content[0].text.trim();\nconst replyData = $('Handle Lead Reply').first().json;\nlet body = {};\nif (typeof replyData.body === 'string') {\n  try { body = JSON.parse(replyData.body); } catch { body = {}; }\n} else if (replyData.body && typeof replyData.body === 'object') {\n  body = replyData.body;\n} else {\n  body = replyData;\n}\nconst contactId = body.contactId || '';\nlet result;\ntry {\n  const clean = text.replace(/^```json\\s*/, '').replace(/```\\s*$/, '');\n  result = JSON.parse(clean);\n} catch {\n  result = { appointmentRequested: false, intent: 'other', responseMessage: '' };\n}\nresult.contactId = contactId;\nreturn [{ json: result }];"
       }
     },
     {

@@ -1,6 +1,6 @@
 export enum AgentType {
   LEAD_GENERATION = 'LEAD_GENERATION',
-  LINKEDIN_OUTREACH = 'LINKEDIN_OUTREACH',
+  B2B_OUTREACH = 'B2B_OUTREACH',
   SOCIAL_MEDIA = 'SOCIAL_MEDIA',
   SOCIAL_ENGAGEMENT = 'SOCIAL_ENGAGEMENT',
   ADVERTISING = 'ADVERTISING',
@@ -35,7 +35,7 @@ export interface AgentDeployment {
 
 export type AgentConfig =
   | LeadGenerationConfig
-  | LinkedInConfig
+  | B2BOutreachConfig
   | SocialMediaConfig
   | AdvertisingConfig
   | AppointmentSetterConfig
@@ -53,7 +53,7 @@ export interface LeadGenerationConfig {
   high_score_threshold: number
 }
 
-export interface LinkedInConfig {
+export interface B2BOutreachConfig {
   person_titles: string[]
   person_locations: string[]
   employee_ranges: string[]
@@ -224,7 +224,7 @@ export const PLANS = {
     stripePriceId: process.env.STRIPE_GROWTH_PRICE_ID || 'price_growth',
     agents: [
       AgentType.LEAD_GENERATION,
-      AgentType.LINKEDIN_OUTREACH,
+      AgentType.B2B_OUTREACH,
       AgentType.SOCIAL_MEDIA,
       AgentType.SOCIAL_ENGAGEMENT,
       AgentType.APPOINTMENT_SETTER,
@@ -238,7 +238,7 @@ export const PLANS = {
     stripePriceId: process.env.STRIPE_AGENCY_PRICE_ID || 'price_agency',
     agents: [
       AgentType.LEAD_GENERATION,
-      AgentType.LINKEDIN_OUTREACH,
+      AgentType.B2B_OUTREACH,
       AgentType.SOCIAL_MEDIA,
       AgentType.SOCIAL_ENGAGEMENT,
       AgentType.ADVERTISING,

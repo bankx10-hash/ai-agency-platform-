@@ -214,6 +214,28 @@ async function runStartupMigrations() {
     logger.info('Startup migration: linkedinUrl column added to Contact table')
   } catch { /* already exist, skip */ }
 
+  // Rename LINKEDIN_OUTREACH → B2B_OUTREACH on the AgentType enum (Apollo replaced LinkedIn).
+  // Idempotent: only renames if old value still exists and new value doesn't.
+  try {
+    await prisma.$executeRaw`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_enum
+          WHERE enumlabel = 'LINKEDIN_OUTREACH'
+            AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'AgentType')
+        ) AND NOT EXISTS (
+          SELECT 1 FROM pg_enum
+          WHERE enumlabel = 'B2B_OUTREACH'
+            AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'AgentType')
+        ) THEN
+          ALTER TYPE "AgentType" RENAME VALUE 'LINKEDIN_OUTREACH' TO 'B2B_OUTREACH';
+        END IF;
+      END $$
+    `
+    logger.info('Startup migration: AgentType LINKEDIN_OUTREACH → B2B_OUTREACH (if needed)')
+  } catch (err) { logger.warn('Failed to rename LINKEDIN_OUTREACH enum value', { err }) }
+
   try {
     await prisma.$executeRaw`
       DO $$ BEGIN

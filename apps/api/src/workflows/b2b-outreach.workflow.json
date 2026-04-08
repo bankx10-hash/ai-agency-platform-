@@ -1,5 +1,5 @@
 {
-  "name": "LinkedIn Outreach Agent (Apollo)",
+  "name": "B2B Outreach Agent (Apollo)",
   "active": false,
   "nodes": [
     {
@@ -53,7 +53,7 @@
       "typeVersion": 2,
       "position": [1000, 300],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst people = data.people || [];\nconst results = people.slice(0, 25).map(p => ({\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  linkedinUrl: p.linkedin_url || '',\n  city: p.city || '',\n  state: p.state || '',\n  country: p.country || '',\n  companyName: p.organization?.name || '',\n  companyWebsite: p.organization?.website_url || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n}));\nreturn results.map(r => ({ json: r }));"
+        "jsCode": "const data = $input.first().json;\nconst people = data.people || [];\nconst results = people.slice(0, 25).map(p => ({\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  city: p.city || '',\n  state: p.state || '',\n  country: p.country || '',\n  companyName: p.organization?.name || '',\n  companyWebsite: p.organization?.website_url || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n}));\nreturn results.map(r => ({ json: r }));"
       }
     },
     {
@@ -85,7 +85,7 @@
       "typeVersion": 2,
       "position": [1250, 300],
       "parameters": {
-        "jsCode": "const p = $input.first().json.person;\nif (!p) return [];\nconst email = p.email || (p.personal_emails && p.personal_emails[0]) || '';\nconst phone = (p.phone_numbers && p.phone_numbers[0]?.sanitized_number) || '';\nif (!email && !phone) return [];\nreturn [{ json: {\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  email: email,\n  phone: phone,\n  linkedinUrl: p.linkedin_url || '',\n  companyName: p.organization?.name || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n} }];"
+        "jsCode": "const p = $input.first().json.person;\nif (!p) return [];\nconst email = p.email || (p.personal_emails && p.personal_emails[0]) || '';\nconst phone = (p.phone_numbers && p.phone_numbers[0]?.sanitized_number) || '';\nif (!email && !phone) return [];\nreturn [{ json: {\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  email: email,\n  phone: phone,\n  companyName: p.organization?.name || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n} }];"
       }
     },
     {
@@ -107,7 +107,7 @@
         "sendBody": true,
         "specifyBody": "string",
         "contentType": "raw",
-        "body": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', linkedinUrl: $json.linkedinUrl, tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName }) }}"
+        "body": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName }) }}"
       }
     },
     {
@@ -117,7 +117,7 @@
       "typeVersion": 2,
       "position": [1750, 300],
       "parameters": {
-        "jsCode": "const contact = $('Extract Contact Info').first().json;\nconst saved = $input.first().json;\nconst contactId = saved.id || saved.contactId || '';\nconst template = '{{AGENT_PROMPT}}';\nconst message = template\n  .replace(/\\{\\{firstName\\}\\}/g, contact.firstName)\n  .replace(/\\{\\{title\\}\\}/g, contact.title)\n  .replace(/\\{\\{companyName\\}\\}/g, contact.companyName);\nreturn [{ json: { contactId, email: contact.email, phone: contact.phone, message, firstName: contact.firstName } }];"
+        "jsCode": "const contact = $('Extract Contact Info').first().json;\nconst saved = $input.first().json;\nconst contactId = saved.id || saved.contactId || '';\nconst template = '{{AGENT_PROMPT}}';\nconst message = template\n  .replace(/\\{\\{firstName\\}\\}/g, contact.firstName)\n  .replace(/\\{\\{title\\}\\}/g, contact.title)\n  .replace(/\\{\\{companyName\\}\\}/g, contact.companyName);\nreturn [{ json: { contactId, name: contact.name, email: contact.email, phone: contact.phone, title: contact.title, companyName: contact.companyName, industry: contact.industry, source: 'apollo', message, firstName: contact.firstName } }];"
       }
     },
     {
@@ -160,7 +160,7 @@
         "sendBody": true,
         "specifyBody": "string",
         "contentType": "raw",
-        "body": "={{ JSON.stringify({ contactId: $json.contactId }) }}"
+        "body": "={{ JSON.stringify({ contactId: $json.contactId, name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', title: $json.title, companyName: $json.companyName, industry: $json.industry }) }}"
       }
     }
   ],

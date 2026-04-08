@@ -54,10 +54,26 @@ export class N8NService {
     // (newlines, tabs, carriage returns, etc.) not just backslashes and quotes
     const esc = (v: string) => JSON.stringify(v).slice(1, -1)
 
+    // Some placeholders get injected INSIDE JS single-quoted string literals
+    // that are themselves inside JSON workflow field values (e.g. jsCode in a
+    // Code node). Those need DOUBLE escaping: first as a JS string literal
+    // (newlines → \n, quotes → \', backslashes → \\), then as a JSON string.
+    // Without this, any user-supplied multi-line value (ICP, prompts) breaks
+    // the generated JS with "Invalid or unexpected token" errors.
+    const escJs = (v: string) => {
+      const jsLiteral = v
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n')
+        .replace(/\t/g, '\\t')
+      return JSON.stringify(jsLiteral).slice(1, -1)
+    }
+
     const replacements: Record<string, string> = {
       '{{CLIENT_ID}}': esc(config.clientId),
       '{{LOCATION_ID}}': esc(config.locationId),
-      '{{AGENT_PROMPT}}': esc(config.agentPrompt || ''),
+      '{{AGENT_PROMPT}}': escJs(config.agentPrompt || ''),
       '{{WEBHOOK_URL}}': esc(config.webhookUrl || ''),
       '{{PHONE_NUMBER}}': esc(config.phoneNumber || ''),
       '{{RETELL_AGENT_ID}}': esc(config.retellAgentId || ''),
@@ -66,7 +82,7 @@ export class N8NService {
       '{{API_KEY}}': esc(config.apiKey || ''),
       '{{BUSINESS_NAME}}': esc(config.businessName || ''),
       '{{BOOKING_LINK}}': esc(config.bookingLink || ''),
-      '{{ICP_DESCRIPTION}}': esc(config.icpDescription || ''),
+      '{{ICP_DESCRIPTION}}': escJs(config.icpDescription || ''),
       '{{N8N_API_SECRET}}': esc(config.n8nApiSecret || process.env.N8N_API_SECRET || ''),
       '{{RETELL_API_KEY}}': esc(config.retellApiKey || process.env.RETELL_API_KEY || ''),
       '{{ANTHROPIC_API_KEY}}': esc(config.anthropicApiKey || process.env.ANTHROPIC_API_KEY || ''),

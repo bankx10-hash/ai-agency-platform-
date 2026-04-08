@@ -3,7 +3,7 @@ import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { n8nService } from '../services/n8n.service'
 import { logger } from '../utils/logger'
 
-export interface LinkedInAgentConfig {
+export interface B2BOutreachConfig {
   person_titles: string[]
   person_locations: string[]
   employee_ranges: string[]
@@ -17,18 +17,18 @@ export interface LinkedInAgentConfig {
   booking_link?: string
 }
 
-export class LinkedInAgent extends BaseAgent {
-  agentType = AgentType.LINKEDIN_OUTREACH
+export class B2BOutreachAgent extends BaseAgent {
+  agentType = AgentType.B2B_OUTREACH
 
-  generatePrompt(config: Partial<LinkedInAgentConfig>): string {
-    return `LinkedIn prospecting agent for ${config.businessName || 'our business'} powered by Apollo.io.
+  generatePrompt(config: Partial<B2BOutreachConfig>): string {
+    return `B2B prospecting agent for ${config.businessName || 'our business'} powered by Apollo.io.
 Searches for: ${(config.person_titles || []).join(', ')} in ${(config.person_locations || []).join(', ')}.
 Daily limit: ${config.daily_limit || 25} prospects per day.`
   }
 
   async deploy(clientId: string, config: Record<string, unknown>): Promise<{ id: string; n8nWorkflowId?: string }> {
-    const typedConfig = config as unknown as LinkedInAgentConfig
-    logger.info('Deploying LinkedIn Outreach Agent (Apollo)', { clientId })
+    const typedConfig = config as unknown as B2BOutreachConfig
+    logger.info('Deploying B2B Outreach Agent (Apollo)', { clientId })
 
     // Normalise fields that may come as newline-separated strings from textarea
     const toArray = (val: unknown): string[] => {
@@ -55,7 +55,7 @@ Return ONLY the message text.`,
       'You are an expert B2B outreach copywriter. Your messages get 30%+ reply rates because they feel personal, not templated.'
     )
 
-    const workflowResult = await n8nService.deployWorkflow('linkedin-outreach', {
+    const workflowResult = await n8nService.deployWorkflow('b2b-outreach', {
       clientId,
       locationId: typedConfig.locationId || '',
       businessName: typedConfig.businessName,
@@ -77,7 +77,7 @@ Return ONLY the message text.`,
       workflowResult.workflowId
     )
 
-    logger.info('LinkedIn Outreach Agent deployed', { clientId, deploymentId: deployment.id })
+    logger.info('B2B Outreach Agent deployed', { clientId, deploymentId: deployment.id })
 
     return {
       id: deployment.id,

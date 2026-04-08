@@ -25,7 +25,7 @@ interface ClientInfo {
 
 const AGENT_LABELS: Record<string, string> = {
   LEAD_GENERATION: 'Lead Generation',
-  LINKEDIN_OUTREACH: 'LinkedIn Outreach',
+  B2B_OUTREACH: 'B2B Outreach',
   SOCIAL_MEDIA: 'Social Media',
   ADVERTISING: 'Advertising',
   APPOINTMENT_SETTER: 'Appointment Setter',
@@ -38,7 +38,7 @@ const AGENT_LABELS: Record<string, string> = {
 
 const AGENT_ICONS: Record<string, string> = {
   LEAD_GENERATION: '🎯',
-  LINKEDIN_OUTREACH: '💼',
+  B2B_OUTREACH: '📧',
   SOCIAL_MEDIA: '📱',
   ADVERTISING: '📢',
   APPOINTMENT_SETTER: '📅',
@@ -51,7 +51,7 @@ const AGENT_ICONS: Record<string, string> = {
 
 // Key config fields per agent type (others use defaults)
 const AGENT_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; type: string; placeholder: string; required?: boolean }>> = {
-  LINKEDIN_OUTREACH: [
+  B2B_OUTREACH: [
     { key: 'person_titles', label: 'Target Job Titles (one per line)', type: 'textarea', placeholder: 'CEO\nBusiness Owner\nManaging Director' },
     { key: 'person_locations', label: 'Target Locations (one per line)', type: 'textarea', placeholder: 'Sydney\nMelbourne\nPerth' },
     { key: 'keywords', label: 'Industry Keywords (one per line)', type: 'textarea', placeholder: 'dental\nconstruction\nreal estate' },
@@ -192,7 +192,7 @@ export default function AdminConfigurePage() {
       const config = configs[agentType] || {}
       // Parse number fields
       const parsedConfig: Record<string, unknown> = { ...config }
-      if (agentType === 'LINKEDIN_OUTREACH' && config.daily_limit) parsedConfig.daily_limit = parseInt(config.daily_limit)
+      if (agentType === 'B2B_OUTREACH' && config.daily_limit) parsedConfig.daily_limit = parseInt(config.daily_limit)
       if (agentType === 'ADVERTISING' && config.daily_budget_limit) parsedConfig.daily_budget_limit = parseFloat(config.daily_budget_limit)
       if (agentType === 'VOICE_OUTBOUND' && config.max_daily_calls) parsedConfig.max_daily_calls = parseInt(config.max_daily_calls)
       if (config.high_score_threshold) parsedConfig.high_score_threshold = parseInt(config.high_score_threshold)

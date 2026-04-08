@@ -1,7 +1,7 @@
 import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { BaseAgent } from './base.agent'
 import { LeadGenerationAgent } from './lead-generation.agent'
-import { LinkedInAgent } from './linkedin.agent'
+import { B2BOutreachAgent } from './b2b-outreach.agent'
 import { SocialMediaAgent } from './social-media.agent'
 import { SocialEngagementAgent } from './social-engagement.agent'
 import { AdvertisingAgent } from './advertising.agent'
@@ -16,7 +16,7 @@ import { ReceptionistFollowupAgent } from './receptionist-followup.agent'
 export {
   BaseAgent,
   LeadGenerationAgent,
-  LinkedInAgent,
+  B2BOutreachAgent,
   SocialMediaAgent,
   SocialEngagementAgent,
   AdvertisingAgent,
@@ -33,7 +33,7 @@ export type AgentConstructor = new () => BaseAgent
 
 export const AGENT_REGISTRY: Record<AgentType, AgentConstructor> = {
   [AgentType.LEAD_GENERATION]: LeadGenerationAgent,
-  [AgentType.LINKEDIN_OUTREACH]: LinkedInAgent,
+  [AgentType.B2B_OUTREACH]: B2BOutreachAgent,
   [AgentType.SOCIAL_MEDIA]: SocialMediaAgent,
   [AgentType.SOCIAL_ENGAGEMENT]: SocialEngagementAgent,
   [AgentType.ADVERTISING]: AdvertisingAgent,
