@@ -223,26 +223,6 @@
         "specifyBody": "string",
         "body": "={{ JSON.stringify({ contactId: $json.contactId, score: $json.score, tags: $json.tags, summary: $json.summary, nextAction: $json.nextAction }) }}"
       }
-    },
-    {
-      "id": "notify-outbound-queue",
-      "name": "Notify Voice Outbound",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [2500, 300],
-      "parameters": {
-        "method": "POST",
-        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/outbound-queue",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $('Parse Lead Score').first().json.contactId, score: $('Parse Lead Score').first().json.score, summary: $('Parse Lead Score').first().json.summary, nextAction: $('Parse Lead Score').first().json.nextAction, contactName: $('Prepare Lead Data').first().json.lead.name || '', contactEmail: $('Prepare Lead Data').first().json.lead.email || '', contactPhone: $('Prepare Lead Data').first().json.lead.phone || '' }) }}"
-      }
     }
   ],
   "connections": {
@@ -279,9 +259,6 @@
     },
     "Update Lead - High Score": {
       "main": [[{ "node": "Notify Appointment Setter", "type": "main", "index": 0 }]]
-    },
-    "Update Lead - Medium Score": {
-      "main": [[{ "node": "Notify Voice Outbound", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

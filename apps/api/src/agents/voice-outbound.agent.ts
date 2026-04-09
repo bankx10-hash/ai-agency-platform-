@@ -2,8 +2,10 @@ import { BaseAgent } from './base.agent'
 import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { n8nService } from '../services/n8n.service'
 import { voiceService } from '../services/voice.service'
+import { calendarService } from '../services/calendar.service'
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
+import type { RetellTool } from '../../../../packages/shared/types/workflow.types'
 
 export interface VoiceOutboundConfig {
   call_script: string
@@ -99,16 +101,64 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
       ? `${outboundScript}\n\n═══════════════════════════════════════════\nSERVICES & KNOWLEDGE BASE\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above to answer prospect questions, handle objections, and demonstrate expertise during the call. Reference specific examples and pricing naturally — never read it verbatim.`
       : outboundScript
 
+    // Build calendar booking tools so the agent can book appointments
+    // mid-call if the prospect is interested. This is what wires the
+    // outbound agent into the closer flow — a booking → /appointments →
+    // closer-ready webhook → closer calls at the booked time.
+    const calendarProvider = await calendarService.getCalendarProvider(clientId).catch(() => null)
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000'
+    const calendarTools: RetellTool[] = calendarProvider ? [
+      {
+        type: 'custom',
+        name: 'check_availability',
+        description: 'Check available appointment times in the calendar. Call this IMMEDIATELY when the prospect expresses interest in booking a call or meeting. Do NOT make up times — you MUST call this tool to get real availability.',
+        url: `${apiBaseUrl}/calendar/${clientId}/availability`,
+        speak_during_execution: true,
+        speak_after_execution: true,
+        execution_message_description: 'Let me check our available times for you...',
+        timeout_ms: 15000,
+        parameters: { type: 'object', properties: {}, required: [] }
+      },
+      {
+        type: 'custom',
+        name: 'book_appointment',
+        description: 'Book an appointment for the prospect. You MUST call this tool to actually create the booking — do NOT pretend the booking is done without calling this tool. Requires the prospect name, email, and chosen start time.',
+        url: `${apiBaseUrl}/calendar/${clientId}/book`,
+        speak_during_execution: true,
+        speak_after_execution: true,
+        execution_message_description: 'Let me lock that appointment in for you...',
+        timeout_ms: 15000,
+        parameters: {
+          type: 'object',
+          properties: {
+            start_time: { type: 'string', description: 'ISO 8601 datetime of the chosen appointment slot' },
+            caller_name: { type: 'string', description: 'Full name of the prospect' },
+            caller_email: { type: 'string', description: 'Email address of the prospect' },
+            caller_phone: { type: 'string', description: 'Phone number of the prospect (optional)' }
+          },
+          required: ['start_time', 'caller_name', 'caller_email']
+        }
+      }
+    ] : []
+
+    // If calendar tools are wired up, strengthen the prompt with explicit
+    // instructions so the agent actually invokes them mid-call rather than
+    // just promising a follow-up.
+    const promptWithBookingTools = calendarProvider
+      ? finalScript + `\n\n## BOOKING TOOLS — MANDATORY\n\nIf the prospect expresses ANY interest in a chat, demo, or meeting, do this immediately:\n\nSTEP 1: Call check_availability tool — read the slots aloud: "I can do [list options]. Which works for you?"\n\nSTEP 2: Confirm their name and email if you don't already have them.\n\nSTEP 3: Call book_appointment tool with start_time (ISO 8601), caller_name, caller_email, caller_phone.\n\nSTEP 4: Confirm: "You're booked for [time]. We'll call you then — looking forward to it!"\n\nNEVER suggest booking later or via email. ALWAYS call the tools mid-call.`
+      : finalScript
+
     let retellAgentId: string | undefined
 
     try {
       const voiceResult = await voiceService.createOutboundAgent({
-        prompt: finalScript,
+        prompt: promptWithBookingTools,
         voice: '11labs-Cimo',
         firstSentence: `Hi, is this a good time to chat for just 2 minutes? I'm calling from ${typedConfig.businessName}.`,
         clientId,
         businessName: typedConfig.businessName,
-        callWebhook: `${process.env.API_URL || 'https://api.nodusaisystems.com'}/calls/webhook`
+        callWebhook: `${process.env.API_URL || 'https://api.nodusaisystems.com'}/calls/webhook`,
+        tools: calendarTools.length > 0 ? calendarTools : undefined
       })
 
       retellAgentId = voiceResult.agentId

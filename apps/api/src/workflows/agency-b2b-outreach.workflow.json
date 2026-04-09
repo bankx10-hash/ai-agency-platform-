@@ -1,0 +1,200 @@
+{
+  "name": "B2B Outreach Agent (Apollo)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "daily-trigger",
+      "name": "Daily Prospecting Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1-5" }]
+        }
+      }
+    },
+    {
+      "id": "build-search-filters",
+      "name": "Build Apollo Search Filters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": {
+        "jsCode": "const titlesRaw = '{{PERSON_TITLES}}';\nconst locationsRaw = '{{PERSON_LOCATIONS}}';\nconst keywordsRaw = '{{KEYWORDS}}';\nconst rangesRaw = '{{EMPLOYEE_RANGES}}';\nconst toArr = (s) => s.split(',').map(v => v.trim()).filter(Boolean);\nconst body = { api_key: '{{APOLLO_API_KEY}}', per_page: 25, page: 1 };\nconst titles = toArr(titlesRaw);\nif (titles.length) body.person_titles = titles;\nconst locations = toArr(locationsRaw);\nif (locations.length) body.person_locations = locations;\nconst keywords = toArr(keywordsRaw);\nif (keywords.length) body.q_keywords = keywords.join(' ');\nconst ranges = toArr(rangesRaw);\nif (ranges.length) body.organization_num_employees_ranges = ranges;\nreturn [{ json: body }];"
+      }
+    },
+    {
+      "id": "search-apollo",
+      "name": "Apollo - Search Prospects",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/mixed_people/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Cache-Control", "value": "no-cache" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify($json) }}"
+      }
+    },
+    {
+      "id": "filter-new-prospects",
+      "name": "Filter New Prospects",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst people = data.people || [];\nconst results = people.slice(0, 25).map(p => ({\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  city: p.city || '',\n  state: p.state || '',\n  country: p.country || '',\n  companyName: p.organization?.name || '',\n  companyWebsite: p.organization?.website_url || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n}));\nreturn results.map(r => ({ json: r }));"
+      }
+    },
+    {
+      "id": "enrich-prospect",
+      "name": "Apollo - Enrich Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/people/match",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Cache-Control", "value": "no-cache" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ api_key: '{{APOLLO_API_KEY}}', id: $json.apolloId, reveal_personal_emails: true, reveal_phone_number: true }) }}"
+      }
+    },
+    {
+      "id": "extract-contact-info",
+      "name": "Extract Contact Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "parameters": {
+        "jsCode": "const p = $input.first().json.person;\nif (!p) return [];\nconst email = p.email || (p.personal_emails && p.personal_emails[0]) || '';\nconst phone = (p.phone_numbers && p.phone_numbers[0]?.sanitized_number) || '';\nif (!email && !phone) return [];\nreturn [{ json: {\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  email: email,\n  phone: phone,\n  companyName: p.organization?.name || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n} }];"
+      }
+    },
+    {
+      "id": "save-contact",
+      "name": "Save Contact to CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1500, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName }) }}"
+      }
+    },
+    {
+      "id": "build-outreach",
+      "name": "Build Personalised Outreach",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 300],
+      "parameters": {
+        "jsCode": "const contact = $('Extract Contact Info').first().json;\nconst saved = $input.first().json;\nconst contactId = saved.id || saved.contactId || '';\nconst template = '{{AGENT_PROMPT}}';\nconst message = template\n  .replace(/\\{\\{firstName\\}\\}/g, contact.firstName)\n  .replace(/\\{\\{title\\}\\}/g, contact.title)\n  .replace(/\\{\\{companyName\\}\\}/g, contact.companyName);\nreturn [{ json: { contactId, name: contact.name, email: contact.email, phone: contact.phone, title: contact.title, companyName: contact.companyName, industry: contact.industry, source: 'apollo', message, firstName: contact.firstName } }];"
+      }
+    },
+    {
+      "id": "send-outreach-email",
+      "name": "Send Outreach Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ contactId: $json.contactId, to: $json.email, subject: 'Quick question, ' + $json.firstName, body: $json.message }) }}"
+      }
+    },
+    {
+      "id": "forward-to-lead-gen",
+      "name": "Forward to Lead Scoring",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{N8N_BASE_URL}}/webhook/lead-gen-{{CLIENT_ID}}' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ contactId: $json.contactId, name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', title: $json.title, companyName: $json.companyName, industry: $json.industry }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Daily Prospecting Trigger": {
+      "main": [[{ "node": "Build Apollo Search Filters", "type": "main", "index": 0 }]]
+    },
+    "Build Apollo Search Filters": {
+      "main": [[{ "node": "Apollo - Search Prospects", "type": "main", "index": 0 }]]
+    },
+    "Apollo - Search Prospects": {
+      "main": [[{ "node": "Filter New Prospects", "type": "main", "index": 0 }]]
+    },
+    "Filter New Prospects": {
+      "main": [[{ "node": "Apollo - Enrich Contact", "type": "main", "index": 0 }]]
+    },
+    "Apollo - Enrich Contact": {
+      "main": [[{ "node": "Extract Contact Info", "type": "main", "index": 0 }]]
+    },
+    "Extract Contact Info": {
+      "main": [[{ "node": "Save Contact to CRM", "type": "main", "index": 0 }]]
+    },
+    "Save Contact to CRM": {
+      "main": [[{ "node": "Build Personalised Outreach", "type": "main", "index": 0 }]]
+    },
+    "Build Personalised Outreach": {
+      "main": [
+        [{ "node": "Send Outreach Email", "type": "main", "index": 0 },
+         { "node": "Forward to Lead Scoring", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  }
+}

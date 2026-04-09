@@ -33,15 +33,77 @@ export class N8NService {
     )
   }
 
-  private loadWorkflowTemplate(templateName: string): Record<string, unknown> {
-    const templatePath = path.join(__dirname, '..', 'workflows', `${templateName}.workflow.json`)
+  /**
+   * Some templates are deliberately shared across multiple packages even
+   * though each package still gets its own-named workflow in N8N.
+   *
+   * - All packages share the AGENCY copy of the social agents, so editing
+   *   agency-social-media.workflow.json updates every package at once.
+   * - Growth shares the AGENCY copies of b2b-outreach, lead-generation,
+   *   and appointment-setter, so Growth + Agency stay in lock-step.
+   *
+   * The workflow NAME in N8N still gets the client's real plan prefix
+   * ([Growth] or [Agency]) — only the source template file is shared.
+   */
+  private getCanonicalTemplatePlan(templateName: string, plan?: string): string | undefined {
+    const SOCIAL_TEMPLATES = ['social-media', 'social-engagement']
+    if (SOCIAL_TEMPLATES.includes(templateName)) return 'AGENCY'
 
-    if (!fs.existsSync(templatePath)) {
-      throw new Error(`Workflow template not found: ${templateName}`)
+    const GROWTH_SHARED_WITH_AGENCY = ['b2b-outreach', 'lead-generation', 'appointment-setter']
+    if (plan === 'GROWTH' && GROWTH_SHARED_WITH_AGENCY.includes(templateName)) return 'AGENCY'
+
+    return undefined
+  }
+
+  // Loads a workflow template, preferring per-package files over the base.
+  private loadWorkflowTemplate(templateName: string, plan?: string): Record<string, unknown> {
+    // If a plan is supplied, prefer the per-package template file. This lets
+    // each package (AI Receptionist, Starter, Growth, Agency) have its own
+    // copy of the workflow that can be customised independently. Falls back
+    // to the base template if no per-package version exists yet.
+    //
+    // For templates in the canonical-share map, the effective plan is
+    // overridden so shared agents (social, Growth's sales agents) all load
+    // from the same canonical file even though each package has its own
+    // named workflow in N8N.
+    const dir = path.join(__dirname, '..', 'workflows')
+    const canonicalPlan = this.getCanonicalTemplatePlan(templateName, plan)
+    const effectivePlan = canonicalPlan || plan
+    const candidates: string[] = []
+    if (effectivePlan) {
+      const planSlug = effectivePlan.toLowerCase().replace(/_/g, '-')
+      candidates.push(path.join(dir, `${planSlug}-${templateName}.workflow.json`))
     }
+    candidates.push(path.join(dir, `${templateName}.workflow.json`))
 
-    const content = fs.readFileSync(templatePath, 'utf-8')
-    return JSON.parse(content)
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf-8')
+        const wf = JSON.parse(content)
+        logger.info('Loaded workflow template', {
+          templateName,
+          requestedPlan: plan,
+          effectivePlan,
+          sharedFromCanonical: !!canonicalPlan,
+          file: path.basename(p)
+        })
+        return wf
+      }
+    }
+    throw new Error(`Workflow template not found: ${templateName} (plan=${plan || 'none'}, effectivePlan=${effectivePlan || 'none'})`)
+  }
+
+  /**
+   * Returns a human-friendly label for a plan code (used in workflow names).
+   */
+  private planLabel(plan?: string): string {
+    switch (plan) {
+      case 'AI_RECEPTIONIST': return 'AI Receptionist'
+      case 'STARTER':         return 'Starter'
+      case 'GROWTH':          return 'Growth'
+      case 'AGENCY':          return 'Agency'
+      default:                return ''
+    }
   }
 
   private injectVariables(
@@ -545,7 +607,7 @@ export class N8NService {
     // ── 1. Load and parse template ────────────────────────────────────────────
     let template: Record<string, unknown>
     try {
-      template = this.loadWorkflowTemplate(templateName)
+      template = this.loadWorkflowTemplate(templateName, config.plan)
       result.checks.templateValid = true
     } catch (err) {
       result.errors.push(`Template error: ${err}`)
@@ -687,6 +749,25 @@ export class N8NService {
       throw new Error('N8N_API_KEY is not configured')
     }
 
+    // If the caller didn't pass plan explicitly, look it up from the client
+    // record so per-package template selection still works for the 11 agent
+    // classes that don't pass plan in their deployWorkflow calls.
+    if (!clientConfig.plan && clientConfig.clientId) {
+      try {
+        const { prisma } = await import('../lib/prisma')
+        const c = await prisma.client.findUnique({
+          where: { id: clientConfig.clientId },
+          select: { plan: true }
+        })
+        if (c?.plan) {
+          clientConfig = { ...clientConfig, plan: c.plan as WorkflowDeployConfig['plan'] }
+          logger.info('Auto-resolved client plan for workflow deploy', { clientId: clientConfig.clientId, plan: c.plan, templateName })
+        }
+      } catch (err) {
+        logger.warn('Failed to auto-resolve client plan, will fall back to base template', { clientId: clientConfig.clientId, err: String(err) })
+      }
+    }
+
     // Run pre-deployment test before creating workflow in N8N
     const testResult = await this.testWorkflow(templateName, clientConfig)
     if (!testResult.success) {
@@ -702,11 +783,16 @@ export class N8NService {
       })
     }
 
-    const template = this.loadWorkflowTemplate(templateName)
+    const template = this.loadWorkflowTemplate(templateName, clientConfig.plan)
     const workflow = this.injectVariables(template, clientConfig)
     const workflowWithUUIDs = this.assignNodeUUIDs(workflow)
 
-    const workflowName = `[${clientConfig.clientId} | ${clientConfig.businessName || 'Unknown'}] ${(workflow as { name?: string }).name || templateName}`
+    // Workflow name format: "[Plan] [clientId | BusinessName] {Base Name}"
+    // The plan prefix lets you visually identify which package owns each
+    // workflow in the N8N UI without opening it.
+    const planLabel = this.planLabel(clientConfig.plan)
+    const planPrefix = planLabel ? `[${planLabel}] ` : ''
+    const workflowName = `${planPrefix}[${clientConfig.clientId} | ${clientConfig.businessName || 'Unknown'}] ${(workflow as { name?: string }).name || templateName}`
 
     // Delete any existing workflow with this exact name to prevent webhook conflicts
     const existing = await this.listClientWorkflows(clientConfig.clientId)

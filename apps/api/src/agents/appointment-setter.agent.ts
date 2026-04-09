@@ -87,7 +87,8 @@ Respond with JSON:
         locationId: typedConfig.locationId,
         webhookUrl: `${process.env.N8N_BASE_URL}/webhook/appointments-${clientId}`,
         calendarId: typedConfig.calendar_id,
-        businessName: typedConfig.businessName
+        businessName: typedConfig.businessName,
+        bookingLink: typedConfig.booking_link || ''
       })
     } catch (error) {
       logger.warn('N8N workflow deployment failed', { clientId, error })

@@ -1,0 +1,146 @@
+{
+  "name": "Social Media Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "name": "Post Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }]
+        }
+      }
+    },
+    {
+      "id": "content-brief-webhook",
+      "name": "Content Brief Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 500],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-brief-{{CLIENT_ID}}",
+        "options": {}
+      },
+      "webhookId": "social-brief-{{CLIENT_ID}}"
+    },
+    {
+      "id": "claude-generate-content",
+      "name": "Claude - Generate Post Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [550, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/generate-content",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ platforms: '{{PLATFORMS}}', topic: $json.body?.topic || $json.topic || '' }) }}"
+      }
+    },
+    {
+      "id": "generate-images",
+      "name": "Generate Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 300],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/generate-images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ content: $json.content }) }}"
+      }
+    },
+    {
+      "id": "post-to-platforms",
+      "name": "Post to All Connected Platforms",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1150, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/post-all",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ content: Object.fromEntries(Object.entries($('Claude - Generate Post Content').first().json.content).map(([k,v]) => [k, v.content + (v.hashtags && v.hashtags.length ? '\\n\\n' + v.hashtags.map(h => h.startsWith('#') ? h : '#' + h).join(' ') : '')])), images: $json.images || {}, metadata: Object.fromEntries(Object.entries($('Claude - Generate Post Content').first().json.content).map(([k,v]) => [k, { hashtags: v.hashtags || [], image_prompt: v.image_prompt || '' }])), generatedAt: $('Claude - Generate Post Content').first().json.generatedAt }) }}"
+      }
+    },
+    {
+      "id": "log-activity",
+      "name": "Log Post Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1450, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/activity",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ type: 'social_post', platforms: Object.keys($('Claude - Generate Post Content').first().json.content), results: $json.results, postedAt: new Date().toISOString() }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Post Schedule": {
+      "main": [[{ "node": "Claude - Generate Post Content", "type": "main", "index": 0 }]]
+    },
+    "Content Brief Webhook": {
+      "main": [[{ "node": "Claude - Generate Post Content", "type": "main", "index": 0 }]]
+    },
+    "Claude - Generate Post Content": {
+      "main": [[{ "node": "Generate Images", "type": "main", "index": 0 }]]
+    },
+    "Generate Images": {
+      "main": [[{ "node": "Post to All Connected Platforms", "type": "main", "index": 0 }]]
+    },
+    "Post to All Connected Platforms": {
+      "main": [[{ "node": "Log Post Activity", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  }
+}

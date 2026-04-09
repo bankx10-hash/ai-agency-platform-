@@ -398,7 +398,7 @@ router.get('/agents/:clientId', async (req: Request, res: Response): Promise<voi
     }
     const deployments = await prisma.agentDeployment.findMany({
       where: { clientId },
-      select: { agentType: true, status: true, n8nWorkflowId: true, retellAgentId: true, createdAt: true, metrics: true }
+      select: { agentType: true, status: true, n8nWorkflowId: true, retellAgentId: true, createdAt: true, metrics: true, config: true }
     })
     const deployedMap = Object.fromEntries(deployments.map(d => [d.agentType, d]))
     const allAgentTypes = Object.values(AgentType)
@@ -408,7 +408,8 @@ router.get('/agents/:clientId', async (req: Request, res: Response): Promise<voi
       status: deployedMap[agentType]?.status || null,
       n8nWorkflowId: deployedMap[agentType]?.n8nWorkflowId || null,
       retellAgentId: deployedMap[agentType]?.retellAgentId || null,
-      createdAt: deployedMap[agentType]?.createdAt || null
+      createdAt: deployedMap[agentType]?.createdAt || null,
+      config: deployedMap[agentType]?.config || null
     }))
     res.json({ client, agents })
   } catch (error) {
@@ -505,6 +506,29 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
     // Remove DB record so deploy() can create a fresh one
     await prisma.agentDeployment.deleteMany({ where: { clientId, agentType: agentType as never } })
 
+    // Merge layers so re-deploys preserve prior config values that the
+    // admin form didn't re-type this time. Order: defaults → existing DB
+    // config → new form values (only non-empty strings overwrite).
+    const existingConfig: Record<string, unknown> = {}
+    for (const dep of existingDeployments) {
+      const depConfig = dep.config as Record<string, unknown> | null
+      if (depConfig) Object.assign(existingConfig, depConfig)
+    }
+    // Strip internal fields that shouldn't be re-merged
+    delete (existingConfig as Record<string, unknown>).generatedPrompt
+    delete (existingConfig as Record<string, unknown>).generatedSequence
+    delete (existingConfig as Record<string, unknown>).generatedOutreachTemplate
+
+    // Only overwrite existing values with new values that are actually set
+    // (non-empty strings, non-null). This means leaving a form field blank
+    // preserves the previous value instead of wiping it.
+    const filteredNew: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(config)) {
+      if (value === undefined || value === null) continue
+      if (typeof value === 'string' && value.trim() === '') continue
+      filteredNew[key] = value
+    }
+
     const agent = new AgentClass()
     const mergedConfig = {
       locationId: '',
@@ -512,8 +536,16 @@ router.post('/deploy-agent/:clientId', async (req: Request, res: Response): Prom
       country: client.country || 'AU',
       // Pass existing phone number so deploy() skips purchasing a new one
       existingPhoneNumber,
-      ...config
+      ...existingConfig,
+      ...filteredNew
     }
+
+    logger.info('Admin deploy merged config', {
+      clientId, agentType,
+      existingKeys: Object.keys(existingConfig),
+      newKeys: Object.keys(filteredNew),
+      finalBookingLink: (mergedConfig as Record<string, unknown>).booking_link
+    })
 
     const result = await agent.deploy(clientId, mergedConfig)
 

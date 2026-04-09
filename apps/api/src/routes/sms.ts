@@ -150,18 +150,51 @@ export async function handleSmsWebhook(req: Request, res: Response): Promise<voi
 
     if (!From || !To || !Body) { res.status(400).send('Bad Request'); return }
 
-    // Find which client owns this Twilio number
+    // Find which client owns this Twilio number. Voice numbers can be stored
+    // under several service names depending on which provisioning path was
+    // used (twilio-phone, twilio-phone-*, retell-inbound, voice-inbound-*).
+    // Check ALL of them.
     const creds = await prisma.clientCredential.findMany({
-      where: { service: { startsWith: 'twilio-phone-' } },
-      select: { clientId: true, credentials: true }
+      where: {
+        OR: [
+          { service: 'twilio-phone' },
+          { service: { startsWith: 'twilio-phone-' } },
+          { service: 'retell-inbound' },
+          { service: { startsWith: 'voice-inbound-' } },
+          { service: { startsWith: 'retell-' } }
+        ]
+      },
+      select: { clientId: true, credentials: true, service: true }
     })
 
     let clientId: string | null = null
     for (const cred of creds) {
       try {
-        const data = decryptJSON<{ phoneNumber: string }>(cred.credentials)
-        if (data.phoneNumber === To) { clientId = cred.clientId; break }
+        const data = decryptJSON<{ phoneNumber?: string; phone_number?: string }>(cred.credentials)
+        const stored = data.phoneNumber || data.phone_number || ''
+        if (stored && stored === To) {
+          clientId = cred.clientId
+          logger.info('SMS webhook matched client by phone', { To, clientId, service: cred.service })
+          break
+        }
       } catch { continue }
+    }
+
+    // Last-resort: scan all AgentDeployment configs for a phone_number match
+    if (!clientId) {
+      const deployments = await prisma.agentDeployment.findMany({
+        where: { agentType: { in: ['VOICE_INBOUND' as never, 'VOICE_OUTBOUND' as never, 'VOICE_CLOSER' as never] } },
+        select: { clientId: true, config: true, agentType: true }
+      })
+      for (const dep of deployments) {
+        const cfg = dep.config as Record<string, unknown> | null
+        const num = cfg?.phone_number as string | undefined
+        if (num && num === To) {
+          clientId = dep.clientId
+          logger.info('SMS webhook matched client by deployment config phone', { To, clientId, agentType: dep.agentType })
+          break
+        }
+      }
     }
 
     // Fall back to TWILIO_PHONE_NUMBER env var (shared number)
@@ -206,6 +239,33 @@ export async function handleSmsWebhook(req: Request, res: Response): Promise<voi
       INSERT INTO "Notification" ("id", "clientId", "type", "title", "body", "link", "createdAt")
       VALUES (${notifId}, ${clientId}, 'NEW_LEAD', ${`SMS from ${contactName || From}`}, ${Body.substring(0, 100)}, ${'/dashboard/sms'}, NOW())
     `.catch(() => {})
+
+    // Forward to appointment-setter reply webhook so the workflow can
+    // classify the reply and book an appointment if the lead is interested.
+    // Fire-and-forget — don't block the Twilio response on this.
+    // Also try to look up contactId by phone if we don't have one yet,
+    // normalising for common format mismatches (leading +, spaces).
+    let replyContactId = contactId
+    if (!replyContactId) {
+      const normalisedFrom = From.replace(/[^\d+]/g, '')
+      const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "Contact"
+        WHERE "clientId" = ${clientId}
+          AND (
+            phone = ${From}
+            OR phone = ${normalisedFrom}
+            OR REPLACE(REPLACE(phone, ' ', ''), '+', '') = ${normalisedFrom.replace('+', '')}
+          )
+        LIMIT 1
+      `.catch(() => [])
+      replyContactId = rows[0]?.id || null
+    }
+    const n8nBase = process.env.N8N_BASE_URL || 'http://localhost:5678'
+    fetch(`${n8nBase}/webhook/appt-reply-${clientId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactId: replyContactId || '', from: From, message: Body })
+    }).catch(err => logger.warn('Failed to forward SMS to appt-reply webhook', { clientId, err: String(err) }))
 
     // Respond to Twilio with empty TwiML
     res.setHeader('Content-Type', 'text/xml')

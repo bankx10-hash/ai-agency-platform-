@@ -2,7 +2,7 @@
 import axios from 'axios'
 import twilio from 'twilio'
 import { prisma } from '../lib/prisma'
-import { encryptJSON } from '../utils/encrypt'
+import { encryptJSON, decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
 
 const RETELL_API_KEY = process.env.RETELL_API_KEY || ''
@@ -101,6 +101,7 @@ export interface CreateOutboundAgentParams {
   businessName: string
   callWebhook?: string
   voicemailMessage?: string  // spoken when voicemail detected; empty = silent hangup
+  tools?: RetellTool[]       // optional custom tools (e.g. calendar booking)
 }
 
 export interface VoiceAgentResult {
@@ -116,16 +117,41 @@ export class VoiceService {
   private async createRetellLlm(
     systemPrompt: string,
     firstSentence: string,
-    tools?: RetellTool[]
+    tools?: RetellTool[],
+    includeEndCallTool?: boolean
   ): Promise<string> {
     const payload: Record<string, unknown> = {
       model: 'claude-4.5-sonnet',
-      general_prompt: systemPrompt,
-      begin_message: firstSentence
+      general_prompt: systemPrompt
     }
+    // Only set begin_message if a first sentence is explicitly provided.
+    // For outbound calls where we want voicemail detection to work cleanly,
+    // omit begin_message so the agent waits for the human to speak first —
+    // that way if the call hits voicemail, Retell's detection has time to
+    // fire and play voicemail_message without the agent racing against it.
+    if (firstSentence && firstSentence.trim().length > 0) {
+      payload.begin_message = firstSentence
+    }
+
+    // Assemble the tool list. For outbound agents we always attach the
+    // built-in end_call tool so the agent can actively hang up after
+    // leaving a voicemail (instead of relying on silence timeouts which
+    // let it keep speaking if the model improvises).
+    const allTools: Array<Record<string, unknown>> = []
     if (tools && tools.length > 0) {
-      payload.general_tools = tools
+      allTools.push(...(tools as unknown as Array<Record<string, unknown>>))
     }
+    if (includeEndCallTool) {
+      allTools.push({
+        type: 'end_call',
+        name: 'end_call',
+        description: 'Hangs up the call immediately. Call this after leaving a voicemail message or when the conversation has naturally concluded. Do not call this while a live human is still speaking.'
+      })
+    }
+    if (allTools.length > 0) {
+      payload.general_tools = allTools
+    }
+
     const llmRes = await retellApi.post('/create-retell-llm', payload)
     return llmRes.data.llm_id as string
   }
@@ -309,11 +335,108 @@ export class VoiceService {
     return { agentId, phoneNumber }
   }
 
-  async createOutboundAgent(params: CreateOutboundAgentParams): Promise<VoiceAgentResult> {
-    const { prompt, voice, firstSentence, clientId, businessName, callWebhook, voicemailMessage } = params
+  /**
+   * Look up the client's inbound voice agent number — the number callers
+   * can use to reach the client's receptionist. This is the number leads
+   * are asked to call back on when a closer/outbound call goes to voicemail.
+   * Searches the VOICE_INBOUND deployment config AND ClientCredential rows.
+   */
+  async getInboundCallbackNumber(clientId: string): Promise<string | undefined> {
+    try {
+      const inboundDeployment = await prisma.agentDeployment.findFirst({
+        where: { clientId, agentType: 'VOICE_INBOUND' as never },
+        orderBy: { createdAt: 'desc' }
+      })
+      const inboundConfig = (inboundDeployment?.config as Record<string, unknown>) || {}
+      const candidates = [
+        inboundConfig.phone_number,
+        inboundConfig.phoneNumber,
+        (inboundConfig.address as Record<string, unknown> | undefined)?.phone_number,
+      ]
+      for (const c of candidates) {
+        if (typeof c === 'string' && c.trim().length > 0) return c.trim()
+      }
+      // Fall back to credential store
+      const creds = await prisma.clientCredential.findMany({
+        where: {
+          clientId,
+          OR: [
+            { service: 'retell-inbound' },
+            { service: 'twilio-phone' },
+            { service: { startsWith: 'voice-inbound-' } },
+            { service: { startsWith: 'twilio-phone-' } }
+          ]
+        }
+      })
+      for (const cred of creds) {
+        try {
+          const data = decryptJSON<{ phoneNumber?: string; phone_number?: string }>(cred.credentials)
+          const num = data.phoneNumber || data.phone_number
+          if (num) return num
+        } catch { continue }
+      }
+    } catch (err) {
+      logger.warn('Failed to look up inbound callback number', { clientId, err: String(err) })
+    }
+    return undefined
+  }
 
-    // Step 1: create the LLM
-    const llmId = await this.createRetellLlm(prompt, firstSentence)
+  /**
+   * Build the standard voicemail message used by ALL outbound agents
+   * (closer, voice-outbound, receptionist-followup, etc.). Single source
+   * of truth — every outbound agent that hits voicemail says the same
+   * thing with the client's inbound receptionist number as the callback.
+   */
+  buildVoicemailMessage(businessName: string, inboundCallbackNumber: string): string {
+    return `Hi, this is Sarah from ${businessName}. I was calling for our scheduled chat but looks like I missed you. To reschedule, please give us a call back on ${inboundCallbackNumber} and we will sort out a new time. Thanks!`
+  }
+
+  /**
+   * Build the voicemail behaviour block that gets injected into an outbound
+   * agent's system prompt. When Retell detects voicemail, it plays the
+   * recorded voicemail_message. When detection fails and the agent is left
+   * talking to a voicemail machine, this block tells it what to say and
+   * instructs it to invoke the end_call tool immediately after. Belt-and-
+   * braces: both Retell's detection AND the agent's own behaviour deliver
+   * the same message with the same callback number.
+   */
+  buildVoicemailPromptBlock(businessName: string, inboundCallbackNumber: string): string {
+    const voicemailLine = this.buildVoicemailMessage(businessName, inboundCallbackNumber)
+    return `\n\n# VOICEMAIL HANDLING\nIf the call is answered by anything non-human — an automated greeting, a pre-recorded message, music on hold, a beep, or a pause longer than 4 seconds with no live response — say ONLY this exact sentence:\n\n"${voicemailLine}"\n\nImmediately after speaking that sentence, invoke the end_call function to hang up. One sentence, then end_call. Nothing else.\n`
+  }
+
+  async createOutboundAgent(params: CreateOutboundAgentParams): Promise<VoiceAgentResult> {
+    const { prompt, voice, firstSentence, clientId, businessName, callWebhook, voicemailMessage, tools } = params
+
+    // Resolve the inbound callback number — required for ALL outbound agents
+    // so voicemail messages always direct leads to the client's receptionist.
+    const inboundCallbackNumber = await this.getInboundCallbackNumber(clientId)
+    if (!inboundCallbackNumber) {
+      throw new Error(
+        'Outbound agent cannot deploy without a Voice Inbound agent that has a phone number provisioned. ' +
+        'The voicemail message must direct unanswered leads to the inbound number to reschedule. ' +
+        'Deploy Voice Inbound first.'
+      )
+    }
+
+    // Standard voicemail message — same across all outbound agents / packages
+    const standardVoicemailMessage = voicemailMessage || this.buildVoicemailMessage(businessName, inboundCallbackNumber)
+
+    // Inject the voicemail behavior block into the system prompt so the
+    // agent also knows what to say if Retell's detection misses voicemail.
+    const promptWithVoicemail = prompt + this.buildVoicemailPromptBlock(businessName, inboundCallbackNumber)
+
+    logger.info('Creating outbound agent with standard voicemail', {
+      clientId,
+      inboundCallbackNumber,
+      voicemailMessagePreview: standardVoicemailMessage.substring(0, 80)
+    })
+
+    // Step 1: create the LLM — include the built-in end_call tool so the
+    // agent can hang up itself after finishing a voicemail message, plus
+    // any custom tools the caller passed (e.g. calendar booking for
+    // outbound agents that need to book appointments mid-call).
+    const llmId = await this.createRetellLlm(promptWithVoicemail, firstSentence, tools, true)
     logger.info('Retell LLM created for outbound agent', { llmId, clientId })
 
     // Step 2: create the agent (with voicemail detection for outbound agents)
@@ -325,8 +448,11 @@ export class VoiceService {
       // Voicemail detection — leave a message if we reach voicemail
       enable_voicemail_detection: true,
       voicemail_detection_timeout_ms: 30000,
-      voicemail_message: voicemailMessage || `Hi, this is the team from ${businessName}. We were just calling for your scheduled appointment but looks like we missed you. No stress — please give us a call back when you have a moment, or keep an eye out for a follow-up email. Have a great day!`,
-      end_call_after_silence_ms: 15000,
+      voicemail_message: standardVoicemailMessage,
+      // 10 seconds is Retell's minimum. After the agent says its voicemail
+      // line, this timer starts counting down silence — voicemail doesn't
+      // respond, so the call ends 10s later.
+      end_call_after_silence_ms: 10000,
       ...(callWebhook && { webhook_url: callWebhook })
     })
 

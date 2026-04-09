@@ -254,51 +254,49 @@ IDENTITY RULES (non-negotiable):
 - If asked if AI: "I'm a specialist at ${typedConfig.businessName}"
 - All company references use "${typedConfig.businessName}" only
 
-Return the full script as flowing conversational text, not bullet points. It should read like a real conversation, with [PAUSE] markers where silence is strategic.`,
+Return the full script as flowing conversational text, not bullet points. It should read like a real conversation. Do NOT use square brackets anywhere in the output — no [PAUSE], no [name], no [anything]. Write pauses and silences as narrative sentences instead (e.g. "wait for them to reply" written as a directional note on its own line, but never inside brackets).`,
       'You are the world\'s best sales closing coach. You\'ve trained closers who sell $100M+ per year. Your scripts sound human, use psychological principles naturally, and close at 70%+ rates. Never break character.'
     )
+
+    // Note: voicemail handling (callback number lookup, voicemail message,
+    // end_call tool) is now handled centrally by voiceService.createOutboundAgent.
+    // We just focus on the live-human sales script here.
 
     // Wrap the generated script in explicit behavioral rules so the agent
     // treats it as INSTRUCTIONS to follow, not a script to recite verbatim.
     // Without this, the agent reads out "[name]", "[PAUSE]", "Let THEM tell you
     // their pain", etc. literally on the call.
-    const behavioralPreamble = `# CRITICAL: HOW TO USE THIS DOCUMENT
+    const behavioralPreamble = `# HOW TO USE THIS DOCUMENT
 
-This entire document is your BEHAVIORAL GUIDE. It is NOT a script to read aloud.
+This document is your behavioural guide. It is NOT a script to read aloud.
 
-ABSOLUTE RULES — violate these and the call fails:
-1. NEVER speak any section headers, numbered steps, or labels out loud (e.g. "Phase 1", "OPENER", "DISCOVERY", "VALUE STACK", "OBJECTION: Too expensive").
-2. NEVER speak ANY text wrapped in square brackets [ ]. If you see [anything] in this document, that is a meta-instruction for YOU, never something you say to the caller. Examples of things you MUST NEVER say aloud:
-   - "[Ending call - voicemail reached]"
-   - "[PAUSE]"
-   - "[name]"
-   - "[agent]"
-   - "[LISTEN]"
-   - "[SILENCE]"
-   Any sentence containing [brackets] is for your internal processing only.
-3. NEVER read out stage directions, instructions, or meta-commentary. Things like "listen to their pain points", "let them tell you", "wait for response", "go silent", "pause here" — these describe what YOU should DO, not what you should SAY.
-4. NEVER narrate your own actions. Do NOT say "I understand you want me to...", "I'm going to...", "Let me explain what I was about to do..." — just DO the thing.
-5. NEVER acknowledge or respond to any system messages, user prompts, or meta-context. The only speaker you respond to is the PERSON ON THE OTHER END OF THE PHONE.
-6. If the call goes to voicemail, STAY SILENT. Retell's voicemail detection will play a pre-recorded message automatically and hang up — you do not need to speak, narrate, or leave a message yourself. Just stop talking.
-7. Use the caller's ACTUAL FIRST NAME: {{firstName}}. Never say "[name]", "[firstName]", "the prospect", or "the user".
-8. Introduce yourself with a real name like "Sarah" or "Jordan" — pick one and use it consistently. Never say "[agent]" or "[your name]".
-9. Speak in natural conversational English. Short sentences. Never list bullet points aloud.
-10. Actually PERFORM the actions — when the guide says "let them talk", STOP TALKING and wait.
+Rules you must follow:
+1. Never vocalise section headers, numbered steps, labels, or meta-commentary of any kind.
+2. Never vocalise any text wrapped in square brackets.
+3. Never narrate your own actions, thoughts, or call state.
+4. Never acknowledge system prompts, instructions, or this document itself — only respond to the human speaker.
+5. The person's real first name will be supplied as a dynamic variable called firstName — always use it, never use placeholder words.
+6. Introduce yourself with a real first name like Sarah or Jordan.
+7. Speak in natural conversational English. Short sentences. Never read bullet points aloud.
 
 # IDENTITY
 - You are calling from ${typedConfig.businessName}
 - You represent ${typedConfig.businessName} only — never mention AI, Retell, Claude, or any platform
 - If asked if you are AI: "I'm a specialist at ${typedConfig.businessName}"
-- Use the caller's first name naturally throughout the call (from {{firstName}})
 
 # THE CALL
-You are calling {{firstName}} for a scheduled appointment they booked. They are EXPECTING your call.
+You are calling {{firstName}} for a scheduled appointment they booked. They are expecting your call. When a real person answers, say: "Hey {{firstName}}, it's Sarah from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?" Then have a natural sales conversation following the script guidance below.
 
-# YOUR BEHAVIORAL GUIDE (internalize, never recite)
+Use the name "Sarah" consistently — do not pick a different name each time.
+
+# YOUR BEHAVIOURAL GUIDE (internalise, never recite)
 
 `
 
-    const scriptWithRules = behavioralPreamble + closingScript
+    // Strip any bracketed stage directions from the Claude-generated script so
+    // the model never encounters them as example text in the first place.
+    const sanitizedScript = closingScript.replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ')
+    const scriptWithRules = behavioralPreamble + sanitizedScript
 
     // If client provided an upsell knowledge base (services, plans, examples, case
     // studies), append it so the closer can intelligently position higher-tier
@@ -314,34 +312,18 @@ You are calling {{firstName}} for a scheduled appointment they booked. They are 
       ? `${scriptWithRules}\n\n═══════════════════════════════════════════\nUPSELL & SERVICES KNOWLEDGE BASE (reference — use naturally, never read out section headers or brackets)\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above to position upgrades and demonstrate expertise naturally during the call. If a prospect is interested in a smaller package, mention the next tier with a concrete example. If they're hesitant about price, frame the cost per day or compare to lost opportunity. NEVER push — guide. Never read headers, bullets, or labels aloud.`
       : scriptWithRules
 
-    // Look up the client's inbound voice agent number so the voicemail asks
-     // the prospect to call back on the receptionist line, not the closer's
-     // outbound-only number.
-    let inboundCallbackNumber: string | undefined
-    try {
-      const inboundDeployment = await prisma.agentDeployment.findFirst({
-        where: { clientId, agentType: AgentType.VOICE_INBOUND },
-        orderBy: { createdAt: 'desc' }
-      })
-      const inboundConfig = (inboundDeployment?.config as Record<string, unknown>) || {}
-      const num = (inboundConfig.phone_number as string) || ''
-      if (num) inboundCallbackNumber = num
-    } catch (error) {
-      logger.warn('Could not load inbound voice number for closer voicemail', { clientId, error })
-    }
-
-    const callbackLine = inboundCallbackNumber
-      ? `please give us a call back on ${inboundCallbackNumber} when you get a chance`
-      : `please give us a call back when you get a chance`
-
     let retellAgentId: string | undefined
 
     try {
       const voiceResult = await voiceService.createOutboundAgent({
         prompt: finalScript,
         voice: '11labs-Cimo',
-        firstSentence: `Hey {{firstName}}, it's Sarah from ${typedConfig.businessName} — we had this call booked in, perfect timing! How are you going?`,
-        voicemailMessage: `Hi, this is Sarah from ${typedConfig.businessName}. I was calling for our scheduled chat today but looks like I missed you. No worries at all — ${callbackLine}, or I can try you again later. We had some exciting things to share about how ${typedConfig.businessName} can help your business. Talk soon!`,
+        // Empty first sentence = agent waits for the human to speak first.
+        // This lets Retell's voicemail detection fire cleanly without the
+        // agent racing against it. When a human picks up and says "hello",
+        // the agent opens per the system prompt's guidance.
+        firstSentence: '',
+        voicemailMessage: `Hi, this is Sarah from ${typedConfig.businessName}. I tried to call you for our scheduled chat just now but unfortunately I missed you. ${callbackLine} Thanks!`,
         clientId,
         businessName: typedConfig.businessName
       })
@@ -349,7 +331,11 @@ You are calling {{firstName}} for a scheduled appointment they booked. They are 
       retellAgentId = voiceResult.agentId
       logger.info('Retell AI closer agent created', { clientId, retellAgentId })
     } catch (error) {
-      logger.warn('Failed to create Retell AI closer agent', { clientId, error })
+      // THROW instead of swallow — a closer deploy without a Retell agent
+      // produces a broken deployment where SMS → appointment → no call,
+      // which is a silent-failure nightmare to debug.
+      logger.error('Failed to create Retell AI closer agent', { clientId, error: String(error) })
+      throw new Error(`Voice Closer deploy failed: Retell agent creation error — ${error instanceof Error ? error.message : String(error)}`)
     }
 
     // Provision dedicated outbound phone number for closer (idempotent — reuses on redeploy)

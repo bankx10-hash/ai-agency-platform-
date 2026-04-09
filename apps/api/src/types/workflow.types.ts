@@ -1,5 +1,9 @@
 export interface WorkflowDeployConfig {
   clientId: string
+  // Client's plan — used to select per-package template files (e.g.
+  // `ai-receptionist-voice-inbound.workflow.json`) so each package has
+  // its own customisable template that can't be overwritten by another.
+  plan?: 'AI_RECEPTIONIST' | 'STARTER' | 'GROWTH' | 'AGENCY'
   locationId?: string
   agentPrompt?: string
   webhookUrl?: string

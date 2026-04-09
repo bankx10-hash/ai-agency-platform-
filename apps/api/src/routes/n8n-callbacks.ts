@@ -679,12 +679,45 @@ router.post('/:clientId/appointments', async (req, res) => {
     const client = await prisma.client.findUnique({ where: { id: clientId }, select: { businessName: true } })
     const businessName = client?.businessName || 'our business'
 
-    // Calendar booking happens upstream in /calendar/:clientId/book (Retell tool) or
-    // via the N8N calendar webhook path. Skip booking + email here to avoid duplicate
-    // invites. This endpoint is now metrics + closer trigger only.
+    // Look up contact details (we need name + email + phone for the calendar event)
+    let lookupContactName = contactName
+    let lookupContactEmail = contactEmail
+    let lookupContactPhone: string | undefined
+    if (contactId) {
+      const contactRow = await prisma.contact.findFirst({
+        where: { id: contactId, clientId },
+        select: { name: true, email: true, phone: true }
+      })
+      if (contactRow) {
+        lookupContactName = lookupContactName || contactRow.name || undefined
+        lookupContactEmail = lookupContactEmail || contactRow.email || undefined
+        lookupContactPhone = contactRow.phone || undefined
+      }
+    }
+
+    // Create the REAL calendar event in the client's connected calendar
+    // (Google Calendar / Calendly / Cal.com) so the lead receives an invite
+    // and the client sees it in their calendar. If no calendar is connected,
+    // we still proceed — the appointment record + closer trigger don't depend
+    // on a real calendar event.
     type BookingResult = { success: boolean; booked: boolean; confirmationMessage: string; eventLink?: string }
-    const bookingResult = undefined as BookingResult | undefined
-    logger.info('Calendar booking skipped (handled upstream)', { clientId })
+    let bookingResult: BookingResult | undefined
+    if (startTime && lookupContactEmail && lookupContactName) {
+      try {
+        const { calendarService } = await import('../services/calendar.service')
+        bookingResult = await calendarService.bookAppointment(
+          clientId,
+          startTime,
+          { name: lookupContactName, email: lookupContactEmail, phone: lookupContactPhone },
+          businessName
+        )
+        logger.info('Calendar booking attempted', { clientId, contactId, booked: bookingResult.booked, eventLink: bookingResult.eventLink })
+      } catch (calErr) {
+        logger.warn('Calendar booking failed (non-fatal — closer will still fire)', { clientId, contactId, err: String(calErr) })
+      }
+    } else {
+      logger.info('Calendar booking skipped (missing startTime/email/name)', { clientId, hasStartTime: !!startTime, hasEmail: !!lookupContactEmail, hasName: !!lookupContactName })
+    }
 
     // Update agent metrics
     const agent = await prisma.agentDeployment.findFirst({ where: { clientId, agentType: 'APPOINTMENT_SETTER' as never } })
@@ -754,6 +787,80 @@ router.post('/:clientId/appointments', async (req, res) => {
 })
 
 // POST /:clientId/linkedin-lead — LinkedIn outreach reply captured as a lead
+// POST /:clientId/outbound-queue — tag a contact for the Voice Outbound
+// agent to call. Used by Lead Generation for warm leads (score 40-70)
+// that aren't hot enough for the SMS path but are worth a live call.
+// Also immediately triggers the Voice Outbound workflow webhook for that
+// specific contact so we don't have to wait for the daily cron.
+router.post('/:clientId/outbound-queue', async (req, res) => {
+  const { clientId } = req.params
+  const { contactId, contactName, contactEmail, contactPhone, score, summary } = req.body as {
+    contactId?: string
+    contactName?: string
+    contactEmail?: string
+    contactPhone?: string
+    score?: number
+    summary?: string
+  }
+  try {
+    if (!contactId) {
+      res.status(400).json({ error: 'contactId required' })
+      return
+    }
+
+    // Tag the contact in our internal CRM so the daily cron also picks it
+    // up as a fallback if the immediate trigger fails.
+    await prisma.$executeRaw`
+      UPDATE "Contact"
+      SET "stage" = 'outbound-queue', "updatedAt" = NOW()
+      WHERE "id" = ${contactId} AND "clientId" = ${clientId}
+    `.catch(err => logger.warn('Failed to tag contact for outbound queue', { clientId, contactId, err: String(err) }))
+
+    // Log CRM activity
+    await prisma.contactActivity.create({
+      data: {
+        id: randomUUID(),
+        contactId,
+        clientId,
+        type: 'NOTE' as never,
+        title: 'Queued for Voice Outbound',
+        body: `Warm lead (score ${score ?? 'n/a'}) — queued for a live outbound qualifying call.`,
+        metadata: { score, summary } as never,
+        agentType: 'VOICE_OUTBOUND'
+      }
+    }).catch(() => {})
+
+    // Immediately trigger the Voice Outbound workflow for this specific
+    // contact — don't wait for the daily cron. The workflow has a
+    // `outbound-queue-{clientId}` webhook trigger that accepts a single
+    // lead and places a Retell call to it.
+    const outboundDeployment = await prisma.agentDeployment.findFirst({
+      where: { clientId, agentType: 'VOICE_OUTBOUND' as never, status: 'ACTIVE' as never },
+      select: { n8nWorkflowId: true }
+    })
+    if (outboundDeployment?.n8nWorkflowId) {
+      const webhookUrl = `${process.env.N8N_BASE_URL}/webhook/outbound-queue-${clientId}`
+      axios.post(webhookUrl, {
+        contactId,
+        contactName,
+        contactEmail,
+        contactPhone,
+        score,
+        summary,
+        leadSource: 'lead-gen-warm-score'
+      }).catch(err => logger.warn('Failed to trigger outbound-queue webhook', { clientId, contactId, err: String(err) }))
+      logger.info('Voice Outbound queue handoff triggered', { clientId, contactId, score })
+    } else {
+      logger.info('No active Voice Outbound agent — contact tagged only, will be picked up by daily cron if deployed later', { clientId, contactId })
+    }
+
+    res.json({ success: true, contactId, queued: true })
+  } catch (err) {
+    logger.error('Outbound queue error', { clientId, err: String(err) })
+    res.status(500).json({ error: 'Failed to queue contact for outbound' })
+  }
+})
+
 router.post('/:clientId/linkedin-lead', async (req, res) => {
   const { clientId } = req.params
   const { name, email, phone, linkedinUrl, message } = req.body as {

@@ -1,0 +1,197 @@
+{
+  "name": "Client Services Agent",
+  "active": false,
+  "nodes": [
+    {
+      "id": "new-client-webhook",
+      "name": "New Client Sale Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "parameters": {
+        "path": "client-services-{{CLIENT_ID}}",
+        "options": {}
+      },
+      "webhookId": "client-services-{{CLIENT_ID}}"
+    },
+    {
+      "id": "schedule-checkins",
+      "name": "Weekly Check-in Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 500],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1" }]
+        }
+      }
+    },
+    {
+      "id": "claude-write-welcome",
+      "name": "Claude - Write Welcome Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Write a personalised welcome sequence for new client: \" + JSON.stringify($json)}]}"
+      }
+    },
+    {
+      "id": "send-welcome-email",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"contactId\":$json.contactId,\"to\":$json.email,\"subject\":\"Welcome! Here's your next step\",\"body\":$json.content[0].text}"
+      }
+    },
+    {
+      "id": "get-all-clients",
+      "name": "Get Active Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 500],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "tag", "value": "active-client" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "claude-health-check",
+      "name": "Claude - Assess Client Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Assess client health and generate weekly check-in message for: \" + JSON.stringify($json.contacts?.[0])}]}"
+      }
+    },
+    {
+      "id": "send-checkin",
+      "name": "Send Check-in Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "={{$env.N8N_API_SECRET}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"contactId\":$json.contacts?.[0]?.id,\"to\":$json.contacts?.[0]?.email,\"subject\":\"Quick check-in from your success team\",\"body\":$json.content[0].text}"
+      }
+    },
+    {
+      "id": "support-webhook",
+      "name": "Support Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 700],
+      "parameters": {
+        "path": "client-support-{{CLIENT_ID}}",
+        "options": {}
+      },
+      "webhookId": "client-support-{{CLIENT_ID}}"
+    },
+    {
+      "id": "claude-handle-support",
+      "name": "Claude - Handle Support Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 700],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1024,\"system\":\"{{AGENT_PROMPT}}\",\"messages\":[{\"role\":\"user\",\"content\":\"Handle this support request: \" + JSON.stringify($json)}]}"
+      }
+    }
+  ],
+  "connections": {
+    "New Client Sale Webhook": {
+      "main": [[{ "node": "Claude - Write Welcome Message", "type": "main", "index": 0 }]]
+    },
+    "Claude - Write Welcome Message": {
+      "main": [[{ "node": "Send Welcome Email", "type": "main", "index": 0 }]]
+    },
+    "Weekly Check-in Schedule": {
+      "main": [[{ "node": "Get Active Contacts", "type": "main", "index": 0 }]]
+    },
+    "Get Active Contacts": {
+      "main": [[{ "node": "Claude - Assess Client Health", "type": "main", "index": 0 }]]
+    },
+    "Claude - Assess Client Health": {
+      "main": [[{ "node": "Send Check-in Email", "type": "main", "index": 0 }]]
+    },
+    "Support Request Webhook": {
+      "main": [[{ "node": "Claude - Handle Support Request", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  }
+}

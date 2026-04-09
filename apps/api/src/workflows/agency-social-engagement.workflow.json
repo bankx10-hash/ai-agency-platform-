@@ -1,0 +1,213 @@
+{
+  "name": "Social Engagement Bot — {{BUSINESS_NAME}}",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-engage-{{CLIENT_ID}}",
+        "options": {}
+      },
+      "id": "engagement-webhook",
+      "name": "Engagement Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "social-engage-{{CLIENT_ID}}"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst type = body.type || 'dm';\nconst platform = body.platform || 'facebook';\nconst senderId = String(body.senderId || '');\nconst senderName = String(body.senderName || '');\nconst message = String(body.message || '');\nconst postId = String(body.postId || '');\nconst commentId = String(body.commentId || '');\nconst clientId = body.clientId || '{{CLIENT_ID}}';\nif (!message.trim()) return [];\nreturn [{ json: { type, platform, senderId, senderName, message, postId, commentId, clientId } }];"
+      },
+      "id": "normalise-event",
+      "name": "Normalise Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ name: $('Normalise Event').first().json.senderName || $('Normalise Event').first().json.senderId, email: $('Normalise Event').first().json.platform + '_' + $('Normalise Event').first().json.senderId + '@social.nodus', source: $('Normalise Event').first().json.platform, phone: '' }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "options": {}
+      },
+      "id": "save-contact",
+      "name": "Save Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/analyse-engagement",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ type: $('Normalise Event').first().json.type, platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, senderName: $('Normalise Event').first().json.senderName, message: $('Normalise Event').first().json.message, postId: $('Normalise Event').first().json.postId, commentId: $('Normalise Event').first().json.commentId }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "options": {}
+      },
+      "id": "analyse-and-reply",
+      "name": "Analyse and Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.intent}}",
+              "operation": "notEqual",
+              "value2": "spam"
+            }
+          ]
+        }
+      },
+      "id": "if-not-spam",
+      "name": "IF Not Spam",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [960, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/social/send-reply",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ type: $('Normalise Event').first().json.type, platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, reply: $('Analyse and Reply').first().json.reply, postId: $('Normalise Event').first().json.postId, commentId: $('Normalise Event').first().json.commentId }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "options": {}
+      },
+      "id": "send-reply",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1200, -120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$('Analyse and Reply').first().json.shouldBook}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-should-book",
+      "name": "IF Should Book",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1440, -120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{N8N_BASE_URL}}/webhook/appointments-{{CLIENT_ID}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ source: 'social_engagement', platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, senderName: $('Normalise Event').first().json.senderName, message: $('Normalise Event').first().json.message, intent: $('Analyse and Reply').first().json.intent, urgency: $('Analyse and Reply').first().json.urgency }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "options": {}
+      },
+      "id": "trigger-appointment-setter",
+      "name": "Trigger Appointment Setter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1680, -240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ '{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts/' + $('Save Contact').first().json.id + '/notes' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ body: 'Social engagement via ' + $('Normalise Event').first().json.platform + ' (' + $('Normalise Event').first().json.type + '). Intent: ' + $('Analyse and Reply').first().json.intent + '. Message: ' + $('Normalise Event').first().json.message + '. Reply: ' + $('Analyse and Reply').first().json.reply }) }}",
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "options": {}
+      },
+      "id": "save-note",
+      "name": "Save Conversation Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1680, -120]
+    }
+  ],
+  "connections": {
+    "Engagement Webhook": {
+      "main": [[{ "node": "Normalise Event", "type": "main", "index": 0 }]]
+    },
+    "Normalise Event": {
+      "main": [[{ "node": "Save Contact", "type": "main", "index": 0 }]]
+    },
+    "Save Contact": {
+      "main": [[{ "node": "Analyse and Reply", "type": "main", "index": 0 }]]
+    },
+    "Analyse and Reply": {
+      "main": [[{ "node": "IF Not Spam", "type": "main", "index": 0 }]]
+    },
+    "IF Not Spam": {
+      "main": [
+        [{ "node": "Send Reply", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Send Reply": {
+      "main": [[{ "node": "IF Should Book", "type": "main", "index": 0 }]]
+    },
+    "IF Should Book": {
+      "main": [
+        [
+          { "node": "Trigger Appointment Setter", "type": "main", "index": 0 },
+          { "node": "Save Conversation Note", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Save Conversation Note", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

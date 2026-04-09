@@ -13,6 +13,7 @@ interface AgentRow {
   n8nWorkflowId: string | null
   retellAgentId: string | null
   createdAt: string | null
+  config: Record<string, unknown> | null
 }
 
 interface ClientInfo {
@@ -178,6 +179,32 @@ export default function AdminConfigurePage() {
       const data = await res.json() as { client: ClientInfo; agents: AgentRow[] }
       setClient(data.client)
       setAgents(data.agents)
+
+      // Pre-fill the configs state from existing deployment config so re-deploys
+      // preserve whatever the admin set previously instead of starting blank.
+      const prefilled: Record<string, Record<string, string>> = {}
+      for (const agent of data.agents) {
+        if (!agent.config) continue
+        const fields = AGENT_CONFIG_FIELDS[agent.agentType] || []
+        const agentConfig: Record<string, string> = {}
+        for (const field of fields) {
+          const v = (agent.config as Record<string, unknown>)[field.key]
+          if (v === undefined || v === null) continue
+          agentConfig[field.key] = typeof v === 'string' ? v : String(v)
+        }
+        // Flatten nested address object (voice inbound) back to flat fields
+        const addr = (agent.config as Record<string, unknown>).address as Record<string, string> | undefined
+        if (addr) {
+          if (addr.street) agentConfig.address_street = addr.street
+          if (addr.city) agentConfig.address_city = addr.city
+          if (addr.state) agentConfig.address_state = addr.state
+          if (addr.postcode) agentConfig.address_postcode = addr.postcode
+        }
+        if (Object.keys(agentConfig).length > 0) {
+          prefilled[agent.agentType] = agentConfig
+        }
+      }
+      setConfigs(prefilled)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load client')
     } finally {
