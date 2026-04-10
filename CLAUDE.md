@@ -108,7 +108,7 @@ Stripe price IDs live in env vars (`STRIPE_STARTER_PRICE_ID`, etc.). When a subs
 | `voice.service.ts` | Retell AI — create inbound/outbound agents, launch calls, fetch transcripts. Phone numbers provisioned via Twilio credentials passed to Retell's `/create-phone-number` endpoint. SIP credentials passed on import-phone-number for outbound. |
 | `calendar.service.ts` | Calendar provider integrations — Google Calendar, Calendly, Cal.com. `bookAppointment()` writes to whichever provider the client connected during onboarding. No GHL calendar. |
 | `email.service.ts` | Gmail OAuth2 flow + SMTP sending via Nodemailer |
-| `apollo.service.ts` | Apollo.io — B2B prospect search, contact enrichment, verified emails/phones (replaces Phantombuster — no LinkedIn ban risk) |
+| `apollo.service.ts` | Apollo.io — B2B prospect search + enrichment. Uses `X-Api-Key` header auth (NOT body param). Search endpoint: `/api/v1/mixed_people/api_search`. One master Nodus API key ($59/mo Basic) serves all clients; per-client usage tracked via UsageRecord. |
 | `social.service.ts` | **Direct posting** to Meta Graph API (Facebook + Instagram) and LinkedIn Marketing API. No Buffer integration. Posts scheduled via internal `ScheduledPost` table. |
 | `encrypt.ts` | AES-256 encrypt/decrypt for `ClientCredential.credentials` |
 | `onboarding.service.ts` | **Master orchestrator** — `runOnboarding()` walks `PLANS[plan].agents` and deploys each agent in sequence with a 10s stagger. Sends welcome email at the end. Phone provisioning happens **inside each voice agent's `deploy()`**, not in a separate step (the `assignVoiceNumbers()` method exists but is dead code). |
