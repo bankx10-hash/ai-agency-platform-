@@ -74,12 +74,12 @@ Always be warm, proactive, and solutions-focused. You genuinely care about clien
       `Create a comprehensive client success playbook for ${typedConfig.businessName}.
 
        Design:
-       1. Welcome sequence for new clients (${typedConfig.welcome_sequence.length} touchpoints)
+       1. Welcome sequence for new clients (${(typedConfig.welcome_sequence || []).length || 3} touchpoints)
        2. Onboarding checklist follow-up cadence
        3. Monthly check-in framework
-       4. Health score calculation based on: ${JSON.stringify(typedConfig.health_score_weights)}
+       4. Health score calculation based on: ${JSON.stringify(typedConfig.health_score_weights || { engagement: 0.3, nps: 0.3, support_tickets: 0.2, usage: 0.2 })}
        5. Churn risk intervention script
-       6. Upsell conversation framework triggered by: ${(typedConfig.upsell_triggers || []).join(', ')}
+       6. Upsell conversation framework triggered by: ${(typedConfig.upsell_triggers || ['high_engagement', 'plan_limit_reached', '90_days_active']).join(', ')}
        7. NPS survey follow-up based on score ranges
 
        Create specific message templates for each scenario.
