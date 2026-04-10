@@ -709,6 +709,35 @@ async function runStartupMigrations() {
     logger.info('Startup migration: Social media dashboard tables ensured')
   } catch (err) { logger.warn('Social media migration partial', { err }) }
 
+  // ── UsageRecord table for usage tracking + overage billing ──────────────
+  try {
+    await prisma.$executeRawUnsafe(`
+      DO $$ BEGIN
+        CREATE TYPE "UsageType" AS ENUM ('VOICE_MINUTES', 'AI_ACTIONS', 'SMS', 'EMAILS', 'SOCIAL_POSTS', 'APOLLO_PROSPECTS');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$
+    `)
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "UsageRecord" (
+        "id" TEXT NOT NULL,
+        "clientId" TEXT NOT NULL,
+        "usageType" "UsageType" NOT NULL,
+        "quantity" DECIMAL(10,2) NOT NULL,
+        "billingPeriodStart" TIMESTAMP(3) NOT NULL,
+        "sourceId" TEXT,
+        "sourceType" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "UsageRecord_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "UsageRecord_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `)
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "UsageRecord_sourceId_sourceType_usageType_key" ON "UsageRecord"("sourceId", "sourceType", "usageType")`)
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "UsageRecord_clientId_usageType_billingPeriodStart_idx" ON "UsageRecord"("clientId", "usageType", "billingPeriodStart")`)
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "UsageRecord_clientId_billingPeriodStart_idx" ON "UsageRecord"("clientId", "billingPeriodStart")`)
+    logger.info('Startup migration: UsageRecord table ensured')
+  } catch (err) { logger.warn('UsageRecord migration partial', { err }) }
+
 }
 
 const app = express()

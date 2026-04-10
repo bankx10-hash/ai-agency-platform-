@@ -75,4 +75,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://localhost:' + (process.env.PORT||4000) + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "npx prisma db execute --schema=prisma/schema.prisma --file=prisma/create-usage-table.sql || true && node dist/apps/api/src/index.js"]
+CMD ["node", "dist/apps/api/src/index.js"]
