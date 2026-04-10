@@ -18,8 +18,9 @@ router.get('/summary', async (req: AuthRequest, res: Response): Promise<void> =>
     }
     res.json(summary)
   } catch (err) {
-    logger.error('Usage summary error', { err })
-    res.status(500).json({ error: 'Failed to fetch usage summary' })
+    const detail = err instanceof Error ? err.message : String(err)
+    logger.error('Usage summary error', { clientId: req.clientId, err: detail })
+    res.status(500).json({ error: 'Failed to fetch usage summary', detail })
   }
 })
 

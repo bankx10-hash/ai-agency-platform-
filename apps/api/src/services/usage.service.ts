@@ -15,6 +15,14 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
 
+// ── Plan limits (hardcoded to avoid import path issues in compiled JS) ────────
+const PLAN_LIMITS: Record<string, Record<string, number>> = {
+  AI_RECEPTIONIST: { VOICE_MINUTES: 375, AI_ACTIONS: 200, SMS: 100, EMAILS: 200, SOCIAL_POSTS: 0, APOLLO_PROSPECTS: 0 },
+  STARTER:         { VOICE_MINUTES: 750, AI_ACTIONS: 750, SMS: 300, EMAILS: 500, SOCIAL_POSTS: 0, APOLLO_PROSPECTS: 0 },
+  GROWTH:          { VOICE_MINUTES: 1500, AI_ACTIONS: 1500, SMS: 500, EMAILS: 1500, SOCIAL_POSTS: 15, APOLLO_PROSPECTS: 550 },
+  AGENCY:          { VOICE_MINUTES: 3750, AI_ACTIONS: 3000, SMS: 1000, EMAILS: 3000, SOCIAL_POSTS: 30, APOLLO_PROSPECTS: 1000 }
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type UsageType =
@@ -90,26 +98,7 @@ async function getPlanLimits(clientId: string): Promise<{ plan: string; limits: 
     select: { plan: true }
   })
   if (!client) return null
-
-  // Import PLANS dynamically to avoid circular deps at module load
-  const { PLANS } = await import('../../../../packages/shared/types/agent.types')
-  const planConfig = (PLANS as Record<string, { limits?: Record<string, number> }>)[client.plan]
-  if (!planConfig?.limits) return { plan: client.plan, limits: {} }
-
-  // Map camelCase limit keys to UsageType enum keys
-  const keyMap: Record<string, UsageType> = {
-    voiceMinutes: 'VOICE_MINUTES',
-    aiActions: 'AI_ACTIONS',
-    sms: 'SMS',
-    emails: 'EMAILS',
-    socialPosts: 'SOCIAL_POSTS',
-    apolloProspects: 'APOLLO_PROSPECTS'
-  }
-  const limits: Record<string, number> = {}
-  for (const [camelKey, usageKey] of Object.entries(keyMap)) {
-    limits[usageKey] = (planConfig.limits as Record<string, number>)[camelKey] ?? 0
-  }
-  return { plan: client.plan, limits }
+  return { plan: client.plan, limits: PLAN_LIMITS[client.plan] || {} }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -160,17 +149,23 @@ export async function getUsageSummary(clientId: string): Promise<UsageSummary | 
   const periodStart = currentPeriodStart()
   const periodEnd = currentPeriodEnd()
 
-  // Aggregate usage per type for the current period
-  const rows = await prisma.$queryRaw<Array<{ usageType: string; total: Prisma.Decimal | null }>>`
-    SELECT "usageType", SUM("quantity") as total
-    FROM "UsageRecord"
-    WHERE "clientId" = ${clientId}
-      AND "billingPeriodStart" = ${periodStart}
-    GROUP BY "usageType"
-  `
+  // Aggregate usage per type for the current period.
+  // Wrapped in try/catch: if the UsageRecord table doesn't exist yet
+  // (migration pending), return zero usage instead of crashing.
   const usageMap: Record<string, number> = {}
-  for (const row of rows) {
-    usageMap[row.usageType] = Number(row.total || 0)
+  try {
+    const rows = await prisma.$queryRaw<Array<{ usageType: string; total: Prisma.Decimal | null }>>`
+      SELECT "usageType", SUM("quantity") as total
+      FROM "UsageRecord"
+      WHERE "clientId" = ${clientId}
+        AND "billingPeriodStart" = ${periodStart}
+      GROUP BY "usageType"
+    `
+    for (const row of rows) {
+      usageMap[row.usageType] = Number(row.total || 0)
+    }
+  } catch (err) {
+    logger.warn('UsageRecord query failed (table may not exist yet)', { clientId, err: String(err) })
   }
 
   const items: UsageLineItem[] = ALL_USAGE_TYPES.map(type => {
@@ -208,17 +203,21 @@ export async function getUsageHistory(
 
   for (let i = months; i >= 1; i--) {
     const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
-    const rows = await prisma.$queryRaw<Array<{ usageType: string; total: Prisma.Decimal | null }>>`
-      SELECT "usageType", SUM("quantity") as total
-      FROM "UsageRecord"
-      WHERE "clientId" = ${clientId}
-        AND "billingPeriodStart" = ${start}
-      GROUP BY "usageType"
-    `
-    periods.push({
-      periodStart: start.toISOString(),
-      items: rows.map(r => ({ type: r.usageType, used: Number(r.total || 0) }))
-    })
+    try {
+      const rows = await prisma.$queryRaw<Array<{ usageType: string; total: Prisma.Decimal | null }>>`
+        SELECT "usageType", SUM("quantity") as total
+        FROM "UsageRecord"
+        WHERE "clientId" = ${clientId}
+          AND "billingPeriodStart" = ${start}
+        GROUP BY "usageType"
+      `
+      periods.push({
+        periodStart: start.toISOString(),
+        items: rows.map(r => ({ type: r.usageType, used: Number(r.total || 0) }))
+      })
+    } catch {
+      periods.push({ periodStart: start.toISOString(), items: [] })
+    }
   }
 
   return periods
