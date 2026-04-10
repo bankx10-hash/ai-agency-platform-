@@ -782,4 +782,155 @@ router.get('/diagnose-voice/:clientId', adminAuth, async (req: Request, res: Res
   }
 })
 
+// ── Apollo B2B Outreach Test Endpoints (admin only) ─────────────────────────
+
+/**
+ * POST /admin/test-apollo-search
+ * Quick test: search Apollo for prospects without deploying anything.
+ * Returns matching prospects so you can verify the API key works and
+ * filters return relevant results before deploying the full agent.
+ */
+router.post('/test-apollo-search', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { apolloService } = await import('../services/apollo.service')
+    const { person_titles, person_locations, employee_ranges, industries, keywords, per_page } = req.body as {
+      person_titles?: string[]; person_locations?: string[]; employee_ranges?: string[]
+      industries?: string[]; keywords?: string[]; per_page?: number
+    }
+
+    const results = await apolloService.searchPeople({
+      personTitles: person_titles || ['Owner', 'CEO', 'Managing Director'],
+      personLocations: person_locations || ['Sydney, Australia'],
+      employeeRanges: employee_ranges || ['1,10', '11,50'],
+      industries: industries || [],
+      keywords: keywords || []
+    }, 1, per_page || 5)
+
+    res.json({
+      success: true,
+      totalResults: results.totalResults,
+      returned: results.people.length,
+      prospects: results.people.map(p => ({
+        name: p.name,
+        title: p.title,
+        company: p.organization?.name,
+        industry: p.organization?.industry,
+        city: p.city,
+        linkedinUrl: p.linkedinUrl
+      }))
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.error('Apollo search test failed', { err: msg })
+    res.status(500).json({ error: msg })
+  }
+})
+
+/**
+ * POST /admin/test-apollo-enrich
+ * Quick test: enrich a single prospect to verify we can get email/phone.
+ * Body: { name: string, company?: string, linkedinUrl?: string }
+ */
+router.post('/test-apollo-enrich', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { apolloService } = await import('../services/apollo.service')
+    const { name, company, linkedinUrl } = req.body as { name?: string; company?: string; linkedinUrl?: string }
+
+    if (!name) {
+      res.status(400).json({ error: 'name is required' })
+      return
+    }
+
+    const [firstName, ...rest] = name.split(' ')
+    const lastName = rest.join(' ') || ''
+
+    const enriched = await apolloService.enrichPerson({
+      firstName,
+      lastName,
+      organizationName: company,
+      linkedinUrl
+    })
+
+    res.json({
+      success: true,
+      person: enriched ? {
+        name: enriched.name,
+        title: enriched.title,
+        email: enriched.email,
+        phone: enriched.phone,
+        company: enriched.organization?.name,
+        linkedinUrl: enriched.linkedinUrl
+      } : null
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.error('Apollo enrich test failed', { err: msg })
+    res.status(500).json({ error: msg })
+  }
+})
+
+/**
+ * POST /admin/test-apollo-deploy/:clientId
+ * Full test: deploys the B2B_OUTREACH agent with test config.
+ * Uses conservative defaults (daily_limit: 5) to avoid burning credits.
+ */
+router.post('/test-apollo-deploy/:clientId', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  const { clientId } = req.params
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, businessName: true, businessDescription: true, icpDescription: true, country: true }
+    })
+    if (!client) { res.status(404).json({ error: 'Client not found' }); return }
+
+    const clientRecord = client as Record<string, unknown>
+    const defaults = req.body as Record<string, unknown>
+
+    const config = {
+      locationId: '',
+      businessName: client.businessName,
+      country: (clientRecord.country as string) || 'AU',
+      person_titles: (defaults.person_titles as string[]) || ['Owner', 'Founder', 'CEO', 'Managing Director'],
+      person_locations: (defaults.person_locations as string[]) || ['Sydney, Australia', 'Melbourne, Australia', 'Brisbane, Australia'],
+      employee_ranges: (defaults.employee_ranges as string[]) || ['1,10', '11,50', '51,200'],
+      industries: (defaults.industries as string[]) || [],
+      keywords: (defaults.keywords as string[]) || [],
+      outreach_message_template: (defaults.outreach_message_template as string) || '',
+      daily_limit: (defaults.daily_limit as number) || 5,
+      owner_email: (defaults.owner_email as string) || '',
+      booking_link: (defaults.booking_link as string) || ''
+    }
+
+    // Delete existing B2B_OUTREACH deployments + workflows
+    const existing = await prisma.agentDeployment.findMany({
+      where: { clientId, agentType: 'B2B_OUTREACH' as never },
+      select: { n8nWorkflowId: true }
+    })
+    for (const dep of existing) {
+      if (dep.n8nWorkflowId) {
+        await n8nService.deleteWorkflow(dep.n8nWorkflowId).catch(() => {})
+      }
+    }
+    await prisma.agentDeployment.deleteMany({ where: { clientId, agentType: 'B2B_OUTREACH' as never } })
+
+    // Deploy the agent
+    const AgentClass = AGENT_REGISTRY[AgentType.B2B_OUTREACH]
+    const agent = new AgentClass()
+    const result = await agent.deploy(clientId, config)
+
+    logger.info('Apollo outreach agent test-deployed', { clientId, result, config })
+    res.json({
+      success: true,
+      deploymentId: result.id,
+      n8nWorkflowId: result.n8nWorkflowId,
+      config,
+      message: `B2B outreach agent deployed for ${client.businessName}. Daily limit: ${config.daily_limit} prospects. N8N workflow will run at 8am weekdays.`
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.error('Apollo test deploy failed', { clientId, err: msg })
+    res.status(500).json({ error: msg })
+  }
+})
+
 export default router
