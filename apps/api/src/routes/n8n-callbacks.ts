@@ -913,6 +913,8 @@ MANDATORY PRINCIPLES — every single post must have ALL of these:
       }]
     })
 
+    recordUsage(clientId, 'AI_ACTIONS', 1, `social-claude-${Date.now()}`, 'claude_social').catch(() => {})
+
     const raw = (message.content[0] as { text: string }).text
     let content: Record<string, unknown>
     try {
@@ -1261,6 +1263,7 @@ Return JSON only:
       return res.status(500).json({ error: 'Claude returned invalid JSON', raw })
     }
 
+    recordUsage(clientId, 'AI_ACTIONS', 1, `engage-claude-${Date.now()}`, 'claude_engagement').catch(() => {})
     logger.info('Engagement analysed', { clientId, platform, type, intent: analysis.intent })
 
     // Bridge: if DM shows buying intent, forward to lead gen pipeline

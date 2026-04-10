@@ -181,6 +181,7 @@ router.post('/campaigns/:id/send', async (req: AuthRequest, res: Response): Prom
           if (!contact.email || contact.email.includes('@social.nodus')) continue
           try {
             await emailService.sendEmail(contact.email, campaign.subject || campaign.name, campaign.body, creds)
+            recordUsage(clientId, 'EMAILS', 1, `campaign-email-${contact.id}-${campaign.id}`, 'campaign_email').catch(() => {})
             await prisma.campaignRecipient.updateMany({
               where: { campaignId: campaign.id, contactId: contact.id },
               data: { status: 'SENT' as never, sentAt: new Date() }
@@ -210,7 +211,8 @@ router.post('/campaigns/:id/send', async (req: AuthRequest, res: Response): Prom
         for (const contact of contacts) {
           if (!contact.phone) continue
           try {
-            await twilioClient.messages.create({ body: campaign.body, from: fromNumber, to: contact.phone })
+            const smsResult = await twilioClient.messages.create({ body: campaign.body, from: fromNumber, to: contact.phone })
+            recordUsage(clientId, 'SMS', 1, smsResult.sid, 'campaign_sms').catch(() => {})
             await prisma.campaignRecipient.updateMany({
               where: { campaignId: campaign.id, contactId: contact.id },
               data: { status: 'SENT' as never, sentAt: new Date() }

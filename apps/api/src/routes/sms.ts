@@ -5,6 +5,7 @@ import twilio from 'twilio'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 import { decryptJSON } from '../utils/encrypt'
 import { logger } from '../utils/logger'
+import { recordUsage } from '../services/usage.service'
 
 const router = Router()
 
@@ -114,6 +115,7 @@ router.post('/send', async (req: AuthRequest, res: Response): Promise<void> => {
     if (!fromNumber) { res.status(400).json({ error: 'No Twilio number configured for this account' }); return }
 
     const msg = await twilioClient.messages.create({ from: fromNumber, to, body })
+    recordUsage(clientId, 'SMS', 1, msg.sid, 'sms').catch(() => {})
 
     const contactId = await findContactByPhone(clientId, to)
     const id = randomUUID()
