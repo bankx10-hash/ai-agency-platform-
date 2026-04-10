@@ -21,7 +21,7 @@
       "typeVersion": 2,
       "position": [500, 300],
       "parameters": {
-        "jsCode": "const titlesRaw = '{{PERSON_TITLES}}';\nconst locationsRaw = '{{PERSON_LOCATIONS}}';\nconst keywordsRaw = '{{KEYWORDS}}';\nconst rangesRaw = '{{EMPLOYEE_RANGES}}';\nconst toArr = (s) => s.split(',').map(v => v.trim()).filter(Boolean);\nconst body = { api_key: '{{APOLLO_API_KEY}}', per_page: 25, page: 1 };\nconst titles = toArr(titlesRaw);\nif (titles.length) body.person_titles = titles;\nconst locations = toArr(locationsRaw);\nif (locations.length) body.person_locations = locations;\nconst keywords = toArr(keywordsRaw);\nif (keywords.length) body.q_keywords = keywords.join(' ');\nconst ranges = toArr(rangesRaw);\nif (ranges.length) body.organization_num_employees_ranges = ranges;\nreturn [{ json: body }];"
+        "jsCode": "const titlesRaw = '{{PERSON_TITLES}}';\nconst locationsRaw = '{{PERSON_LOCATIONS}}';\nconst keywordsRaw = '{{KEYWORDS}}';\nconst rangesRaw = '{{EMPLOYEE_RANGES}}';\nconst toArr = (s) => s.split(',').map(v => v.trim()).filter(Boolean);\nconst body = { per_page: 25, page: 1 };\nconst titles = toArr(titlesRaw);\nif (titles.length) body.person_titles = titles;\nconst locations = toArr(locationsRaw);\nif (locations.length) body.person_locations = locations;\nconst keywords = toArr(keywordsRaw);\nif (keywords.length) body.q_keywords = keywords.join(' ');\nconst ranges = toArr(rangesRaw);\nif (ranges.length) body.organization_num_employees_ranges = ranges;\nreturn [{ json: body }];"
       }
     },
     {
@@ -32,12 +32,13 @@
       "position": [750, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://api.apollo.io/api/v1/mixed_people/search",
+        "url": "https://api.apollo.io/api/v1/mixed_people/api_search",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "Cache-Control", "value": "no-cache" }
+            { "name": "Cache-Control", "value": "no-cache" },
+            { "name": "X-Api-Key", "value": "{{APOLLO_API_KEY}}" }
           ]
         },
         "sendBody": true,
@@ -69,13 +70,14 @@
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "Cache-Control", "value": "no-cache" }
+            { "name": "Cache-Control", "value": "no-cache" },
+            { "name": "X-Api-Key", "value": "{{APOLLO_API_KEY}}" }
           ]
         },
         "sendBody": true,
         "specifyBody": "string",
         "contentType": "raw",
-        "body": "={{ JSON.stringify({ api_key: '{{APOLLO_API_KEY}}', id: $json.apolloId, reveal_personal_emails: true, reveal_phone_number: true }) }}"
+        "body": "={{ JSON.stringify({ id: $json.apolloId, reveal_personal_emails: true, reveal_phone_number: true }) }}"
       }
     },
     {

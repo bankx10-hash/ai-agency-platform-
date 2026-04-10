@@ -58,6 +58,11 @@ class ApolloService {
     return key
   }
 
+  /** Auth headers for Apollo API (key must be in header, not body) */
+  private authHeaders() {
+    return { 'X-Api-Key': this.getApiKey() }
+  }
+
   /**
    * Search for people matching ICP filters.
    * Does NOT consume credits. Does NOT return emails/phones.
@@ -70,7 +75,6 @@ class ApolloService {
   ): Promise<ApolloSearchResult> {
     try {
       const body: Record<string, unknown> = {
-        api_key: this.getApiKey(),
         page,
         per_page: perPage
       }
@@ -82,7 +86,7 @@ class ApolloService {
       if (filters.keywords?.length) body.q_keywords = filters.keywords.join(' ')
       if (filters.companyLocations?.length) body.organization_locations = filters.companyLocations
 
-      const response = await this.client.post('/api/v1/mixed_people/search', body)
+      const response = await this.client.post('/api/v1/mixed_people/api_search', body, { headers: this.authHeaders() })
 
       const people: ApolloPerson[] = (response.data.people || []).map((p: Record<string, unknown>) => ({
         id: p.id as string,
@@ -131,7 +135,6 @@ class ApolloService {
   }): Promise<ApolloPerson | null> {
     try {
       const body: Record<string, unknown> = {
-        api_key: this.getApiKey(),
         reveal_personal_emails: true,
         reveal_phone_number: true
       }
@@ -143,7 +146,7 @@ class ApolloService {
       if (params.organizationName) body.organization_name = params.organizationName
       if (params.linkedinUrl) body.linkedin_url = params.linkedinUrl
 
-      const response = await this.client.post('/api/v1/people/match', body)
+      const response = await this.client.post('/api/v1/people/match', body, { headers: this.authHeaders() })
       const p = response.data.person
 
       if (!p) return null
@@ -192,11 +195,10 @@ class ApolloService {
       }))
 
       const response = await this.client.post('/api/v1/people/bulk_match', {
-        api_key: this.getApiKey(),
         reveal_personal_emails: true,
         reveal_phone_number: true,
         details
-      })
+      }, { headers: this.authHeaders() })
 
       const results: ApolloPerson[] = (response.data.matches || [])
         .filter((m: Record<string, unknown>) => m)
@@ -235,7 +237,6 @@ class ApolloService {
   }, page = 1, perPage = 25): Promise<Array<{ id: string; name: string; website: string; industry: string; employeeCount: number; city: string; state: string }>> {
     try {
       const body: Record<string, unknown> = {
-        api_key: this.getApiKey(),
         page,
         per_page: perPage
       }
@@ -245,7 +246,7 @@ class ApolloService {
       if (filters.employeeRanges?.length) body.organization_num_employees_ranges = filters.employeeRanges
       if (filters.industries?.length) body.organization_industry_tag_ids = filters.industries
 
-      const response = await this.client.post('/api/v1/mixed_companies/search', body)
+      const response = await this.client.post('/api/v1/mixed_companies/search', body, { headers: this.authHeaders() })
 
       return (response.data.organizations || []).map((o: Record<string, unknown>) => ({
         id: o.id as string,
