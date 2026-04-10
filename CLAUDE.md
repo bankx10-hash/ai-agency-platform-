@@ -98,8 +98,9 @@ Stripe price IDs live in env vars (`STRIPE_STARTER_PRICE_ID`, etc.). When a subs
 | File | Purpose |
 |------|---------|
 | `contact.service.ts` | **Source of truth for lead capture.** `upsertContactAndSync()` writes to internal Postgres `Contact` table first, then mirrors to whichever external CRM the client has connected via the provider registry. Supports HubSpot, Salesforce, Zoho, Pipedrive, GoHighLevel. Adding a new CRM = one adapter implementing `CrmProvider` + one entry in `CRM_PROVIDERS`. |
+| `usage.service.ts` | **Usage tracking + overage billing.** `recordUsage()` (fire-and-forget) logs every billable action to `UsageRecord` table with dedup. `getUsageSummary()` aggregates per billing period vs plan limits. `OVERAGE_RATES` defines 1.5x premium rates. Dashboard at `/dashboard/usage`. |
 | `n8n.service.ts` | Deploy/pause/resume/delete N8N workflows. `deployWorkflow(templateName, clientConfig)` clones template and injects client vars. Loads per-plan template files (e.g. `growth-voice-outbound.workflow.json`). |
-| `stripe.service.ts` | Subscription lifecycle, webhook signature verification |
+| `stripe.service.ts` | Subscription lifecycle, webhook signature verification, metered overage billing (`reportOverageUsage()`, `addOverageItems()`). |
 | `voice.service.ts` | Retell AI — create inbound/outbound agents, launch calls, fetch transcripts. Phone numbers provisioned via Twilio credentials passed to Retell's `/create-phone-number` endpoint. SIP credentials passed on import-phone-number for outbound. |
 | `calendar.service.ts` | Calendar provider integrations — Google Calendar, Calendly, Cal.com. `bookAppointment()` writes to whichever provider the client connected during onboarding. No GHL calendar. |
 | `email.service.ts` | Gmail OAuth2 flow + SMTP sending via Nodemailer |
@@ -163,6 +164,7 @@ Shown in four places: onboarding connect page (before the deploy button, with pr
 - Voice agents: each outbound voice agent gets a **dedicated Twilio number** — inbound and outbound never share a number
 - Voice agent prompts: behavioral preamble required so the agent doesn't read `[brackets]` or section headers aloud
 - Website lead capture must be configured during onboarding **before** agents deploy — the onboarding page shows 4 options (embed form / listener script / webhook URL / social bio page) above the deploy button with a pre-launch warning. All plans get this.
+- **Every billable action must be tracked** via `recordUsage()` from `usage.service.ts` — fire-and-forget (`.catch(() => {})`), never block the main action. Usage is never hard-capped — leads must never be lost. Track and bill overages at 1.5x premium via Stripe metered pricing. Dashboard at `/dashboard/usage` shows real-time usage vs plan limits.
 
 ## Environment Variables
 
@@ -201,6 +203,13 @@ PIPEDRIVE_CLIENT_ID=
 PIPEDRIVE_CLIENT_SECRET=
 GHL_CLIENT_ID=                   # GoHighLevel as an external CRM (not the dead ghl.service.ts)
 GHL_CLIENT_SECRET=
+# Stripe metered overage prices (create as recurring/metered/sum in Stripe dashboard)
+STRIPE_OVERAGE_VOICE_PRICE_ID=
+STRIPE_OVERAGE_AI_PRICE_ID=
+STRIPE_OVERAGE_SMS_PRICE_ID=
+STRIPE_OVERAGE_EMAIL_PRICE_ID=
+STRIPE_OVERAGE_SOCIAL_PRICE_ID=
+STRIPE_OVERAGE_APOLLO_PRICE_ID=
 # N8N callback auth — set same value in N8N environment variables
 N8N_API_SECRET=                  # shared secret between API and N8N
 # Set these in N8N's environment variables (Settings → Variables)
