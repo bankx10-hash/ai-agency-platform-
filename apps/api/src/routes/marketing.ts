@@ -6,6 +6,7 @@ import { emailService } from '../services/email.service'
 import { logger } from '../utils/logger'
 import { decryptJSON } from '../utils/encrypt'
 import twilio from 'twilio'
+import { syncExistingContactToCrm } from '../services/contact.service'
 
 const router = Router()
 
@@ -420,6 +421,11 @@ router.post('/funnels/:id/submit', async (req: AuthRequest, res: Response): Prom
         RETURNING "id"
       `
       contactId = rows[0]?.id
+
+      // Mirror to external CRM (HubSpot) if connected — best-effort, never blocks
+      if (contactId) {
+        syncExistingContactToCrm(clientId, contactId).catch(() => {})
+      }
     }
 
     await prisma.funnelSubmission.create({

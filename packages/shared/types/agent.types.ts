@@ -207,47 +207,51 @@ export const PLANS = {
     ]
   },
   STARTER: {
-    price: 197,
+    price: 297,
     stripePriceId: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter',
     pipelineType: 'sales' as const,
     phoneNumbers: 1,
     agents: [
       AgentType.LEAD_GENERATION,
-      AgentType.SOCIAL_ENGAGEMENT,
       AgentType.APPOINTMENT_SETTER,
       AgentType.VOICE_INBOUND,
-      AgentType.CONVERSATIONAL_WORKFLOW
+      AgentType.VOICE_OUTBOUND
     ]
   },
   GROWTH: {
-    price: 297,
+    price: 497,
     stripePriceId: process.env.STRIPE_GROWTH_PRICE_ID || 'price_growth',
     agents: [
       AgentType.LEAD_GENERATION,
       AgentType.B2B_OUTREACH,
       AgentType.SOCIAL_MEDIA,
-      AgentType.SOCIAL_ENGAGEMENT,
       AgentType.APPOINTMENT_SETTER,
       AgentType.VOICE_INBOUND,
-      AgentType.VOICE_OUTBOUND,
-      AgentType.CONVERSATIONAL_WORKFLOW
+      AgentType.VOICE_OUTBOUND
     ]
   },
   AGENCY: {
-    price: 697,
+    price: 997,
     stripePriceId: process.env.STRIPE_AGENCY_PRICE_ID || 'price_agency',
     agents: [
       AgentType.LEAD_GENERATION,
       AgentType.B2B_OUTREACH,
       AgentType.SOCIAL_MEDIA,
-      AgentType.SOCIAL_ENGAGEMENT,
       AgentType.ADVERTISING,
       AgentType.APPOINTMENT_SETTER,
       AgentType.VOICE_INBOUND,
       AgentType.VOICE_OUTBOUND,
       AgentType.VOICE_CLOSER,
-      AgentType.CLIENT_SERVICES,
-      AgentType.CONVERSATIONAL_WORKFLOW
+      AgentType.CLIENT_SERVICES
     ]
   }
 } as const
+
+/**
+ * Add-on agents — not bundled in any plan. Clients purchase these
+ * separately and they get deployed on top of their existing plan.
+ */
+export const ADDON_AGENTS: AgentType[] = [
+  AgentType.SOCIAL_ENGAGEMENT,
+  AgentType.CONVERSATIONAL_WORKFLOW
+]

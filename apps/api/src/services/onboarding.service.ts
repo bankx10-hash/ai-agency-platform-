@@ -56,7 +56,25 @@ export class OnboardingService {
 
     await this.updateOnboardingStep(clientId, 3, { agentsDeployed: true })
 
-    await this.sendWelcomeEmail(client.email, client.businessName)
+    // Gather provisioned phone numbers from deployed voice agents so we can
+    // include them in the welcome email — the client needs to know which
+    // number to divert their main business line to.
+    const voiceDeployments = await prisma.agentDeployment.findMany({
+      where: {
+        clientId,
+        agentType: { in: ['VOICE_INBOUND', 'VOICE_OUTBOUND', 'VOICE_CLOSER'] as never[] },
+        status: 'ACTIVE' as never
+      },
+      select: { agentType: true, config: true }
+    })
+    const phoneNumbers: Record<string, string> = {}
+    for (const dep of voiceDeployments) {
+      const config = dep.config as Record<string, unknown> | null
+      const num = (config?.phone_number as string) || ''
+      if (num) phoneNumbers[dep.agentType] = num
+    }
+
+    await this.sendWelcomeEmail(client.email, client.businessName, clientId, phoneNumbers)
 
     await this.markOnboardingComplete(clientId)
 
@@ -367,11 +385,11 @@ export class OnboardingService {
     }
   }
 
-  private async sendWelcomeEmail(email: string, businessName: string): Promise<void> {
-    const portalUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  private async sendWelcomeEmail(email: string, businessName: string, clientId?: string, phoneNumbers?: Record<string, string>): Promise<void> {
+    const portalUrl = process.env.PORTAL_URL || process.env.NEXTAUTH_URL || 'https://app.nodusaisystems.com'
 
     try {
-      await emailService.sendWelcomeEmail(email, businessName, portalUrl)
+      await emailService.sendWelcomeEmail(email, businessName, portalUrl, clientId, phoneNumbers)
       logger.info('Welcome email sent', { email, businessName })
     } catch (error) {
       logger.error('Failed to send welcome email', { email, error })

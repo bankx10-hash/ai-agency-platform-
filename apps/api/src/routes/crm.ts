@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma'
 import { randomUUID } from 'crypto'
 import { authMiddleware, AuthRequest } from '../middleware/auth'
 import { logger } from '../utils/logger'
+import { syncExistingContactToCrm } from '../services/contact.service'
 
 const router = Router()
 
@@ -256,6 +257,10 @@ router.post('/contacts', async (req: AuthRequest, res: Response): Promise<void> 
 
     await logActivity(contact.id, clientId, 'STAGE_CHANGE', 'Contact created', `Added to ${pipelineStage || 'New Lead'}`)
     calculateAndSaveScore(contact.id, clientId).catch(() => {})
+
+    // Mirror to external CRM (HubSpot) if connected — best-effort, never blocks
+    syncExistingContactToCrm(clientId, contact.id).catch(() => {})
+
     logger.info('CRM contact created', { clientId, contactId: contact.id })
     res.status(201).json({ contact })
   } catch (err) {

@@ -36,6 +36,8 @@ function ConnectPageInner() {
     return ''
   })
   const [businessType, setBusinessType] = useState('other')
+  const [snippetCopied, setSnippetCopied] = useState('')
+  const [websiteOption, setWebsiteOption] = useState<'embed' | 'listener' | 'webhook' | 'bio' | ''>('')
 
   const isReceptionist = clientPlan === 'AI_RECEPTIONIST'
 
@@ -752,6 +754,113 @@ function ConnectPageInner() {
               <p className="text-xs text-gray-400 mt-1">Twilio requires a registered address to provision an Australian phone number.</p>
             </div>
 
+          </div>
+
+          {/* ── SECTION: Website Lead Capture ── */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-4">Website Lead Capture</p>
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <p className="text-sm text-gray-600">
+              Connect your website so leads flow into your AI pipeline from day one. Choose the option that suits your setup — you can change this later in Settings.
+            </p>
+
+            {/* Option selector */}
+            <div className="grid grid-cols-1 gap-3">
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition ${websiteOption === 'embed' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="websiteOption" value="embed" checked={websiteOption === 'embed'} onChange={() => setWebsiteOption('embed')} className="mt-1 accent-indigo-600" />
+                <div>
+                  <span className="text-sm font-semibold text-gray-800">Add our ready-made form</span>
+                  <p className="text-xs text-gray-500 mt-0.5">{"Don't have a form yet? This adds a professional lead capture form to your site automatically."}</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition ${websiteOption === 'listener' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="websiteOption" value="listener" checked={websiteOption === 'listener'} onChange={() => setWebsiteOption('listener')} className="mt-1 accent-indigo-600" />
+                <div>
+                  <span className="text-sm font-semibold text-gray-800">Keep my existing form</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Already have a contact form? This silently captures submissions in the background — your form keeps working normally.</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition ${websiteOption === 'webhook' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="websiteOption" value="webhook" checked={websiteOption === 'webhook'} onChange={() => setWebsiteOption('webhook')} className="mt-1 accent-indigo-600" />
+                <div>
+                  <span className="text-sm font-semibold text-gray-800">Webhook URL (WordPress, Wix, Squarespace, etc.)</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Paste a URL into your form builder{"'"}s webhook settings. Works with WPForms, Gravity Forms, Typeform, Jotform, and more.</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition ${websiteOption === 'bio' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="websiteOption" value="bio" checked={websiteOption === 'bio'} onChange={() => setWebsiteOption('bio')} className="mt-1 accent-indigo-600" />
+                <div>
+                  <span className="text-sm font-semibold text-gray-800">Social media bio link (Instagram, Facebook, etc.)</span>
+                  <p className="text-xs text-gray-500 mt-0.5">A mobile-friendly landing page you can link to from your Instagram bio, Facebook page, Stories, ads, QR codes, or anywhere else.</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Show the relevant snippet */}
+            {websiteOption && (
+              <div className="mt-3">
+                <p className="text-xs font-medium text-gray-700 mb-2">
+                  {websiteOption === 'embed' && 'Paste this line on your website, just before the closing </body> tag:'}
+                  {websiteOption === 'listener' && 'Paste this line on the same page as your existing form:'}
+                  {websiteOption === 'webhook' && 'Paste this URL into your form builder\'s webhook / integration settings:'}
+                  {websiteOption === 'bio' && 'Copy this link and paste it in your Instagram bio, Facebook page, or anywhere you want to capture leads:'}
+                </p>
+                <div className="relative">
+                  <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-800 overflow-x-auto whitespace-pre-wrap break-all select-all">
+{websiteOption === 'embed' && `<script src="${API_URL}/leads/${getClientId()}/embed.js"></script>`}
+{websiteOption === 'listener' && `<script src="${API_URL}/leads/${getClientId()}/listener.js"></script>`}
+{websiteOption === 'webhook' && `${API_URL}/leads/${getClientId()}`}
+{websiteOption === 'bio' && `${API_URL}/leads/${getClientId()}/page`}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cid = getClientId()
+                      const text = websiteOption === 'embed'
+                        ? `<script src="${API_URL}/leads/${cid}/embed.js"></script>`
+                        : websiteOption === 'listener'
+                          ? `<script src="${API_URL}/leads/${cid}/listener.js"></script>`
+                          : websiteOption === 'bio'
+                            ? `${API_URL}/leads/${cid}/page`
+                            : `${API_URL}/leads/${cid}`
+                      navigator.clipboard.writeText(text)
+                      setSnippetCopied(websiteOption)
+                      setTimeout(() => setSnippetCopied(''), 2000)
+                    }}
+                    className="absolute top-1.5 right-1.5 px-2.5 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                  >
+                    {snippetCopied === websiteOption ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
+                  </svg>
+                  Set this up now so leads start flowing the moment your agents go live.
+                </p>
+              </div>
+            )}
+
+            {!websiteOption && (
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                </svg>
+                We recommend setting up website lead capture now so enquiries flow in from the moment your agents launch.
+              </p>
+            )}
+          </div>
+
+          {/* ── Pre-launch reminder ── */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+            <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Before you launch</p>
+              <p className="text-xs text-amber-700 mt-1">
+                Make sure you have copied your website lead capture code above and added it to your website. Once your agents go live, any enquiry submitted through your website form will be automatically scored, followed up, and called — so it needs to be connected first.
+              </p>
+            </div>
           </div>
 
           {/* ── SUBMIT ── */}

@@ -26,7 +26,7 @@ const plans = [
   {
     id: 'STARTER',
     name: 'Starter',
-    price: 197,
+    price: 297,
     description: 'AI lead scoring, appointment setting, and inbound voice — your first AI sales team.',
     agents: [
       'Lead Generation Agent',

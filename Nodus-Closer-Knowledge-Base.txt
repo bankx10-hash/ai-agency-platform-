@@ -19,7 +19,7 @@ Best for: Dentists, salons, mechanics, tradies, clinics, vets, physios — any s
 - 100 voice minutes, 200 SMS, 500 AI actions per month
 - Add-on available: Smart Capture ($49/mo) — website lead form + AI outbound calls to new online enquiries within 5 minutes
 
-STARTER — $197/month
+STARTER — $297/month
 Best for: Small businesses wanting to stop missing leads and start automating their sales follow-up.
 - AI receptionist answers every call 24/7, qualifies callers, books appointments
 - Lead scoring — AI rates every inbound lead against your ideal customer profile and routes hot ones instantly
@@ -86,7 +86,7 @@ The Voice Closer (Agency plan) is the appointment itself:
 ===== PRICING REFRAMES =====
 
 AI Receptionist at $147/month = $4.90/day = less than a coffee for an AI receptionist that answers every call, follows up, and rebooks automatically
-Starter at $197/month = $6.50/day = the cost of a coffee for a system that never misses a lead
+Starter at $297/month = $9.90/day = the cost of a coffee for a system that never misses a lead
 Growth at $497/month = $16.50/day = less than a parking spot for a full AI sales team
 Agency at $997/month = $33/day = less than one hour of a junior employee's salary for an entire AI sales machine
 
@@ -114,7 +114,7 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 ===== COMMON OBJECTIONS AND RESPONSES =====
 
 "It's too expensive"
-→ "I get that. Quick question — how many leads do you reckon you're missing each month because calls go unanswered or you don't follow up fast enough? Even if it's just 5 leads a month and your average deal is worth $500, that's $2,500 in lost revenue. The Starter plan is $197 to capture all of that. It pays for itself with one extra sale."
+→ "I get that. Quick question — how many leads do you reckon you're missing each month because calls go unanswered or you don't follow up fast enough? Even if it's just 5 leads a month and your average deal is worth $500, that's $2,500 in lost revenue. The Starter plan is $297 to capture all of that. It pays for itself with one extra sale."
 → For AI Receptionist: "How many calls do you miss after hours or when you're busy with a client? Even one missed call a week could be $200-$500 in lost bookings. At $4.90 a day, the AI receptionist pays for itself if it catches just one of those calls a month."
 
 "I need to think about it"

@@ -19,10 +19,10 @@ export enum AgentStatus {
 
 export const PLANS: Record<string, { agents: AgentType[] }> = {
   STARTER: {
-    agents: [AgentType.LEAD_GENERATION, AgentType.SOCIAL_MEDIA, AgentType.VOICE_INBOUND],
+    agents: [AgentType.LEAD_GENERATION, AgentType.APPOINTMENT_SETTER, AgentType.VOICE_INBOUND, AgentType.VOICE_OUTBOUND],
   },
   GROWTH: {
-    agents: [AgentType.LEAD_GENERATION, AgentType.B2B_OUTREACH, AgentType.SOCIAL_MEDIA, AgentType.ADVERTISING, AgentType.APPOINTMENT_SETTER, AgentType.VOICE_INBOUND, AgentType.VOICE_OUTBOUND],
+    agents: [AgentType.LEAD_GENERATION, AgentType.B2B_OUTREACH, AgentType.SOCIAL_MEDIA, AgentType.APPOINTMENT_SETTER, AgentType.VOICE_INBOUND, AgentType.VOICE_OUTBOUND],
   },
   AGENCY: {
     agents: [AgentType.LEAD_GENERATION, AgentType.B2B_OUTREACH, AgentType.SOCIAL_MEDIA, AgentType.ADVERTISING, AgentType.APPOINTMENT_SETTER, AgentType.VOICE_INBOUND, AgentType.VOICE_OUTBOUND, AgentType.VOICE_CLOSER, AgentType.CLIENT_SERVICES],

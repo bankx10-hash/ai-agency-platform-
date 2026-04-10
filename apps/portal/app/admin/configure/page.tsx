@@ -308,7 +308,7 @@ export default function AdminConfigurePage() {
             style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
           >
             <option value="AI_RECEPTIONIST">AI RECEPTIONIST — $147/mo</option>
-            <option value="STARTER">STARTER — $197/mo</option>
+            <option value="STARTER">STARTER — $297/mo</option>
             <option value="GROWTH">GROWTH — $497/mo</option>
             <option value="AGENCY">AGENCY — $997/mo</option>
           </select>

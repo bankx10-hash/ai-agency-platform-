@@ -60,7 +60,7 @@ lost bookings, the Receptionist plan at $147/month is the obvious starting
 point. It pays for itself with literally one extra booking per month."
 
 ───────────────────────────────────────────
-PLAN 2 — STARTER  ($197/month USD)
+PLAN 2 — STARTER  ($297/month USD)
 ───────────────────────────────────────────
 WHO IT'S FOR: Small businesses ready to start generating leads, not just
 answering calls. Coaches, consultants, agencies, B2B service providers.
@@ -79,7 +79,7 @@ week to 18 within 6 weeks on the Starter plan. The lead gen agent surfaced
 12% of them.
 
 WHEN TO RECOMMEND: "If you want to actively GET leads, not just respond to
-the ones who find you, Starter at $197/month is where it gets interesting.
+the ones who find you, Starter at $297/month is where it gets interesting.
 You'd see ~150-300 qualified leads in your pipeline every month from Apollo,
 plus the AI books them in for you."
 

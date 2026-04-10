@@ -355,13 +355,13 @@ export const TEMPLATES: Template[] = [
       { type: 'rect', left: 40, top: 20, width: 20, height: 4, fill: '#6366F1', rx: 2, ry: 2 },
       { type: 'textbox', left: 40, top: 20.5, width: 20, text: 'MOST POPULAR', fontSize: 10, fontFamily: 'Arial', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
       { type: 'textbox', left: 37, top: 27, width: 26, text: 'PRO', fontSize: 14, fontFamily: 'Arial', fontWeight: 'bold', fill: '#A5B4FC', textAlign: 'center', letterSpacing: 200 },
-      { type: 'textbox', left: 37, top: 33, width: 26, text: '$297', fontSize: 42, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'textbox', left: 37, top: 33, width: 26, text: '$497', fontSize: 42, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
       { type: 'textbox', left: 37, top: 42, width: 26, text: '/month', fontSize: 14, fontFamily: 'Arial', fontWeight: 'normal', fill: '#6677AA', textAlign: 'center' },
       { type: 'textbox', left: 38, top: 49, width: 24, text: '\u2713 Everything in Basic\n\u2713 LinkedIn Outreach\n\u2713 Social Media AI\n\u2713 Priority Support', fontSize: 14, fontFamily: 'Arial', fontWeight: 'normal', fill: '#C0CCEE', lineHeight: 1.8 },
       // Premium column
       { type: 'rect', left: 68, top: 22, width: 29, height: 58, fill: 'rgba(255,255,255,0.05)', rx: 8, ry: 8, stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 },
       { type: 'textbox', left: 70, top: 25, width: 25, text: 'PREMIUM', fontSize: 14, fontFamily: 'Arial', fontWeight: 'bold', fill: '#8899BB', textAlign: 'center', letterSpacing: 200 },
-      { type: 'textbox', left: 70, top: 31, width: 25, text: '$697', fontSize: 42, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
+      { type: 'textbox', left: 70, top: 31, width: 25, text: '$997', fontSize: 42, fontFamily: 'Arial Black', fontWeight: 'bold', fill: '#FFFFFF', textAlign: 'center' },
       { type: 'textbox', left: 70, top: 40, width: 25, text: '/month', fontSize: 14, fontFamily: 'Arial', fontWeight: 'normal', fill: '#6677AA', textAlign: 'center' },
       { type: 'textbox', left: 71, top: 47, width: 23, text: '\u2713 Everything in Pro\n\u2713 Voice AI Agents\n\u2713 Ad Management\n\u2713 Dedicated Manager', fontSize: 14, fontFamily: 'Arial', fontWeight: 'normal', fill: '#AABBCC', lineHeight: 1.8 },
       // CTA

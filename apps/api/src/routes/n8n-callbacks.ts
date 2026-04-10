@@ -9,6 +9,14 @@ import { encryptJSON, decryptJSON } from '../utils/encrypt'
 import { appendPostRows } from '../services/sheets.service'
 import { logger } from '../utils/logger'
 import axios from 'axios'
+import {
+  getClientCrmType,
+  getHubSpotToken,
+  hubspotAddNote,
+  syncExistingContactToCrm,
+  syncContactScoreToCrm,
+  addCallNoteToCrm
+} from '../services/contact.service'
 
 const router = express.Router()
 
@@ -37,115 +45,6 @@ function n8nAuth(req: express.Request, res: express.Response, next: express.Next
 }
 
 router.use(n8nAuth)
-
-async function getClientCrmType(clientId: string): Promise<string> {
-  try {
-    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { crmType: true } })
-    return client?.crmType || 'internal'
-  } catch {
-    return 'internal'
-  }
-}
-
-async function getCrmCredentials<T>(clientId: string, service: string): Promise<T | null> {
-  try {
-    const cred = await prisma.clientCredential.findFirst({ where: { clientId, service } })
-    if (!cred) return null
-    return decryptJSON<T>(cred.credentials)
-  } catch {
-    return null
-  }
-}
-
-// ── HubSpot helpers ──────────────────────────────────────────────────────────
-
-async function refreshHubSpotToken(clientId: string, refreshToken: string): Promise<string> {
-  const res = await axios.post(
-    'https://api.hubapi.com/oauth/v1/token',
-    new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: process.env.HUBSPOT_CLIENT_ID || '',
-      client_secret: process.env.HUBSPOT_CLIENT_SECRET || '',
-      refresh_token: refreshToken
-    }),
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-  )
-  const { access_token, refresh_token } = res.data
-  // Save updated tokens back to DB
-  const cred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'hubspot' } })
-  if (cred) {
-    await prisma.clientCredential.update({
-      where: { id: cred.id },
-      data: { credentials: encryptJSON({ accessToken: access_token, refreshToken: refresh_token }) }
-    })
-  }
-  logger.info('HubSpot token refreshed', { clientId })
-  return access_token as string
-}
-
-async function getHubSpotToken(clientId: string): Promise<string | null> {
-  const creds = await getCrmCredentials<{ accessToken: string; refreshToken: string }>(clientId, 'hubspot')
-  if (!creds?.accessToken) return null
-  if (!creds.refreshToken) return creds.accessToken
-  // Always refresh — HubSpot tokens expire in 30 min, refresh tokens last 6 months
-  try {
-    return await refreshHubSpotToken(clientId, creds.refreshToken)
-  } catch {
-    // Refresh failed — try the existing access token as fallback
-    return creds.accessToken
-  }
-}
-
-async function hubspotCreateContact(
-  accessToken: string,
-  data: { name: string; phone: string; email: string; source: string }
-): Promise<string> {
-  const [firstname, ...rest] = (data.name || 'Unknown').split(' ')
-  const lastname = rest.join(' ') || ''
-  try {
-    const res = await axios.post(
-      'https://api.hubapi.com/crm/v3/objects/contacts',
-      {
-        properties: {
-          firstname,
-          lastname,
-          ...(data.email && { email: data.email }),
-          ...(data.phone && { phone: data.phone }),
-          hs_lead_status: 'NEW'
-        }
-      },
-      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
-    )
-    return String(res.data.id)
-  } catch (err) {
-    // 409 = contact already exists — extract the existing ID and return it
-    const hsErr = (err as { response?: { status?: number; data?: { message?: string } } })?.response
-    if (hsErr?.status === 409 && hsErr?.data?.message) {
-      const match = hsErr.data.message.match(/Existing ID:\s*(\d+)/)
-      if (match) return match[1]
-    }
-    throw err
-  }
-}
-
-async function hubspotAddNote(accessToken: string, contactId: string, body: string): Promise<void> {
-  const noteRes = await axios.post(
-    'https://api.hubapi.com/crm/v3/objects/notes',
-    {
-      properties: {
-        hs_note_body: body,
-        hs_timestamp: String(Date.now())
-      }
-    },
-    { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
-  )
-  const noteId = noteRes.data.id
-  await axios.put(
-    `https://api.hubapi.com/crm/v3/objects/notes/${noteId}/associations/contacts/${contactId}/202`,
-    {},
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  )
-}
 
 async function updateAgentMetrics(
   clientId: string,
@@ -368,20 +267,9 @@ router.post('/:clientId/contacts', async (req, res) => {
       `.catch(() => {})
     }
 
-    // Sync to HubSpot if connected
-    let crmId: string | undefined
-    if (crmType === 'hubspot') {
-      const token = await getHubSpotToken(clientId)
-      if (token) {
-        try {
-          crmId = await hubspotCreateContact(token, { name: name || '', email: email || '', phone: phone || '', source: source || '' })
-          await prisma.$executeRaw`UPDATE "Contact" SET "crmId" = ${crmId} WHERE "id" = ${id}`
-          logger.info('HubSpot contact created', { clientId, crmId })
-        } catch (hsErr) {
-          logger.warn('HubSpot sync failed, contact still saved locally', { clientId, hsErr })
-        }
-      }
-    }
+    // Mirror to whichever external CRM the client has connected (HubSpot,
+    // Salesforce, Zoho, Pipedrive, GoHighLevel) — best-effort, never blocks.
+    const crmId = await syncExistingContactToCrm(clientId, id)
 
     // If this contact came from an inbound call, link the CallLog row to the
     // contact and create a CALL activity on the contact's timeline so the
@@ -427,24 +315,20 @@ router.post('/:clientId/contacts', async (req, res) => {
           }
         }).catch((err) => logger.warn('Failed to create CALL activity', { clientId, err: String(err) }))
 
-        // Also push a call summary note to the connected external CRM
-        // (HubSpot) if linked, so the call shows up there too.
-        if (crmType === 'hubspot' && crmId) {
-          const token = await getHubSpotToken(clientId)
-          if (token) {
-            const noteBody = [
-              `📞 ${activityTitle}`,
-              callSummary ? `\nSummary: ${callSummary}` : '',
-              intent ? `Intent: ${intent}` : '',
-              fromNumber ? `From: ${fromNumber}` : '',
-              durationSeconds ? `Duration: ${Math.round(durationSeconds / 60)}m ${durationSeconds % 60}s` : '',
-              appointmentBooked ? '✅ Appointment booked during call' : '',
-              transcript ? `\n--- Transcript ---\n${transcript.slice(0, 5000)}` : ''
-            ].filter(Boolean).join('\n')
-            await hubspotAddNote(token, crmId, noteBody).catch((err) =>
-              logger.warn('HubSpot call note sync failed', { clientId, err: String(err) })
-            )
-          }
+        // Also push a call summary note to whichever external CRM is connected
+        // (HubSpot, Salesforce, Zoho, Pipedrive, GoHighLevel) so the call
+        // shows up there too — best-effort, never blocks.
+        if (crmId) {
+          const noteBody = [
+            `📞 ${activityTitle}`,
+            callSummary ? `\nSummary: ${callSummary}` : '',
+            intent ? `Intent: ${intent}` : '',
+            fromNumber ? `From: ${fromNumber}` : '',
+            durationSeconds ? `Duration: ${Math.round(durationSeconds / 60)}m ${durationSeconds % 60}s` : '',
+            appointmentBooked ? '✅ Appointment booked during call' : '',
+            transcript ? `\n--- Transcript ---\n${transcript.slice(0, 5000)}` : ''
+          ].filter(Boolean).join('\n')
+          await addCallNoteToCrm(clientId, id, noteBody)
         }
 
         logger.info('Call linked to contact in platform CRM and synced to external CRM', { clientId, contactId: id, callId, crmType })
@@ -484,24 +368,9 @@ router.patch('/:clientId/contacts/score', async (req, res) => {
       WHERE "id" = ${contactId} AND "clientId" = ${clientId}
     `
 
-    // Push score to HubSpot if connected
-    if (crmType === 'hubspot') {
-      const token = await getHubSpotToken(clientId)
-      if (token) {
-        const rows = await prisma.$queryRaw<Array<{ crmId: string | null }>>`
-          SELECT "crmId" FROM "Contact" WHERE "id" = ${contactId} AND "clientId" = ${clientId}
-        `
-        const crmId = rows[0]?.crmId
-        if (crmId) {
-          const hsStatus = score >= 70 ? 'IN_PROGRESS' : score >= 40 ? 'OPEN' : 'UNQUALIFIED'
-          await axios.patch(
-            `https://api.hubapi.com/crm/v3/objects/contacts/${crmId}`,
-            { properties: { hs_lead_status: hsStatus } },
-            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-          ).catch(e => logger.warn('HubSpot score update failed', { clientId, e: String(e) }))
-        }
-      }
-    }
+    // Push score to whichever external CRM is connected (HubSpot, Salesforce,
+    // Zoho, Pipedrive, GoHighLevel) — best-effort, never blocks.
+    await syncContactScoreToCrm(clientId, contactId, score)
 
     await incrementAgentMetrics(
       clientId, 'LEAD_GENERATION',
