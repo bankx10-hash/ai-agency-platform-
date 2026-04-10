@@ -8,7 +8,7 @@ We also offer a standalone AI Receptionist product for service businesses like d
 
 ===== THE FOUR PLANS =====
 
-AI RECEPTIONIST — $147/month
+AI RECEPTIONIST — $197/month
 Best for: Dentists, salons, mechanics, tradies, clinics, vets, physios — any service business that gets phone calls and books appointments.
 - AI receptionist answers every call 24/7, books appointments, answers FAQs
 - Outbound follow-up agent calls 2 days after every appointment to check in and rebook
@@ -19,7 +19,7 @@ Best for: Dentists, salons, mechanics, tradies, clinics, vets, physios — any s
 - 100 voice minutes, 200 SMS, 500 AI actions per month
 - Add-on available: Smart Capture ($49/mo) — website lead form + AI outbound calls to new online enquiries within 5 minutes
 
-STARTER — $297/month
+STARTER — $497/month
 Best for: Small businesses wanting to stop missing leads and start automating their sales follow-up.
 - AI receptionist answers every call 24/7, qualifies callers, books appointments
 - Lead scoring — AI rates every inbound lead against your ideal customer profile and routes hot ones instantly
@@ -30,7 +30,7 @@ Best for: Small businesses wanting to stop missing leads and start automating th
 - 1 phone number included
 - 100 voice minutes, 200 SMS, 500 AI actions per month
 
-GROWTH — $497/month (most popular)
+GROWTH — $797/month (most popular)
 Best for: Businesses ready to actively generate and close leads across multiple channels.
 - Everything in Starter, PLUS:
 - B2B prospecting agent (powered by Apollo.io) — finds ideal prospects by job title, industry, location, and company size. Gets verified emails and phone numbers. Sends personalised outreach emails automatically. Runs daily Mon-Fri.
@@ -42,7 +42,7 @@ Best for: Businesses ready to actively generate and close leads across multiple 
 - 2 phone numbers included
 - 300 voice minutes, 500 SMS, 1,500 AI actions, 50 AI images per month
 
-AGENCY — $997/month (the full machine)
+AGENCY — $1,497/month (the full machine)
 Best for: Businesses that want every part of their sales pipeline automated from first touch to closed deal to client retention.
 - Everything in Growth, PLUS:
 - Voice Closer agent — AI calls warm leads at their booked appointment time, conducts the sales call, handles objections, and walks them through payment while on the call
@@ -85,10 +85,10 @@ The Voice Closer (Agency plan) is the appointment itself:
 
 ===== PRICING REFRAMES =====
 
-AI Receptionist at $147/month = $4.90/day = less than a coffee for an AI receptionist that answers every call, follows up, and rebooks automatically
-Starter at $297/month = $9.90/day = the cost of a coffee for a system that never misses a lead
-Growth at $497/month = $16.50/day = less than a parking spot for a full AI sales team
-Agency at $997/month = $33/day = less than one hour of a junior employee's salary for an entire AI sales machine
+AI Receptionist at $197/month = $6.50/day = less than a coffee for an AI receptionist that answers every call, follows up, and rebooks automatically
+Starter at $497/month = $16.50/day = less than a parking spot for an AI sales team that never misses a lead
+Growth at $797/month = $26.50/day = less than one hour of a junior employee for a full AI sales + prospecting engine
+Agency at $1,497/month = $49.90/day = less than $50/day for an entire AI sales department
 
 ===== WHAT WE REPLACE (VALUE ANCHORING) =====
 
@@ -114,7 +114,7 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 ===== COMMON OBJECTIONS AND RESPONSES =====
 
 "It's too expensive"
-→ "I get that. Quick question — how many leads do you reckon you're missing each month because calls go unanswered or you don't follow up fast enough? Even if it's just 5 leads a month and your average deal is worth $500, that's $2,500 in lost revenue. The Starter plan is $297 to capture all of that. It pays for itself with one extra sale."
+→ "I get that. Quick question — how many leads do you reckon you're missing each month because calls go unanswered or you don't follow up fast enough? Even if it's just 5 leads a month and your average deal is worth $500, that's $2,500 in lost revenue. The Starter plan is $497 to capture all of that. It pays for itself with one extra sale."
 → For AI Receptionist: "How many calls do you miss after hours or when you're busy with a client? Even one missed call a week could be $200-$500 in lost bookings. At $4.90 a day, the AI receptionist pays for itself if it catches just one of those calls a month."
 
 "I need to think about it"
@@ -128,7 +128,7 @@ Key line: "You're not paying for software — you're hiring a team that works 24
 → "How's that working for you? Are your calls being answered 24/7? Is it following up with every lead automatically? Most businesses that switch to us find we replace 3-4 separate tools with one platform. What if you ran us alongside for a month and compared?"
 
 "Not the right time"
-→ "When would be the right time? What changes between now and then? Every month you wait is another month of missed calls and leads slipping through the cracks. What if we started with just the AI Receptionist plan — $147, minimal commitment, immediate results?"
+→ "When would be the right time? What changes between now and then? Every month you wait is another month of missed calls and leads slipping through the cracks. What if we started with just the AI Receptionist plan — $197, minimal commitment, immediate results?"
 
 "I can't afford it"
 → "I hear you. Is it the budget that's tight, or is it that you're not sure the return justifies it? Because at $4.90 a day for AI Receptionist, if it books you even one extra appointment a month, it's paid for itself. What if we started you on the Receptionist plan and upgraded once you see the results flowing in?"

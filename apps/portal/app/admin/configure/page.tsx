@@ -307,10 +307,10 @@ export default function AdminConfigurePage() {
             onChange={e => setCreateForm(p => ({ ...p, plan: e.target.value }))}
             style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }}
           >
-            <option value="AI_RECEPTIONIST">AI RECEPTIONIST — $147/mo</option>
-            <option value="STARTER">STARTER — $297/mo</option>
-            <option value="GROWTH">GROWTH — $497/mo</option>
-            <option value="AGENCY">AGENCY — $997/mo</option>
+            <option value="AI_RECEPTIONIST">AI RECEPTIONIST — $197/mo</option>
+            <option value="STARTER">STARTER — $497/mo</option>
+            <option value="GROWTH">GROWTH — $797/mo</option>
+            <option value="AGENCY">AGENCY — $1,497/mo</option>
           </select>
         </div>
         <button

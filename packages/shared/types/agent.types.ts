@@ -197,20 +197,22 @@ export type ServicePipelineStage = typeof SERVICE_PIPELINE_STAGES[number]
 
 export const PLANS = {
   AI_RECEPTIONIST: {
-    price: 147,
+    price: 197,
     stripePriceId: process.env.STRIPE_RECEPTIONIST_PRICE_ID || 'price_receptionist',
     pipelineType: 'service' as const,
     phoneNumbers: 2,
+    limits: { voiceMinutes: 375, aiActions: 200, sms: 100, emails: 200, socialPosts: 0, apolloProspects: 0 },
     agents: [
       AgentType.VOICE_INBOUND,
       AgentType.RECEPTIONIST_FOLLOWUP
     ]
   },
   STARTER: {
-    price: 297,
+    price: 497,
     stripePriceId: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter',
     pipelineType: 'sales' as const,
-    phoneNumbers: 1,
+    phoneNumbers: 2,
+    limits: { voiceMinutes: 750, aiActions: 750, sms: 300, emails: 500, socialPosts: 0, apolloProspects: 0 },
     agents: [
       AgentType.LEAD_GENERATION,
       AgentType.APPOINTMENT_SETTER,
@@ -219,8 +221,10 @@ export const PLANS = {
     ]
   },
   GROWTH: {
-    price: 497,
+    price: 797,
     stripePriceId: process.env.STRIPE_GROWTH_PRICE_ID || 'price_growth',
+    phoneNumbers: 2,
+    limits: { voiceMinutes: 1500, aiActions: 1500, sms: 500, emails: 1500, socialPosts: 15, apolloProspects: 550 },
     agents: [
       AgentType.LEAD_GENERATION,
       AgentType.B2B_OUTREACH,
@@ -231,8 +235,10 @@ export const PLANS = {
     ]
   },
   AGENCY: {
-    price: 997,
+    price: 1497,
     stripePriceId: process.env.STRIPE_AGENCY_PRICE_ID || 'price_agency',
+    phoneNumbers: 3,
+    limits: { voiceMinutes: 3750, aiActions: 3000, sms: 1000, emails: 3000, socialPosts: 30, apolloProspects: 1000 },
     agents: [
       AgentType.LEAD_GENERATION,
       AgentType.B2B_OUTREACH,

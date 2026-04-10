@@ -77,7 +77,7 @@ THE 9 AGENTS WE OFFER
 THE 4 PLANS
 ───────────────────────────────────────────
 
-PLAN 1 — AI RECEPTIONIST  ($147/month USD)
+PLAN 1 — AI RECEPTIONIST  ($197/month USD)
 WHO IT'S FOR: Service businesses (dentists, plumbers, electricians, clinics,
 home services, salons, mechanics) that miss calls and lose bookings.
 
@@ -99,11 +99,11 @@ captured 100% of after-hours calls and added an extra $8K/month in
 bookings — the AI paid for itself ~50x over.
 
 WHEN TO RECOMMEND: "Look, if your main pain right now is missed calls and
-lost bookings, the Receptionist plan at $147/month is the obvious starting
+lost bookings, the Receptionist plan at $197/month is the obvious starting
 point. It pays for itself with literally one extra booking per month."
 
 ───────────────────────────────────────────
-PLAN 2 — STARTER  ($297/month USD)
+PLAN 2 — STARTER  ($497/month USD)
 WHO IT'S FOR: Small businesses ready to start generating leads, not just
 answering calls. Coaches, consultants, agencies, B2B service providers.
 
@@ -122,12 +122,12 @@ week to 18 within 6 weeks on the Starter plan. The lead gen agent surfaced
 12% of them — that's 26 booked calls per month, more than 8x their previous rate.
 
 WHEN TO RECOMMEND: "If you want to actively GET leads, not just respond to
-the ones who find you, Starter at $297/month is where it gets interesting.
+the ones who find you, Starter at $497/month is where it gets interesting.
 You'd see ~150-300 qualified leads in your pipeline every month from Apollo,
 plus the AI books them in for you."
 
 ───────────────────────────────────────────
-PLAN 3 — GROWTH  ($497/month USD)
+PLAN 3 — GROWTH  ($797/month USD)
 WHO IT'S FOR: Growing businesses that want a full AI sales team — proactive
 outbound, multi-channel outreach, and content marketing.
 
@@ -147,12 +147,12 @@ per month, the voice outbound agent qualified them, and content marketing
 built brand authority. They added zero headcount.
 
 WHEN TO RECOMMEND: "If you've already got product-market fit and just need
-to scale outbound, Growth at $497/month is the sweet spot. You're getting
+to scale outbound, Growth at $797/month is the sweet spot. You're getting
 LinkedIn outreach, voice cold-calling, and full social media — basically a
 full SDR team for less than the cost of one part-time SDR."
 
 ───────────────────────────────────────────
-PLAN 4 — AGENCY  ($697/month USD)
+PLAN 4 — AGENCY  ($1,497/month USD)
 WHO IT'S FOR: Established businesses doing $50K+/month who want everything:
 inbound, outbound, paid ads, automated closing, and client onboarding.
 

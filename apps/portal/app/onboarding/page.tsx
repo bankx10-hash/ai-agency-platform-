@@ -11,7 +11,7 @@ const plans = [
   {
     id: 'AI_RECEPTIONIST',
     name: 'AI Receptionist',
-    price: 147,
+    price: 197,
     description: 'AI answers every call 24/7, books appointments, follows up, and reminds clients to rebook. Perfect for service businesses.',
     agents: [
       'AI Receptionist (24/7 inbound)',
@@ -26,7 +26,7 @@ const plans = [
   {
     id: 'STARTER',
     name: 'Starter',
-    price: 297,
+    price: 497,
     description: 'AI lead scoring, appointment setting, and inbound voice — your first AI sales team.',
     agents: [
       'Lead Generation Agent',
@@ -41,7 +41,7 @@ const plans = [
   {
     id: 'GROWTH',
     name: 'Growth',
-    price: 497,
+    price: 797,
     description: 'Proactive outreach, social media, and outbound calling to fill your pipeline.',
     agents: [
       'Everything in Starter',
@@ -57,7 +57,7 @@ const plans = [
   {
     id: 'AGENCY',
     name: 'Agency',
-    price: 997,
+    price: 1497,
     description: 'The complete AI-powered sales machine. From first touch to closed deal.',
     agents: [
       'Everything in Growth',

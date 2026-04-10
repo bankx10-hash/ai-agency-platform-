@@ -231,7 +231,7 @@ const doc = new Document({
         spacer(100),
         new Paragraph({ spacing: { after: 60 }, children: [
           new TextRun({ text: 'STARTER', font: 'Arial', size: 32, bold: true, color: BRAND }),
-          new TextRun({ text: '  \u2014  $297/month', font: 'Arial', size: 28, color: DARK }),
+          new TextRun({ text: '  \u2014  $497/month', font: 'Arial', size: 28, color: DARK }),
         ]}),
         new Paragraph({ spacing: { after: 10 }, border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: BRAND } }, children: [] }),
         para('"Your first AI employee"', { italics: true, color: BRAND }),
@@ -278,7 +278,7 @@ const doc = new Document({
         // --- GROWTH ---
         new Paragraph({ spacing: { after: 60 }, children: [
           new TextRun({ text: 'GROWTH', font: 'Arial', size: 32, bold: true, color: GREEN }),
-          new TextRun({ text: '  \u2014  $497/month', font: 'Arial', size: 28, color: DARK }),
+          new TextRun({ text: '  \u2014  $797/month', font: 'Arial', size: 28, color: DARK }),
         ]}),
         new Paragraph({ spacing: { after: 10 }, border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: GREEN } }, children: [] }),
         para('"A full sales team that never sleeps"', { italics: true, color: GREEN }),
@@ -327,7 +327,7 @@ const doc = new Document({
         // --- AGENCY ---
         new Paragraph({ spacing: { after: 60 }, children: [
           new TextRun({ text: 'AGENCY', font: 'Arial', size: 32, bold: true, color: AMBER }),
-          new TextRun({ text: '  \u2014  $997/month', font: 'Arial', size: 28, color: DARK }),
+          new TextRun({ text: '  \u2014  $1,497/month', font: 'Arial', size: 28, color: DARK }),
         ]}),
         new Paragraph({ spacing: { after: 10 }, border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: AMBER } }, children: [] }),
         para('"The complete AI-powered sales machine"', { italics: true, color: AMBER }),
@@ -407,9 +407,9 @@ const doc = new Document({
         simpleTable(
           ['Plan', 'Monthly Revenue', 'Est. Cost', 'Gross Margin', 'Margin %'],
           [
-            ['Starter', '$297', '$25\u201340', '$257\u2013272', '86\u201391%'],
-            ['Growth', '$497', '$50\u201390', '$407\u2013447', '82\u201390%'],
-            ['Agency', '$997', '$90\u2013180', '$817\u2013907', '82\u201391%'],
+            ['Starter', '$497', '$85\u2013120', '$377\u2013412', '76\u201383%'],
+            ['Growth', '$797', '$130\u2013180', '$617\u2013667', '77\u201384%'],
+            ['Agency', '$1,497', '$200\u2013300', '$1,197\u20131,297', '80\u201387%'],
           ],
           [1800, 2000, 1800, 2000, 1760]
         ),
@@ -419,10 +419,10 @@ const doc = new Document({
         simpleTable(
           ['Scenario', '10 Clients', '25 Clients', '50 Clients', '100 Clients'],
           [
-            ['All Starter ($297)', '$2,970/mo', '$7,425/mo', '$14,850/mo', '$29,700/mo'],
+            ['All Starter ($497)', '$4,970/mo', '$12,425/mo', '$24,850/mo', '$49,700/mo'],
             ['Mix (40/40/20%)', '$3,508/mo', '$8,770/mo', '$17,540/mo', '$35,080/mo'],
-            ['All Growth ($497)', '$4,970/mo', '$12,425/mo', '$24,850/mo', '$49,700/mo'],
-            ['All Agency ($997)', '$9,970/mo', '$24,925/mo', '$49,850/mo', '$99,700/mo'],
+            ['All Growth ($797)', '$7,970/mo', '$19,925/mo', '$39,850/mo', '$79,700/mo'],
+            ['All Agency ($1,497)', '$14,970/mo', '$37,425/mo', '$74,850/mo', '$149,700/mo'],
           ],
           [2360, 1750, 1750, 1750, 1750]
         ),
@@ -442,9 +442,9 @@ const doc = new Document({
         simpleTable(
           ['Plan', 'Replaces', 'Human Cost', 'Nodus Cost', 'Savings'],
           [
-            ['Starter ($297/mo)', 'Receptionist / front desk', '$3,500\u2013$4,500/mo', '$297/mo', '92\u201393%'],
-            ['Growth ($497/mo)', 'Junior SDR + social media manager', '$8,000\u2013$10,000/mo', '$497/mo', '94\u201395%'],
-            ['Agency ($997/mo)', 'Sales team of 3 + ad manager', '$18,000\u2013$25,000/mo', '$997/mo', '95\u201396%'],
+            ['Starter ($497/mo)', 'Receptionist / front desk', '$3,500\u2013$4,500/mo', '$497/mo', '86\u201389%'],
+            ['Growth ($797/mo)', 'Junior SDR + social media manager', '$8,000\u2013$10,000/mo', '$797/mo', '90\u201392%'],
+            ['Agency ($1,497/mo)', 'Sales team of 3 + ad manager', '$18,000\u2013$25,000/mo', '$1,497/mo', '92\u201394%'],
           ],
           [2200, 2200, 1800, 1600, 1560]
         ),
@@ -541,7 +541,7 @@ const doc = new Document({
         spacer(50),
 
         simpleTable(
-          ['Feature', 'Starter $297', 'Growth $497', 'Agency $997'],
+          ['Feature', 'Starter $497', 'Growth $797', 'Agency $1,497'],
           [
             ['Lead Generation', '\u2713', '\u2713', '\u2713'],
             ['Appointment Setter', '\u2713', '\u2713', '\u2713'],
