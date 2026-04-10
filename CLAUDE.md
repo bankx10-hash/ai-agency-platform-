@@ -54,9 +54,11 @@ ai-agency-platform/
 npm install
 
 # Database
-npx prisma migrate dev          # Apply migrations
 npx prisma generate             # Regenerate client after schema change
 npx prisma studio               # Browse DB
+# WARNING: Do NOT run `npx prisma db push` against production — it will
+# drop CallLog, SmsMessage, Notification tables (created by raw SQL).
+# New tables must be added to runStartupMigrations() in apps/api/src/index.ts.
 
 # API
 npm run dev --workspace=apps/api        # Start API (ts-node-dev)
@@ -75,10 +77,12 @@ docker-compose -f docker/docker-compose.yml up -d
 
 Key models — see `prisma/schema.prisma` for full definition:
 
-- **Client** — `stripeCustomerId`, `plan` (STARTER/GROWTH/AGENCY), `status`, `ghlLocationId`
+- **Client** — `stripeCustomerId`, `plan` (AI_RECEPTIONIST/STARTER/GROWTH/AGENCY), `status`, `crmType`
 - **AgentDeployment** — `clientId`, `agentType` (enum), `status`, `n8nWorkflowId`, `config` (Json), `metrics` (Json)
-- **ClientCredential** — AES-256 encrypted JSON blob per service (`gmail`, `hubspot`, `linkedin`, etc.)
+- **ClientCredential** — AES-256 encrypted JSON blob per service (`gmail`, `hubspot`, `salesforce`, `zoho`, `pipedrive`, `gohighlevel`, etc.)
 - **Onboarding** — tracks step (1–3) and `data` Json of what has been connected
+- **UsageRecord** — `clientId`, `usageType` (enum: VOICE_MINUTES/AI_ACTIONS/SMS/EMAILS/SOCIAL_POSTS/APOLLO_PROSPECTS), `quantity`, `billingPeriodStart`, `sourceId`, `sourceType`. Created by `runStartupMigrations()` in `index.ts`, NOT by Prisma migrations.
+- **CallLog**, **SmsMessage**, **Notification** — created by raw SQL in `runStartupMigrations()`, NOT in Prisma schema. Do not run `prisma db push` against production.
 
 ## Billing Plans
 
