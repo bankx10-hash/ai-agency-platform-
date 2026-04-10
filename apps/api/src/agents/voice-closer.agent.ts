@@ -323,7 +323,9 @@ Use the name "Sarah" consistently — do not pick a different name each time.
         // agent racing against it. When a human picks up and says "hello",
         // the agent opens per the system prompt's guidance.
         firstSentence: '',
-        voicemailMessage: `Hi, this is Sarah from ${typedConfig.businessName}. I tried to call you for our scheduled chat just now but unfortunately I missed you. We'll try you again shortly, or feel free to give us a call back when you get a chance. Thanks!`,
+        // No custom voicemailMessage — let createOutboundAgent() use the
+        // standard buildVoicemailMessage() which includes the inbound
+        // callback number so the prospect can call back and reschedule.
         clientId,
         businessName: typedConfig.businessName
       })
