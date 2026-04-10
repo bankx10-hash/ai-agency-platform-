@@ -118,20 +118,24 @@ export async function recordUsage(
   if (quantity <= 0) return
   try {
     const periodStart = currentPeriodStart()
+    const id = `ur_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const src = sourceId || id  // always non-null so the unique index works
+    const srcType = sourceType || 'unknown'
     await prisma.$executeRaw`
       INSERT INTO "UsageRecord" ("id", "clientId", "usageType", "quantity", "billingPeriodStart", "sourceId", "sourceType", "createdAt")
       VALUES (
-        ${`ur_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`},
+        ${id},
         ${clientId},
         ${usageType}::"UsageType",
-        ${quantity}::decimal,
+        ${quantity},
         ${periodStart},
-        ${sourceId || null},
-        ${sourceType || null},
+        ${src},
+        ${srcType},
         NOW()
       )
       ON CONFLICT ("sourceId", "sourceType", "usageType") DO NOTHING
     `
+    logger.info('Usage recorded', { clientId, usageType, quantity, sourceId: src })
   } catch (err) {
     // Log but never throw — usage tracking must not block the main action
     logger.warn('Usage record failed (non-fatal)', { clientId, usageType, quantity, err: String(err) })
