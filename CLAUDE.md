@@ -162,7 +162,7 @@ Shown in four places: onboarding connect page (before the deploy button, with pr
 - `AgentDeployment.metrics` (Json) must be updated after every agent run for the dashboard
 - Voice agents: each outbound voice agent gets a **dedicated Twilio number** — inbound and outbound never share a number
 - Voice agent prompts: behavioral preamble required so the agent doesn't read `[brackets]` or section headers aloud
-- Website lead capture must be configured during onboarding **before** agents deploy — the onboarding page shows the 3 options (embed form / listener script / webhook URL) above the deploy button with a pre-launch warning. All plans get this.
+- Website lead capture must be configured during onboarding **before** agents deploy — the onboarding page shows 4 options (embed form / listener script / webhook URL / social bio page) above the deploy button with a pre-launch warning. All plans get this.
 
 ## Environment Variables
 
