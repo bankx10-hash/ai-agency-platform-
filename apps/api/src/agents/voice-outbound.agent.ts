@@ -201,7 +201,8 @@ Always be respectful of the person's time. If they're busy, offer to call at a b
       {
         ...typedConfig,
         generatedScript: outboundScript,
-        retell_agent_id: retellAgentId
+        retell_agent_id: retellAgentId,
+        phone_number: phoneNumber
       },
       workflowResult?.workflowId
     )

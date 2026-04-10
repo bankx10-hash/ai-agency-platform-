@@ -367,7 +367,8 @@ Use the name "Sarah" consistently — do not pick a different name each time.
       {
         ...typedConfig,
         generatedScript: finalScript,
-        retell_agent_id: retellAgentId
+        retell_agent_id: retellAgentId,
+        phone_number: phoneNumber
       },
       workflowResult.workflowId
     )
