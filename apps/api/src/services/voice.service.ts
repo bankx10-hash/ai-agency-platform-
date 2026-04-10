@@ -488,6 +488,33 @@ export class VoiceService {
         const decrypted = JSON.parse(existing.credentials) as { phoneNumber?: string }
         if (decrypted.phoneNumber) {
           logger.info('Reusing existing outbound phone number', { clientId, credentialService, phoneNumber: decrypted.phoneNumber })
+          // Re-link the number to the new Retell agent on redeploy —
+          // the Retell agent ID changes on each deploy but the phone
+          // number stays the same. Import is idempotent.
+          if (retellAgentId) {
+            try {
+              const trunk = await getTwilioClient().trunking.v1.trunks(process.env.TWILIO_SIP_TRUNK_SID!).fetch()
+              await retellApi.post('/import-phone-number', {
+                phone_number: decrypted.phoneNumber,
+                termination_uri: trunk.domainName,
+                ...(RETELL_SIP_AUTH_USERNAME && { sip_trunk_auth_username: RETELL_SIP_AUTH_USERNAME }),
+                ...(RETELL_SIP_AUTH_PASSWORD && { sip_trunk_auth_password: RETELL_SIP_AUTH_PASSWORD }),
+                outbound_agent_id: retellAgentId,
+                nickname: `${businessName} Outbound - ${clientId}`
+              })
+              logger.info('Re-linked existing phone to new Retell agent', { clientId, phoneNumber: decrypted.phoneNumber, retellAgentId })
+            } catch (relinkErr) {
+              // 409 = already imported — try updating the agent assignment instead
+              try {
+                await retellApi.patch(`/update-phone-number/${decrypted.phoneNumber}`, {
+                  outbound_agent_id: retellAgentId
+                })
+                logger.info('Updated Retell phone agent assignment', { clientId, phoneNumber: decrypted.phoneNumber, retellAgentId })
+              } catch (updateErr) {
+                logger.warn('Failed to re-link phone to Retell agent (non-fatal)', { clientId, relinkErr: String(relinkErr), updateErr: String(updateErr) })
+              }
+            }
+          }
           return decrypted.phoneNumber
         }
       } catch { /* fall through to provision */ }
