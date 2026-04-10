@@ -17,6 +17,7 @@ import {
   syncContactScoreToCrm,
   addCallNoteToCrm
 } from '../services/contact.service'
+import { recordUsage } from '../services/usage.service'
 
 const router = express.Router()
 
@@ -239,6 +240,11 @@ router.post('/:clientId/contacts', async (req, res) => {
     const isNew = rows[0]?.is_new !== false
     logger.info('Contact upserted to DB', { clientId, id, isNew })
 
+    // Track Apollo prospect usage for B2B outreach contacts
+    if (isNew && source && (source.includes('apollo') || source.includes('b2b'))) {
+      recordUsage(clientId, 'APOLLO_PROSPECTS', 1, `apollo-${id}`, 'apollo_prospect').catch(() => {})
+    }
+
     // Save/update linkedinUrl if provided
     if (linkedinUrl) {
       await prisma.$executeRaw`
@@ -378,6 +384,7 @@ router.patch('/:clientId/contacts/score', async (req, res) => {
       { totalLeads: 1 },
       { lastScoredContact: { contactId, score, stage, tags, summary, nextAction }, lastScoredAt: new Date().toISOString() }
     )
+    recordUsage(clientId, 'AI_ACTIONS', 1, `lead-score-${contactId}`, 'lead_score').catch(() => {})
     // CRM activity: log score update
     if (contactId) {
       await prisma.contactActivity.create({
@@ -427,6 +434,7 @@ router.post('/:clientId/contacts/:contactId/notes', async (req, res) => {
       { callsAnswered: 1 },
       { lastNote: { contactId, addedAt: new Date().toISOString() } }
     )
+    recordUsage(clientId, 'AI_ACTIONS', 1, `inbound-note-${contactId}-${Date.now()}`, 'inbound_note').catch(() => {})
     res.json({ success: true })
   } catch (err) {
     logger.error('N8N note error', { clientId, err })
@@ -460,6 +468,7 @@ router.post('/:clientId/messages', async (req, res) => {
       body: message
     })
     logger.info('SMS sent via Twilio', { clientId, contactId, to, sid: sms.sid })
+    recordUsage(clientId, 'SMS', 1, sms.sid, 'sms').catch(() => {})
 
     await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
       lastMessageSent: { contactId, type, to, sentAt: new Date().toISOString() }
@@ -479,6 +488,7 @@ router.post('/:clientId/messages/email', async (req, res) => {
     if (to && subject && emailBody) {
       await emailService.sendSystemEmail(to, subject, emailBody)
       logger.info('N8N email sent', { clientId, to, subject })
+      recordUsage(clientId, 'EMAILS', 1, `email-${contactId || to}-${Date.now()}`, 'email').catch(() => {})
     }
     await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
       lastEmailSent: { contactId, to, subject, sentAt: new Date().toISOString() }
@@ -600,6 +610,7 @@ router.post('/:clientId/appointments', async (req, res) => {
       { appointmentsBooked: 1, totalLeads: 1 },
       { appointments, lastAppointment: newAppt }
     )
+    recordUsage(clientId, 'AI_ACTIONS', 1, `appt-${contactId}-${Date.now()}`, 'appointment').catch(() => {})
 
     // CRM activity: log appointment
     if (contactId) {
@@ -766,6 +777,7 @@ router.post('/:clientId/call-outcomes', async (req, res) => {
       { callsMade: 1 },
       { lastCallOutcome: { contactId, outcome, nextAction, recordedAt: new Date().toISOString() } }
     )
+    recordUsage(clientId, 'AI_ACTIONS', 1, `outbound-${contactId}-${Date.now()}`, 'outbound_call').catch(() => {})
     // CRM activity: log call
     if (contactId) {
       await prisma.contactActivity.create({
@@ -792,6 +804,7 @@ router.post('/:clientId/deal-outcomes', async (req, res) => {
       { dealsClosed: outcome === 'closed' ? 1 : 0, callsMade: 1 },
       { lastDealOutcome: { contactId, opportunityId, outcome, reason, recordedAt: new Date().toISOString() } }
     )
+    recordUsage(clientId, 'AI_ACTIONS', 1, `deal-${opportunityId || contactId}-${Date.now()}`, 'deal_outcome').catch(() => {})
     // CRM activity + pipeline stage update
     if (contactId) {
       const newStage = outcome === 'closed' ? 'CLOSED_WON' : outcome === 'lost' ? 'CLOSED_LOST' : undefined
@@ -1137,6 +1150,10 @@ router.post('/:clientId/social/post-all', async (req, res) => {
       { postsPublished: successfulPosts },
       { lastPost: { platforms: Object.keys(content), results, generatedAt, postedAt: new Date().toISOString() } }
     )
+    if (successfulPosts > 0) {
+      recordUsage(clientId, 'SOCIAL_POSTS', successfulPosts, `social-${Date.now()}`, 'social_post').catch(() => {})
+    }
+    recordUsage(clientId, 'AI_ACTIONS', 1, `social-gen-${Date.now()}`, 'social_generate').catch(() => {})
 
     // Log all posts to Google Sheet (non-blocking)
     const timestamp = new Date().toISOString()
@@ -1358,6 +1375,7 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
     logger.info('Social reply sent', { clientId, platform, type, success: result.success, error: result.error })
     if (result.success) {
       await incrementAgentMetrics(clientId, 'SOCIAL_ENGAGEMENT', {}, { repliesSent: 1, totalLeads: 1 }).catch(() => {})
+      recordUsage(clientId, 'AI_ACTIONS', 1, `engagement-${Date.now()}`, 'social_reply').catch(() => {})
     }
     res.json(result)
   } catch (err) {

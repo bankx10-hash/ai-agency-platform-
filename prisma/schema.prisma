@@ -171,6 +171,7 @@ model Client {
   scheduledPosts   ScheduledPost[]
   competitors      Competitor[]
   newsItems        NewsItem[]
+  usageRecords     UsageRecord[]
 }
 
 model AgentDeployment {
@@ -607,4 +608,31 @@ model NewsItem {
   @@unique([clientId, url])
   @@index([clientId, fetchedAt])
   @@index([clientId, category])
+}
+
+// ── Usage Tracking ───────────────────────────────────────────────────────────
+
+enum UsageType {
+  VOICE_MINUTES
+  AI_ACTIONS
+  SMS
+  EMAILS
+  SOCIAL_POSTS
+  APOLLO_PROSPECTS
+}
+
+model UsageRecord {
+  id                 String    @id @default(cuid())
+  clientId           String
+  client             Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  usageType          UsageType
+  quantity           Decimal   @db.Decimal(10, 2)
+  billingPeriodStart DateTime
+  sourceId           String?
+  sourceType         String?
+  createdAt          DateTime  @default(now())
+
+  @@unique([sourceId, sourceType, usageType])
+  @@index([clientId, usageType, billingPeriodStart])
+  @@index([clientId, billingPeriodStart])
 }

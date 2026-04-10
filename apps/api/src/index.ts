@@ -22,6 +22,7 @@ import sequencesRouter, { processSequences } from './routes/sequences'
 import smsRouter, { handleSmsWebhook } from './routes/sms'
 import callsRouter, { handleCallWebhook } from './routes/calls'
 import leadsRouter from './routes/leads'
+import usageRouter from './routes/usage'
 import workflowsRouter from './routes/workflows'
 import whatsappWebhooksRouter from './routes/whatsapp-webhooks'
 import { startWorkflowTimeoutScheduler } from './queue/workflow-timeout.queue'
@@ -30,6 +31,7 @@ import { startSocialReminderScheduler } from './queue/social-reminder.queue'
 import { startSocialAnalyticsScheduler } from './queue/social-analytics.queue'
 import { startSocialCompetitorScheduler } from './queue/social-competitor.queue'
 import { startSocialNewsScheduler } from './queue/social-news.queue'
+import { startUsageReportingScheduler } from './queue/usage-reporting.queue'
 import socialRouter from './routes/social'
 import { logger } from './utils/logger'
 
@@ -819,6 +821,7 @@ app.use('/sequences', sequencesRouter)
 app.post('/sms/webhook', handleSmsWebhook)
 app.use('/sms', smsRouter)
 app.use('/social', socialRouter)
+app.use('/usage', usageRouter)
 app.post('/calls/webhook', handleCallWebhook)
 app.use('/calls', callsRouter)
 // Public lead capture — allow any origin (embedded on client websites)
@@ -881,6 +884,7 @@ runStartupMigrations().then(() => {
     startSocialAnalyticsScheduler()
     startSocialCompetitorScheduler()
     startSocialNewsScheduler()
+    startUsageReportingScheduler()
   })
 })
 

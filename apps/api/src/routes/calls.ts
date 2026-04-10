@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth'
 import { logger } from '../utils/logger'
 import axios from 'axios'
 import { randomUUID } from 'crypto'
+import { recordUsage } from '../services/usage.service'
 
 const router = Router()
 
@@ -110,6 +111,11 @@ export async function handleCallWebhook(req: Request, res: Response): Promise<vo
     `
 
     logger.info('Call logged via webhook', { clientId, callId: callData.call_id, direction, durationSeconds })
+
+    // Track voice minutes usage for billing
+    if (durationSeconds > 0) {
+      recordUsage(clientId, 'VOICE_MINUTES', Math.round(durationSeconds / 6) / 10, callData.call_id as string, 'call').catch(() => {})
+    }
 
     // Forward to N8N for Claude analysis + contact creation (async — don't block response)
     if (shouldForwardToN8n) {
