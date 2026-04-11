@@ -7,16 +7,31 @@ import axios from 'axios'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
-const STAGES = ['NEW_LEAD', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'CLOSED_WON', 'CLOSED_LOST']
+// Sales pipeline (Starter, Growth, Agency)
+const SALES_STAGES = ['NEW_LEAD', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'CLOSED_WON', 'CLOSED_LOST']
+
+// Service pipeline (AI Receptionist)
+const SERVICE_STAGES = ['NEW_INQUIRY', 'APPOINTMENT_BOOKED', 'APPOINTMENT_COMPLETED', 'FOLLOW_UP_DUE', 'RECURRING_CLIENT', 'NO_SHOW', 'INACTIVE']
+
 const STAGE_LABELS: Record<string, string> = {
+  // Sales
   NEW_LEAD: 'New Lead',
   CONTACTED: 'Contacted',
   QUALIFIED: 'Qualified',
   PROPOSAL: 'Proposal',
   CLOSED_WON: 'Closed Won',
   CLOSED_LOST: 'Closed Lost',
+  // Service
+  NEW_INQUIRY: 'New Inquiry',
+  APPOINTMENT_BOOKED: 'Booked',
+  APPOINTMENT_COMPLETED: 'Completed',
+  FOLLOW_UP_DUE: 'Follow-Up Due',
+  RECURRING_CLIENT: 'Recurring',
+  NO_SHOW: 'No Show',
+  INACTIVE: 'Inactive',
 }
 const STAGE_COLORS: Record<string, { header: string; bg: string; badge: string }> = {
+  // Sales stages
   NEW_LEAD: {
     header: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
     bg: 'bg-blue-50/50 dark:bg-blue-900/10',
@@ -47,6 +62,42 @@ const STAGE_COLORS: Record<string, { header: string; bg: string; badge: string }
     bg: 'bg-red-50/50 dark:bg-red-900/10',
     badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
   },
+  // Service stages
+  NEW_INQUIRY: {
+    header: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
+    bg: 'bg-blue-50/50 dark:bg-blue-900/10',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+  },
+  APPOINTMENT_BOOKED: {
+    header: 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800',
+    bg: 'bg-cyan-50/50 dark:bg-cyan-900/10',
+    badge: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-400',
+  },
+  APPOINTMENT_COMPLETED: {
+    header: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
+    bg: 'bg-green-50/50 dark:bg-green-900/10',
+    badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
+  },
+  FOLLOW_UP_DUE: {
+    header: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
+    bg: 'bg-amber-50/50 dark:bg-amber-900/10',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+  },
+  RECURRING_CLIENT: {
+    header: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
+    bg: 'bg-emerald-50/50 dark:bg-emerald-900/10',
+    badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+  },
+  NO_SHOW: {
+    header: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
+    bg: 'bg-red-50/50 dark:bg-red-900/10',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+  },
+  INACTIVE: {
+    header: 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700',
+    bg: 'bg-gray-50/50 dark:bg-gray-800/30',
+    badge: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  },
 }
 
 interface Contact {
@@ -70,6 +121,8 @@ export default function PipelinePage() {
   const [dragging, setDragging] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const dragContact = useRef<Contact | null>(null)
+  const clientPlan = (session?.user as { plan?: string })?.plan || (typeof window !== 'undefined' ? localStorage.getItem('clientPlan') : '') || ''
+  const STAGES = clientPlan === 'AI_RECEPTIONIST' ? SERVICE_STAGES : SALES_STAGES
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')

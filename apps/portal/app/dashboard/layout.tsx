@@ -33,18 +33,24 @@ type NavItem =
   | { type: 'link';  href: string; label: string; exact?: boolean; icon: React.ReactNode }
   | { type: 'group'; href: string; label: string; icon: React.ReactNode; children: { href: string; label: string }[] }
 
-// Sections hidden for AI_RECEPTIONIST plan
-const RECEPTIONIST_HIDDEN = new Set([
-  '/dashboard/social',
-  '/dashboard/marketing',
-  '/dashboard/workflows',
-])
-
-// Sections only visible for GROWTH+ plans
-const GROWTH_PLUS_ONLY = new Set([
-  '/dashboard/social',
-  '/dashboard/marketing',
-])
+// Sections hidden per plan — if a plan key is missing, nothing is hidden (show all)
+const PLAN_HIDDEN_SECTIONS: Record<string, Set<string>> = {
+  AI_RECEPTIONIST: new Set([
+    '/dashboard/social',
+    '/dashboard/marketing',
+    '/dashboard/workflows',
+    '/dashboard/voice/outbound',
+  ]),
+  STARTER: new Set([
+    '/dashboard/social',
+    '/dashboard/marketing',
+    '/dashboard/workflows',
+  ]),
+  GROWTH: new Set([
+    '/dashboard/workflows',
+  ]),
+  // AGENCY: nothing hidden — sees everything
+}
 
 const NAV: NavItem[] = [
   {
@@ -251,10 +257,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [session])
 
-  // Filter nav based on plan
+  // Filter nav based on plan — hide sections the plan doesn't include
+  const hiddenSections = PLAN_HIDDEN_SECTIONS[clientPlan] || new Set()
   const filteredNav = NAV.filter(item => {
-    if (clientPlan === 'AI_RECEPTIONIST' && RECEPTIONIST_HIDDEN.has(item.href)) return false
+    if (hiddenSections.has(item.href)) return false
+    // For groups (e.g. Voice), filter out hidden children
+    if (item.type === 'group' && 'children' in item) {
+      item = { ...item, children: item.children.filter(c => !hiddenSections.has(c.href)) }
+    }
     return true
+  }).map(item => {
+    // Re-filter group children (the filter above creates a shallow copy)
+    if (item.type === 'group' && 'children' in item) {
+      return { ...item, children: item.children.filter(c => !hiddenSections.has(c.href)) }
+    }
+    return item
   })
 
   const sidebarW = collapsed ? 64 : 224

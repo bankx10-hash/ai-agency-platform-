@@ -2,8 +2,10 @@ import { BaseAgent } from './base.agent'
 import { AgentType } from '../../../../packages/shared/types/agent.types'
 import { n8nService } from '../services/n8n.service'
 import { voiceService } from '../services/voice.service'
+import { calendarService } from '../services/calendar.service'
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
+import type { RetellTool } from '../../../../packages/shared/types/workflow.types'
 
 export interface ReceptionistFollowupConfig {
   businessName: string
@@ -105,15 +107,59 @@ RULES
       ? `${basePrompt}\n\n═══════════════════════════════════════════\nSERVICES & KNOWLEDGE BASE\n═══════════════════════════════════════════\n${knowledgeBase}\n\nIMPORTANT: Use the knowledge above when callers ask about services, pricing, or upcoming offers during the check-in. Reference specific details naturally — never read it verbatim.`
       : basePrompt
 
+    // Build calendar booking tools so the follow-up agent can rebook
+    // appointments mid-call (e.g. "shall I book you in for another visit?")
+    const calendarProvider = await calendarService.getCalendarProvider(clientId).catch(() => null)
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000'
+    const calendarTools: RetellTool[] = calendarProvider ? [
+      {
+        type: 'custom',
+        name: 'check_availability',
+        description: 'Check available appointment times. Call this when the client wants to rebook or schedule a follow-up appointment.',
+        url: `${apiBaseUrl}/calendar/${clientId}/availability`,
+        speak_during_execution: true,
+        speak_after_execution: true,
+        execution_message_description: 'Let me check what times we have available...',
+        timeout_ms: 15000,
+        parameters: { type: 'object', properties: {}, required: [] }
+      },
+      {
+        type: 'custom',
+        name: 'book_appointment',
+        description: 'Book a follow-up or rebooking appointment for the client. Requires their name, email, and chosen time.',
+        url: `${apiBaseUrl}/calendar/${clientId}/book`,
+        speak_during_execution: true,
+        speak_after_execution: true,
+        execution_message_description: 'Let me lock that appointment in for you...',
+        timeout_ms: 15000,
+        parameters: {
+          type: 'object',
+          properties: {
+            start_time: { type: 'string', description: 'ISO 8601 datetime of the chosen appointment slot' },
+            caller_name: { type: 'string', description: 'Full name of the client' },
+            caller_email: { type: 'string', description: 'Email address of the client' },
+            caller_phone: { type: 'string', description: 'Phone number of the client (optional)' }
+          },
+          required: ['start_time', 'caller_name', 'caller_email']
+        }
+      }
+    ] : []
+
+    // If calendar tools are available, add booking instructions to the prompt
+    const promptWithBooking = calendarProvider
+      ? prompt + `\n\n## REBOOKING TOOLS — USE THESE\n\nWhen the client says they'd like to rebook, schedule their next visit, or come back:\n\nSTEP 1: Call check_availability — read the available slots aloud.\nSTEP 2: Confirm their name and email.\nSTEP 3: Call book_appointment with start_time, caller_name, caller_email.\nSTEP 4: Confirm: "You're all booked in for [time]. We'll see you then!"\n\nALWAYS offer to rebook during every follow-up call. Don't just ask "how was your visit" — proactively suggest booking their next one.`
+      : prompt
+
     let retellAgentId: string | undefined
 
     try {
       const voiceResult = await voiceService.createOutboundAgent({
-        prompt,
+        prompt: promptWithBooking,
         voice: '11labs-Cimo',
         firstSentence: `Hi {{firstName}}, it's your team from ${typedConfig.businessName} — just a quick call to check in. How are you going?`,
         clientId,
-        businessName: typedConfig.businessName
+        businessName: typedConfig.businessName,
+        tools: calendarTools.length > 0 ? calendarTools : undefined
       })
       retellAgentId = voiceResult.agentId
       logger.info('Retell follow-up agent created', { clientId, retellAgentId })
