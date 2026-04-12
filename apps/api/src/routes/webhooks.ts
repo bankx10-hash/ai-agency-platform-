@@ -52,6 +52,22 @@ router.post(
                 status: 'ACTIVE'
               }
             })
+
+            // Add metered overage price items to the subscription (best-effort)
+            // These are $0 items that only charge when usage is reported
+            try {
+              const overageItems = await stripeService.addOverageItems(subscription.id)
+              if (Object.keys(overageItems).length > 0) {
+                await prisma.clientCredential.upsert({
+                  where: { id: `stripe-overage-${clientId}` },
+                  update: { credentials: JSON.stringify(overageItems) },
+                  create: { id: `stripe-overage-${clientId}`, clientId, service: 'stripe-overage-items', credentials: JSON.stringify(overageItems) }
+                })
+                logger.info('Stripe overage items added to subscription', { clientId, items: Object.keys(overageItems) })
+              }
+            } catch (overageErr) {
+              logger.warn('Failed to add overage items (non-fatal)', { clientId, err: String(overageErr) })
+            }
           }
 
           await onboardingQueue.add(

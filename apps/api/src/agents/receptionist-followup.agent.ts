@@ -5,7 +5,7 @@ import { voiceService } from '../services/voice.service'
 import { calendarService } from '../services/calendar.service'
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
-import type { RetellTool } from '../../../../packages/shared/types/workflow.types'
+import type { RetellTool } from '../services/voice.service'
 
 export interface ReceptionistFollowupConfig {
   businessName: string

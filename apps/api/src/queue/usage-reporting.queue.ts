@@ -1,6 +1,6 @@
 /**
- * Usage Reporting Worker — runs daily, checks for billing periods that have
- * ended, and reports overage usage to Stripe for invoicing.
+ * Usage Reporting Worker — runs every 6 hours, checks for clients with
+ * overage usage, and reports it to Stripe for metered billing.
  */
 
 import Bull from 'bull'
@@ -20,8 +20,17 @@ export const usageReportingQueue = new Bull('usage-reporting', REDIS_URL, {
   }
 })
 
+/** Map UsageType keys to the Stripe overage item keys from addOverageItems() */
+const USAGE_TO_STRIPE_KEY: Record<string, string> = {
+  VOICE_MINUTES: 'VOICE_MINUTES',
+  AI_ACTIONS: 'AI_ACTIONS',
+  SMS: 'SMS',
+  EMAILS: 'EMAILS',
+  SOCIAL_POSTS: 'SOCIAL_POSTS',
+  APOLLO_PROSPECTS: 'APOLLO_PROSPECTS'
+}
+
 usageReportingQueue.process(async () => {
-  // Find all active clients with Stripe subscriptions
   const clients = await prisma.client.findMany({
     where: { status: 'ACTIVE', stripeSubId: { not: null } },
     select: { id: true, plan: true, stripeSubId: true, stripeCustomerId: true }
@@ -35,46 +44,75 @@ usageReportingQueue.process(async () => {
     try {
       if (!client.stripeSubId) continue
 
-      // Get the subscription's billing period
-      const period = await stripeService.getSubscriptionPeriod(client.stripeSubId)
-      if (!period) continue
-
-      // Only report if the period has ended (or is about to end — within 1 hour)
-      const now = new Date()
-      const hourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
-      if (period.periodEnd > hourFromNow) continue
-
-      // Get the usage summary for this client
+      // Get usage summary for this client
       const summary = await getUsageSummary(client.id)
       if (!summary || summary.totalOverageCost <= 0) continue
 
-      // Report each overage to Stripe
-      // The overage subscription item IDs should be stored on the client
-      // For now, log what would be reported — actual Stripe item IDs need
-      // to be configured per client when overage metered prices are set up
-      logger.info('Usage overage detected', {
-        clientId: client.id,
-        plan: client.plan,
-        totalOverageCost: summary.totalOverageCost,
-        items: summary.items.filter(i => i.overage > 0).map(i => ({
-          type: i.type,
-          used: i.used,
-          limit: i.limit,
-          overage: i.overage,
-          cost: i.overageCost
-        }))
+      // Load the Stripe overage subscription item IDs for this client
+      const overageCred = await prisma.clientCredential.findFirst({
+        where: { clientId: client.id, service: 'stripe-overage-items' }
       })
+      if (!overageCred) {
+        logger.warn('No overage items configured for client — skipping Stripe reporting', { clientId: client.id })
 
-      // TODO: Once Stripe metered prices are created and item IDs are stored,
-      // uncomment this to actually report usage:
-      //
-      // for (const item of summary.items) {
-      //   if (item.overage <= 0) continue
-      //   const subItemId = clientOverageItems[item.type]
-      //   if (subItemId) {
-      //     await stripeService.reportOverageUsage(subItemId, item.overage)
-      //   }
-      // }
+        // Try to add overage items now (may have been missed during checkout)
+        try {
+          const overageItems = await stripeService.addOverageItems(client.stripeSubId)
+          if (Object.keys(overageItems).length > 0) {
+            await prisma.clientCredential.upsert({
+              where: { id: `stripe-overage-${client.id}` },
+              update: { credentials: JSON.stringify(overageItems) },
+              create: { id: `stripe-overage-${client.id}`, clientId: client.id, service: 'stripe-overage-items', credentials: JSON.stringify(overageItems) }
+            })
+            logger.info('Late-added overage items to subscription', { clientId: client.id })
+          }
+        } catch (addErr) {
+          logger.warn('Failed to late-add overage items', { clientId: client.id, err: String(addErr) })
+        }
+        continue
+      }
+
+      let overageItemMap: Record<string, string> = {}
+      try {
+        overageItemMap = JSON.parse(overageCred.credentials)
+      } catch {
+        logger.warn('Invalid overage items JSON', { clientId: client.id })
+        continue
+      }
+
+      // Report each overage to Stripe
+      let reported = 0
+      for (const item of summary.items) {
+        if (item.overage <= 0) continue
+
+        const stripeKey = USAGE_TO_STRIPE_KEY[item.type]
+        const subItemId = stripeKey ? overageItemMap[stripeKey] : undefined
+
+        if (!subItemId) {
+          logger.warn('No Stripe subscription item for usage type', { clientId: client.id, type: item.type })
+          continue
+        }
+
+        await stripeService.reportOverageUsage(subItemId, item.overage)
+        reported++
+
+        logger.info('Overage reported to Stripe', {
+          clientId: client.id,
+          type: item.type,
+          overage: item.overage,
+          cost: item.overageCost,
+          subItemId
+        })
+      }
+
+      if (reported > 0) {
+        logger.info('Usage overage reported', {
+          clientId: client.id,
+          plan: client.plan,
+          totalOverageCost: summary.totalOverageCost,
+          itemsReported: reported
+        })
+      }
 
     } catch (err) {
       logger.error('Usage reporting failed for client', { clientId: client.id, err: String(err) })

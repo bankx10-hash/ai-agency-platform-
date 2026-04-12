@@ -32,6 +32,7 @@ import { startSocialAnalyticsScheduler } from './queue/social-analytics.queue'
 import { startSocialCompetitorScheduler } from './queue/social-competitor.queue'
 import { startSocialNewsScheduler } from './queue/social-news.queue'
 import { startUsageReportingScheduler } from './queue/usage-reporting.queue'
+import { startServicePipelineScheduler } from './queue/service-pipeline.queue'
 import socialRouter from './routes/social'
 import { logger } from './utils/logger'
 
@@ -914,6 +915,7 @@ runStartupMigrations().then(() => {
     startSocialCompetitorScheduler()
     startSocialNewsScheduler()
     startUsageReportingScheduler()
+    startServicePipelineScheduler()
   })
 })
 

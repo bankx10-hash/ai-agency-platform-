@@ -7,6 +7,7 @@ import { logger } from '../utils/logger'
 import { decryptJSON } from '../utils/encrypt'
 import twilio from 'twilio'
 import { syncExistingContactToCrm } from '../services/contact.service'
+import { recordUsage } from '../services/usage.service'
 
 const router = Router()
 
