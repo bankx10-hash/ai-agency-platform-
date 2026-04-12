@@ -169,6 +169,8 @@ Shown in four places: onboarding connect page (before the deploy button, with pr
 - Voice agent prompts: behavioral preamble required so the agent doesn't read `[brackets]` or section headers aloud
 - Website lead capture must be configured during onboarding **before** agents deploy — the onboarding page shows 4 options (embed form / listener script / webhook URL / social bio page) above the deploy button with a pre-launch warning. All plans get this.
 - **Every billable action must be tracked** via `recordUsage()` from `usage.service.ts` — fire-and-forget (`.catch(() => {})`), never block the main action. Usage is never hard-capped — leads must never be lost. Track and bill overages at 1.5x premium via Stripe metered pricing. Dashboard at `/dashboard/usage` shows real-time usage vs plan limits.
+- **Dashboard nav filtering per plan** — controlled by `PLAN_HIDDEN_SECTIONS` map in `apps/portal/app/dashboard/layout.tsx`. AI_RECEPTIONIST hides Social/Marketing/Workflows/Voice-Outbound. STARTER hides Social/Marketing/Workflows. GROWTH hides Workflows. AGENCY sees everything. CRM pipeline page shows service stages for AI_RECEPTIONIST, sales stages for other plans. When adding new dashboard sections, add to the map.
+- **Outbound phone re-linking on redeploy** — `provisionOutboundPhoneNumber()` in `voice.service.ts` now re-imports/re-links the phone number to the new Retell agent when a credential already exists. Phone numbers are saved to `AgentDeployment.config.phone_number`.
 
 ## Environment Variables
 
