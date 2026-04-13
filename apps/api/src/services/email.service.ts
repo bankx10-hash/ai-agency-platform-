@@ -37,7 +37,8 @@ export class EmailService {
     to: string,
     subject: string,
     body: string,
-    credentials: EmailCredentials
+    credentials: EmailCredentials,
+    clientId?: string
   ): Promise<void> {
     const oauth2Client = this.getOAuth2Client()
 
@@ -47,6 +48,23 @@ export class EmailService {
     })
 
     const accessToken = await oauth2Client.getAccessToken()
+
+    // Save refreshed token back to DB so it stays fresh for next use
+    if (clientId && accessToken.token && accessToken.token !== credentials.accessToken) {
+      try {
+        const { prisma } = await import('../lib/prisma')
+        const { encryptJSON } = await import('../utils/encrypt')
+        const updatedCreds = { ...credentials, accessToken: accessToken.token }
+        const encrypted = encryptJSON(updatedCreds as unknown as Record<string, unknown>)
+        await prisma.clientCredential.updateMany({
+          where: { clientId, service: 'gmail' },
+          data: { credentials: encrypted }
+        })
+        logger.info('Gmail access token refreshed and saved', { clientId })
+      } catch (saveErr) {
+        logger.warn('Failed to save refreshed Gmail token (non-fatal)', { clientId, err: String(saveErr) })
+      }
+    }
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',

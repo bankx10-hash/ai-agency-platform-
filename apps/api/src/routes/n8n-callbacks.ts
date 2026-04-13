@@ -493,7 +493,7 @@ router.post('/:clientId/messages/email', async (req, res) => {
         try {
           const creds = decryptJSON<{ email: string; accessToken: string; refreshToken: string }>(gmailCred.credentials)
           if (creds.email && creds.refreshToken) {
-            await emailService.sendEmail(to, subject, emailBody, creds)
+            await emailService.sendEmail(to, subject, emailBody, creds, clientId)
             logger.info('N8N email sent via client Gmail', { clientId, to, subject, from: creds.email })
           } else {
             await emailService.sendSystemEmail(to, subject, emailBody)
