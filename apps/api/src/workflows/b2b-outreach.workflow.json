@@ -84,7 +84,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName }) }}",
+        "jsonBody": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName, _enriched: { firstName: $json.firstName, lastName: $json.lastName, title: $json.title, companyName: $json.companyName, industry: $json.industry, email: $json.email, phone: $json.phone, name: $json.name } }) }}",
         "contentType": "json",
         "options": {
           "batching": { "batch": { "batchSize": 1 } }
@@ -98,7 +98,7 @@
       "typeVersion": 2,
       "position": [1750, 300],
       "parameters": {
-        "jsCode": "const saved = $input.first().json;\nconst contactId = saved.id || saved.contactId || '';\nconst enriched = $('Enrich All Prospects').first().json;\nconst template = '{{AGENT_PROMPT}}';\nconst message = template\n  .replace(/\\{\\{firstName\\}\\}/g, enriched.firstName || '')\n  .replace(/\\{\\{title\\}\\}/g, enriched.title || '')\n  .replace(/\\{\\{companyName\\}\\}/g, enriched.companyName || '');\nreturn [{ json: { contactId, name: enriched.name, email: enriched.email, phone: enriched.phone, title: enriched.title, companyName: enriched.companyName, industry: enriched.industry, source: 'apollo', message, firstName: enriched.firstName } }];"
+        "jsCode": "const saved = $input.first().json;\nconst contactId = saved.id || saved.contactId || '';\nconst e = saved._enriched || saved;\nconst template = '{{AGENT_PROMPT}}';\nconst message = template\n  .replace(/\\{\\{firstName\\}\\}/g, e.firstName || '')\n  .replace(/\\{\\{title\\}\\}/g, e.title || '')\n  .replace(/\\{\\{companyName\\}\\}/g, e.companyName || '');\nreturn [{ json: { contactId, name: e.name, email: e.email, phone: e.phone, title: e.title, companyName: e.companyName, industry: e.industry, source: 'apollo', message, firstName: e.firstName } }];"
       }
     },
     {
