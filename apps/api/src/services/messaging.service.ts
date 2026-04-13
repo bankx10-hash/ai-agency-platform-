@@ -92,11 +92,11 @@ class MessagingService {
       }))
     }
 
-    const res = await axios.post(`${META_GRAPH_URL}/me/messages`, {
-      recipient: { id: recipientId },
-      message: messagePayload,
-      access_token: creds.accessToken.trim()
-    })
+    const res = await axios.post(
+      `${META_GRAPH_URL}/me/messages`,
+      { recipient: { id: recipientId }, message: messagePayload },
+      { headers: { Authorization: `Bearer ${creds.accessToken.trim()}` } }
+    )
 
     return { success: true, messageId: res.data?.message_id }
   }
@@ -107,12 +107,14 @@ class MessagingService {
     text: string,
     quickReplies?: string[]
   ): Promise<SendResult> {
-    // Instagram DMs use the same /me/messages endpoint as Facebook Messenger
-    // but with the Instagram-scoped page access token
+    // Instagram DMs use POST /{ig-user-id}/messages (NOT /me/messages)
     const igCreds = await this.getCredentials<InstagramCredentials>(clientId, 'instagram')
     const fbCreds = await this.getCredentials<FacebookCredentials>(clientId, 'facebook')
     const accessToken = igCreds?.pageAccessToken || igCreds?.accessToken || fbCreds?.accessToken
     if (!accessToken) return { success: false, error: 'No Instagram credentials found' }
+
+    const igUserId = igCreds?.igUserId
+    if (!igUserId) return { success: false, error: 'No Instagram user ID found — reconnect Instagram in Settings' }
 
     const messagePayload: Record<string, unknown> = { text }
     if (quickReplies?.length) {
@@ -123,11 +125,11 @@ class MessagingService {
       }))
     }
 
-    const res = await axios.post(`${META_GRAPH_URL}/me/messages`, {
-      recipient: { id: recipientId },
-      message: messagePayload,
-      access_token: accessToken.trim()
-    })
+    const res = await axios.post(
+      `${META_GRAPH_URL}/${igUserId}/messages`,
+      { recipient: { id: recipientId }, message: messagePayload },
+      { headers: { Authorization: `Bearer ${accessToken.trim()}` } }
+    )
 
     return { success: true, messageId: res.data?.message_id }
   }
