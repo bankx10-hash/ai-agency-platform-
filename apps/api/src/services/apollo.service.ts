@@ -135,8 +135,7 @@ class ApolloService {
   }): Promise<ApolloPerson | null> {
     try {
       const body: Record<string, unknown> = {
-        reveal_personal_emails: true,
-        reveal_phone_number: true
+        reveal_personal_emails: true
       }
 
       if (params.id) body.id = params.id
@@ -196,7 +195,6 @@ class ApolloService {
 
       const response = await this.client.post('/api/v1/people/bulk_match', {
         reveal_personal_emails: true,
-        reveal_phone_number: true,
         details
       }, { headers: this.authHeaders() })
 

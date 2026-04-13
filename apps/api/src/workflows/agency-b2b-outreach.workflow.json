@@ -74,7 +74,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ id: $json.apolloId, reveal_personal_emails: true, reveal_phone_number: true }) }}",
+        "jsonBody": "={{ JSON.stringify({ id: $json.apolloId, reveal_personal_emails: true }) }}",
         "contentType": "json"
       }
     },
