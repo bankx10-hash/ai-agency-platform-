@@ -500,7 +500,9 @@ router.post('/:clientId/messages/email', async (req, res) => {
             logger.info('N8N email sent via system (Gmail creds incomplete)', { clientId, to, subject })
           }
         } catch (gmailErr) {
-          logger.warn('Gmail send failed, falling back to system email', { clientId, err: String(gmailErr) })
+          const gmailErrMsg = gmailErr instanceof Error ? gmailErr.message : String(gmailErr)
+          const gmailErrStack = gmailErr instanceof Error ? gmailErr.stack?.split('\n')[1] : ''
+          logger.error('GMAIL SEND FAILED', { clientId, to, error: gmailErrMsg, stack: gmailErrStack })
           await emailService.sendSystemEmail(to, subject, emailBody)
           logger.info('N8N email sent via system (Gmail fallback)', { clientId, to, subject })
         }
