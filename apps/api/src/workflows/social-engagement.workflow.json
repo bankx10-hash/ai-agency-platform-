@@ -100,7 +100,7 @@
         },
         "sendBody": true,
         "specifyBody": "string",
-        "body": "={{ JSON.stringify({ type: $('Normalise Event').first().json.type, platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, reply: $('Analyse and Reply').first().json.reply, postId: $('Normalise Event').first().json.postId, commentId: $('Normalise Event').first().json.commentId }) }}",
+        "body": "={{ JSON.stringify({ type: $('Normalise Event').first().json.type, platform: $('Normalise Event').first().json.platform, senderId: $('Normalise Event').first().json.senderId, recipientId: $('Normalise Event').first().json.recipientId, reply: $('Analyse and Reply').first().json.reply, postId: $('Normalise Event').first().json.postId, commentId: $('Normalise Event').first().json.commentId }) }}",
         "contentType": "raw",
         "rawContentType": "application/json",
         "options": {}

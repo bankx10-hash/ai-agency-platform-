@@ -1288,12 +1288,14 @@ Return JSON only:
 
 // POST /:clientId/social/send-reply
 // Called by N8N after analysis. Routes the reply to the correct Meta Graph API endpoint.
+// Instagram DMs use a DIFFERENT endpoint than Facebook Messenger.
 router.post('/:clientId/social/send-reply', async (req, res) => {
   const { clientId } = req.params
-  const { type, platform, senderId, reply, postId, commentId } = req.body as {
+  const { type, platform, senderId, recipientId, reply, postId, commentId } = req.body as {
     type: string
     platform: string
     senderId: string
+    recipientId?: string
     reply: string
     postId?: string
     commentId?: string
@@ -1304,72 +1306,127 @@ router.post('/:clientId/social/send-reply', async (req, res) => {
   }
 
   try {
-    // Get the page access token for this client
-    // Instagram DMs use the Facebook Page access token (needs pages_messaging permission)
-    // Try instagram creds first, fall back to facebook creds, then env override
+    // Get the PAGE access token — required for both Facebook and Instagram
+    // Instagram DMs/comments use the connected Facebook Page's access token
+    // (the IG business account is linked to a FB Page)
     let accessToken: string | undefined
+    let igUserId: string | undefined
 
     if (process.env.META_PAGE_ACCESS_TOKEN) {
       accessToken = process.env.META_PAGE_ACCESS_TOKEN
-    } else {
-      // Try the platform-specific credential first
-      const primaryService = platform === 'instagram' ? 'instagram' : 'facebook'
-      const primaryCred = await prisma.clientCredential.findFirst({ where: { clientId, service: primaryService } })
-      if (primaryCred) {
-        const data = decryptJSON<Record<string, string>>(primaryCred.credentials)
+    }
+
+    // Try facebook creds first (has the page access token for both FB + IG)
+    if (!accessToken) {
+      const fbCred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'facebook' } })
+      if (fbCred) {
+        const data = decryptJSON<Record<string, string>>(fbCred.credentials)
         accessToken = data.pageAccessToken || data.accessToken
       }
+    }
 
-      // For Instagram DMs, fall back to the Facebook page token (it's the same page)
-      if (!accessToken && platform === 'instagram') {
-        const fbCred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'facebook' } })
-        if (fbCred) {
-          const data = decryptJSON<Record<string, string>>(fbCred.credentials)
-          accessToken = data.accessToken
-        }
+    // Try instagram creds (may have pageAccessToken + igUserId stored)
+    if (!accessToken) {
+      const igCred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'instagram' } })
+      if (igCred) {
+        const data = decryptJSON<Record<string, string>>(igCred.credentials)
+        accessToken = data.pageAccessToken || data.accessToken
+        igUserId = data.igUserId || data.instagramUserId
+      }
+    }
+
+    // Also try to get igUserId from instagram creds if we got token from facebook
+    if (accessToken && platform === 'instagram' && !igUserId) {
+      const igCred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'instagram' } })
+      if (igCred) {
+        try {
+          const data = decryptJSON<Record<string, string>>(igCred.credentials)
+          igUserId = data.igUserId || data.instagramUserId
+        } catch { /* ignore */ }
       }
     }
 
     if (!accessToken) {
+      logger.error('No Meta credentials found for social reply', { clientId, platform, type })
       return res.status(404).json({ error: `No ${platform} credentials found for client` })
     }
 
     let result: { success: boolean; id?: string; error?: string }
 
     if (type === 'dm') {
-      // Both Facebook Messenger and Instagram use /me/messages with access_token in body
-      const dmRes = await axios.post(
-        'https://graph.facebook.com/v19.0/me/messages',
-        {
-          recipient: { id: senderId },
-          message: { text: reply },
-          access_token: accessToken.trim()
-        },
-        { validateStatus: () => true }
-      )
-      result = dmRes.status < 300
-        ? { success: true, id: dmRes.data?.message_id }
-        : { success: false, error: JSON.stringify(dmRes.data) }
+      if (platform === 'instagram') {
+        // Instagram DMs use the Instagram Messaging API
+        // Endpoint: POST /{ig-user-id}/messages (NOT /me/messages)
+        // The recipientId from the webhook = the page's IG user ID
+        const igId = igUserId || recipientId
+        if (!igId) {
+          logger.error('Instagram DM reply failed: no IG user ID available', { clientId, senderId })
+          return res.status(400).json({ error: 'Instagram user ID not found — reconnect Instagram in Settings' })
+        }
+
+        const dmRes = await axios.post(
+          `https://graph.facebook.com/v19.0/${igId}/messages`,
+          {
+            recipient: { id: senderId },
+            message: { text: reply }
+          },
+          {
+            headers: { Authorization: `Bearer ${accessToken.trim()}` },
+            validateStatus: () => true
+          }
+        )
+        result = dmRes.status < 300
+          ? { success: true, id: dmRes.data?.message_id }
+          : { success: false, error: JSON.stringify(dmRes.data) }
+
+        if (!result.success) {
+          logger.error('Instagram DM send failed', { clientId, senderId, igId, status: dmRes.status, error: result.error })
+        }
+
+      } else {
+        // Facebook Messenger — uses /me/messages with page token
+        const dmRes = await axios.post(
+          'https://graph.facebook.com/v19.0/me/messages',
+          {
+            recipient: { id: senderId },
+            message: { text: reply }
+          },
+          {
+            headers: { Authorization: `Bearer ${accessToken.trim()}` },
+            validateStatus: () => true
+          }
+        )
+        result = dmRes.status < 300
+          ? { success: true, id: dmRes.data?.message_id }
+          : { success: false, error: JSON.stringify(dmRes.data) }
+
+        if (!result.success) {
+          logger.error('Facebook DM send failed', { clientId, senderId, status: dmRes.status, error: result.error })
+        }
+      }
 
     } else if (type === 'comment') {
-      // Reply to a comment on a Facebook post
+      // Reply to a comment — same endpoint for both Facebook and Instagram
       const targetId = commentId || postId
       if (!targetId) {
         return res.status(400).json({ error: 'commentId or postId required for comment replies' })
       }
 
-      const response = await fetch(
+      const commentRes = await axios.post(
         `https://graph.facebook.com/v19.0/${targetId}/comments`,
+        { message: reply },
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: reply, access_token: accessToken })
+          headers: { Authorization: `Bearer ${accessToken.trim()}` },
+          validateStatus: () => true
         }
       )
-      const data = await response.json() as Record<string, unknown>
-      result = response.ok
-        ? { success: true, id: data.id as string }
-        : { success: false, error: JSON.stringify(data) }
+      result = commentRes.status < 300
+        ? { success: true, id: commentRes.data?.id }
+        : { success: false, error: JSON.stringify(commentRes.data) }
+
+      if (!result.success) {
+        logger.error('Comment reply failed', { clientId, platform, targetId, status: commentRes.status, error: result.error })
+      }
 
     } else {
       return res.status(400).json({ error: `Unsupported reply type: ${type}` })

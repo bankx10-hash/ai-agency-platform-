@@ -294,6 +294,7 @@ async function handleEngagementDirectly(clientId: string, event: EngagementEvent
         type: event.type,
         platform: event.platform,
         senderId: event.senderId,
+        recipientId: event.recipientId,
         reply: analysis.reply,
         postId: event.postId,
         commentId: event.commentId
