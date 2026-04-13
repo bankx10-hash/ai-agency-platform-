@@ -83,9 +83,12 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName }) }}",
+        "contentType": "json",
+        "options": {
+          "batching": { "batch": { "batchSize": 1 } }
+        }
       }
     },
     {
@@ -110,14 +113,16 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({ contactId: $json.contactId, to: $json.email, subject: 'Quick question, ' + $json.firstName, body: $json.message }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, to: $json.email, subject: 'Quick question, ' + $json.firstName, body: $json.message }) }}",
+        "contentType": "json",
+        "options": {
+          "batching": { "batch": { "batchSize": 1 } }
+        }
       }
     },
     {
@@ -131,14 +136,15 @@
         "url": "={{ '{{N8N_BASE_URL}}/webhook/lead-gen-{{CLIENT_ID}}' }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
-          ]
+          "parameters": []
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({ contactId: $json.contactId, name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', title: $json.title, companyName: $json.companyName, industry: $json.industry }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', title: $json.title, companyName: $json.companyName, industry: $json.industry }) }}",
+        "contentType": "json",
+        "options": {
+          "batching": { "batch": { "batchSize": 1 } }
+        }
       }
     }
   ],
