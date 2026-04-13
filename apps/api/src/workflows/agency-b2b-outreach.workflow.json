@@ -67,84 +67,13 @@
       }
     },
     {
-      "id": "save-contact",
-      "name": "Save Contact to CRM",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1500, 300],
-      "parameters": {
-        "method": "POST",
-        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/contacts",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', tags: ['apollo-prospect', $json.industry || 'unknown'], summary: $json.title + ' at ' + $json.companyName, _enriched: { firstName: $json.firstName, lastName: $json.lastName, title: $json.title, companyName: $json.companyName, industry: $json.industry, email: $json.email, phone: $json.phone, name: $json.name } }) }}",
-        "contentType": "json",
-        "options": {
-          "batching": { "batch": { "batchSize": 1 } }
-        }
-      }
-    },
-    {
-      "id": "build-outreach",
-      "name": "Build Personalised Outreach",
+      "id": "process-contacts",
+      "name": "Save, Email and Score Each Contact",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1750, 300],
+      "position": [1500, 300],
       "parameters": {
-        "jsCode": "const saved = $input.first().json;\nconst contactId = saved.id || saved.contactId || '';\nconst e = saved._enriched || saved;\nconst template = '{{AGENT_PROMPT}}';\nconst message = template\n  .replace(/\\{\\{firstName\\}\\}/g, e.firstName || '')\n  .replace(/\\{\\{title\\}\\}/g, e.title || '')\n  .replace(/\\{\\{companyName\\}\\}/g, e.companyName || '');\nreturn [{ json: { contactId, name: e.name, email: e.email, phone: e.phone, title: e.title, companyName: e.companyName, industry: e.industry, source: 'apollo', message, firstName: e.firstName } }];"
-      }
-    },
-    {
-      "id": "send-outreach-email",
-      "name": "Send Outreach Email",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [2000, 200],
-      "parameters": {
-        "method": "POST",
-        "url": "{{API_BASE_URL}}/n8n/{{CLIENT_ID}}/messages/email",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-secret", "value": "{{N8N_API_SECRET}}" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, to: $json.email, subject: 'Quick question, ' + $json.firstName, body: $json.message }) }}",
-        "contentType": "json",
-        "options": {
-          "batching": { "batch": { "batchSize": 1 } }
-        }
-      }
-    },
-    {
-      "id": "forward-to-lead-gen",
-      "name": "Forward to Lead Scoring",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [2000, 400],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ '{{N8N_BASE_URL}}/webhook/lead-gen-{{CLIENT_ID}}' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": []
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, name: $json.name, email: $json.email, phone: $json.phone, source: 'apollo', title: $json.title, companyName: $json.companyName, industry: $json.industry }) }}",
-        "contentType": "json",
-        "options": {
-          "batching": { "batch": { "batchSize": 1 } }
-        }
+        "jsCode": "const apiBase = '{{API_BASE_URL}}';\nconst clientId = '{{CLIENT_ID}}';\nconst apiSecret = '{{N8N_API_SECRET}}';\nconst n8nBase = '{{N8N_BASE_URL}}';\nconst template = '{{AGENT_PROMPT}}';\nconst headers = { 'x-api-secret': apiSecret, 'Content-Type': 'application/json' };\nconst results = [];\n\nfor (const item of $input.all()) {\n  const c = item.json;\n  try {\n    // 1. Save to CRM\n    const saveRes = await this.helpers.httpRequest({\n      method: 'POST',\n      url: apiBase + '/n8n/' + clientId + '/contacts',\n      headers,\n      body: { name: c.name, email: c.email, phone: c.phone, source: 'apollo', tags: ['apollo-prospect', c.industry || 'unknown'], summary: (c.title || '') + ' at ' + (c.companyName || '') },\n      json: true\n    });\n    const contactId = saveRes.id || '';\n\n    // 2. Build personalised message\n    const message = template\n      .replace(/\\{\\{firstName\\}\\}/g, c.firstName || '')\n      .replace(/\\{\\{title\\}\\}/g, c.title || '')\n      .replace(/\\{\\{companyName\\}\\}/g, c.companyName || '');\n\n    // 3. Send outreach email\n    if (c.email) {\n      await this.helpers.httpRequest({\n        method: 'POST',\n        url: apiBase + '/n8n/' + clientId + '/messages/email',\n        headers,\n        body: { contactId, to: c.email, subject: 'Quick question, ' + (c.firstName || c.name || ''), body: message },\n        json: true\n      }).catch(() => {});\n    }\n\n    // 4. Forward to lead scoring\n    await this.helpers.httpRequest({\n      method: 'POST',\n      url: n8nBase + '/webhook/lead-gen-' + clientId,\n      headers: { 'Content-Type': 'application/json' },\n      body: { contactId, name: c.name, email: c.email, phone: c.phone, source: 'apollo', title: c.title, companyName: c.companyName, industry: c.industry },\n      json: true\n    }).catch(() => {});\n\n    results.push({ json: { contactId, name: c.name, email: c.email, status: 'processed' } });\n  } catch (e) {\n    results.push({ json: { name: c.name, email: c.email, status: 'failed', error: String(e).substring(0, 200) } });\n  }\n  // Rate limit: 1 second between contacts\n  await new Promise(r => setTimeout(r, 1000));\n}\nreturn results;"
       }
     }
   ],
@@ -162,16 +91,7 @@
       "main": [[{ "node": "Enrich All Prospects", "type": "main", "index": 0 }]]
     },
     "Enrich All Prospects": {
-      "main": [[{ "node": "Save Contact to CRM", "type": "main", "index": 0 }]]
-    },
-    "Save Contact to CRM": {
-      "main": [[{ "node": "Build Personalised Outreach", "type": "main", "index": 0 }]]
-    },
-    "Build Personalised Outreach": {
-      "main": [
-        [{ "node": "Send Outreach Email", "type": "main", "index": 0 },
-         { "node": "Forward to Lead Scoring", "type": "main", "index": 0 }]
-      ]
+      "main": [[{ "node": "Save, Email and Score Each Contact", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
