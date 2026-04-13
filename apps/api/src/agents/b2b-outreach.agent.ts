@@ -47,12 +47,15 @@ Daily limit: ${config.daily_limit || 25} prospects per day.`
 Target audience: ${titles.join(', ')} at companies with ${ranges.join(', ')} employees.
 The message should:
 - Be under 100 words
-- Reference their role/company naturally
+- Reference their role/company naturally using the placeholders below
 - Mention a specific pain point relevant to their industry
 - End with a soft CTA (question, not a hard sell)
-- Use {{firstName}}, {{title}}, {{companyName}} as placeholders
-Return ONLY the message text.`,
-      'You are an expert B2B outreach copywriter. Your messages get 30%+ reply rates because they feel personal, not templated.'
+- Sign off with "Best regards," followed by "${typedConfig.businessName} Team" on the next line
+- Use these exact placeholders (double curly braces): {{firstName}}, {{title}}, {{companyName}}
+- NEVER use [brackets] or [Your name] or any other placeholder format — only {{curlyBraces}}
+- NEVER include a subject line — only the email body
+Return ONLY the message text, nothing else.`,
+      'You are an expert B2B outreach copywriter. Your messages get 30%+ reply rates because they feel personal, not templated. Never use square brackets for placeholders.'
     )
 
     const workflowResult = await n8nService.deployWorkflow('b2b-outreach', {
