@@ -22,7 +22,7 @@
       "position": [250, 500],
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1" }]
+          "interval": [{ "field": "cronExpression", "expression": "0 1 * * 1" }]
         }
       }
     },
