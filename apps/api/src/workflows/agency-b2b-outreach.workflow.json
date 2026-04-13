@@ -36,15 +36,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
             { "name": "Cache-Control", "value": "no-cache" },
             { "name": "X-Api-Key", "value": "{{APOLLO_API_KEY}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "contentType": "raw",
-        "body": "={{ JSON.stringify($json) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "contentType": "json"
       }
     },
     {
@@ -69,15 +68,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
             { "name": "Cache-Control", "value": "no-cache" },
             { "name": "X-Api-Key", "value": "{{APOLLO_API_KEY}}" }
           ]
         },
         "sendBody": true,
-        "specifyBody": "string",
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({ id: $json.apolloId, reveal_personal_emails: true, reveal_phone_number: true }) }}"
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ id: $json.apolloId, reveal_personal_emails: true, reveal_phone_number: true }) }}",
+        "contentType": "json"
       }
     },
     {
