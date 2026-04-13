@@ -58,34 +58,12 @@
     },
     {
       "id": "enrich-prospect",
-      "name": "Apollo - Enrich Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1000, 300],
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.apollo.io/api/v1/people/match",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Cache-Control", "value": "no-cache" },
-            { "name": "X-Api-Key", "value": "{{APOLLO_API_KEY}}" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ id: $json.apolloId, reveal_personal_emails: true }) }}",
-        "contentType": "json"
-      }
-    },
-    {
-      "id": "extract-contact-info",
-      "name": "Extract Contact Info",
+      "name": "Enrich All Prospects",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300],
+      "position": [1000, 300],
       "parameters": {
-        "jsCode": "const p = $input.first().json.person;\nif (!p) return [];\nconst email = p.email || (p.personal_emails && p.personal_emails[0]) || '';\nconst phone = (p.phone_numbers && p.phone_numbers[0]?.sanitized_number) || '';\nif (!email && !phone) return [];\nreturn [{ json: {\n  apolloId: p.id,\n  firstName: p.first_name || '',\n  lastName: p.last_name || '',\n  name: p.name || '',\n  title: p.title || '',\n  email: email,\n  phone: phone,\n  companyName: p.organization?.name || '',\n  industry: p.organization?.industry || '',\n  employeeCount: p.organization?.estimated_num_employees || 0\n} }];"
+        "jsCode": "const axios = require('axios');\nconst apiKey = '{{APOLLO_API_KEY}}';\nconst results = [];\nfor (const item of $input.all()) {\n  try {\n    const res = await axios.post('https://api.apollo.io/api/v1/people/match', {\n      id: item.json.apolloId,\n      reveal_personal_emails: true\n    }, { headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' } });\n    const p = res.data.person;\n    if (!p) continue;\n    const email = p.email || (p.personal_emails && p.personal_emails[0]) || '';\n    if (!email) continue;\n    results.push({ json: {\n      apolloId: p.id,\n      firstName: p.first_name || '',\n      lastName: p.last_name || '',\n      name: p.name || '',\n      title: p.title || '',\n      email: email,\n      phone: (p.phone_numbers && p.phone_numbers[0]?.sanitized_number) || '',\n      companyName: p.organization?.name || '',\n      industry: p.organization?.industry || '',\n      employeeCount: p.organization?.estimated_num_employees || 0\n    } });\n  } catch (e) { /* skip failed enrichments */ }\n  await new Promise(r => setTimeout(r, 500));\n}\nreturn results;"
       }
     },
     {
@@ -175,12 +153,9 @@
       "main": [[{ "node": "Filter New Prospects", "type": "main", "index": 0 }]]
     },
     "Filter New Prospects": {
-      "main": [[{ "node": "Apollo - Enrich Contact", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Enrich All Prospects", "type": "main", "index": 0 }]]
     },
-    "Apollo - Enrich Contact": {
-      "main": [[{ "node": "Extract Contact Info", "type": "main", "index": 0 }]]
-    },
-    "Extract Contact Info": {
+    "Enrich All Prospects": {
       "main": [[{ "node": "Save Contact to CRM", "type": "main", "index": 0 }]]
     },
     "Save Contact to CRM": {
