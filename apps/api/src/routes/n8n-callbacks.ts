@@ -486,8 +486,28 @@ router.post('/:clientId/messages/email', async (req, res) => {
   const { to, subject, body: emailBody, contactId } = req.body
   try {
     if (to && subject && emailBody) {
-      await emailService.sendSystemEmail(to, subject, emailBody)
-      logger.info('N8N email sent', { clientId, to, subject })
+      // Try sending from client's Gmail first (appears in their sent folder)
+      // Fall back to system email (Resend) if Gmail not connected
+      const gmailCred = await prisma.clientCredential.findFirst({ where: { clientId, service: 'gmail' } })
+      if (gmailCred) {
+        try {
+          const creds = decryptJSON<{ email: string; accessToken: string; refreshToken: string }>(gmailCred.credentials)
+          if (creds.email && creds.refreshToken) {
+            await emailService.sendEmail(to, subject, emailBody, creds)
+            logger.info('N8N email sent via client Gmail', { clientId, to, subject, from: creds.email })
+          } else {
+            await emailService.sendSystemEmail(to, subject, emailBody)
+            logger.info('N8N email sent via system (Gmail creds incomplete)', { clientId, to, subject })
+          }
+        } catch (gmailErr) {
+          logger.warn('Gmail send failed, falling back to system email', { clientId, err: String(gmailErr) })
+          await emailService.sendSystemEmail(to, subject, emailBody)
+          logger.info('N8N email sent via system (Gmail fallback)', { clientId, to, subject })
+        }
+      } else {
+        await emailService.sendSystemEmail(to, subject, emailBody)
+        logger.info('N8N email sent via system (no Gmail)', { clientId, to, subject })
+      }
       recordUsage(clientId, 'EMAILS', 1, `email-${contactId || to}-${Date.now()}`, 'email').catch(() => {})
     }
     await updateAgentMetrics(clientId, 'APPOINTMENT_SETTER', {
